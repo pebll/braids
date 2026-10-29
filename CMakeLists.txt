@@ -181,9 +181,10 @@ endif()
 if (${CMAKE_SYSTEM_NAME} MATCHES "OpenBSD")
   set(HAS_WHATSAPP OFF)
   set(HAS_SIGNAL OFF)
+  set(HAS_MATRIX OFF)
   set(HAS_SHARED_LIBS OFF)
   set(HAS_DYNAMICLOAD OFF)
-  message(STATUS "Disabling WhatsApp, Signal, Shared libs, Dynamic load - OpenBSD restrictions")
+  message(STATUS "Disabling WhatsApp, Signal, Matrix, Shared libs, Dynamic load - OpenBSD restrictions")
 endif()
 
 # FreeBSD restrictions - Go supports c-archive / c-shared build modes only on
@@ -191,7 +192,8 @@ endif()
 if (${CMAKE_SYSTEM_NAME} MATCHES "FreeBSD" AND NOT ${CMAKE_SYSTEM_PROCESSOR} MATCHES "amd64|x86_64")
   set(HAS_WHATSAPP OFF)
   set(HAS_SIGNAL OFF)
-  message(STATUS "Disabling WhatsApp, Signal - FreeBSD ${CMAKE_SYSTEM_PROCESSOR} restrictions")
+  set(HAS_MATRIX OFF)
+  message(STATUS "Disabling WhatsApp, Signal, Matrix - FreeBSD ${CMAKE_SYSTEM_PROCESSOR} restrictions")
 endif()
 
 # Config - Static linking of external library dependencies
@@ -231,6 +233,10 @@ message(STATUS "WhatsApp: ${HAS_WHATSAPP}")
 option(HAS_SIGNAL "Signal" OFF)
 message(STATUS "Signal: ${HAS_SIGNAL}")
 
+# Optional component - Matrix
+option(HAS_MATRIX "Matrix" OFF)
+message(STATUS "Matrix: ${HAS_MATRIX}")
+
 # musl restrictions - Go c-archives built with a stock Go toolchain segfault
 # at startup on musl (nchat issue #204 / Go PR #69325), so on musl WhatsApp and
 # Signal (both Go/cgo) require a patched Go toolchain, asserted via
@@ -247,6 +253,10 @@ if (TARGET_TRIPLE MATCHES "musl")
   if (HAS_SIGNAL AND NOT HAS_MUSL_GO_PATCHED)
     set(HAS_SIGNAL OFF)
     message(STATUS "Signal: ${HAS_SIGNAL} (Forced - musl needs a Go toolchain patched with Go PR #69325, then pass -DHAS_MUSL_GO_PATCHED=ON; see doc/MUSLGO.md)")
+  endif()
+  if (HAS_MATRIX AND NOT HAS_MUSL_GO_PATCHED)
+    set(HAS_MATRIX OFF)
+    message(STATUS "Matrix: ${HAS_MATRIX} (Forced - musl needs a Go toolchain patched with Go PR #69325, then pass -DHAS_MUSL_GO_PATCHED=ON; see doc/MUSLGO.md)")
   endif()
 endif()
 
@@ -287,11 +297,18 @@ else()
 endif()
 message(STATUS "Combined Go library: ${HAS_COMBINED_GOLIB}")
 
+# Matrix has its own Go c-archive, which cannot be linked into one executable
+# together with another Go c-archive (see above). Not yet part of lib/gostat.
+if(HAS_MATRIX AND (HAS_WHATSAPP OR HAS_SIGNAL) AND HAS_STATICGOLIB AND NOT HAS_SHARED_LIBS)
+  message(FATAL_ERROR "Matrix cannot be combined with WhatsApp/Signal in a fully static build "
+                      "(HAS_SHARED_LIBS=OFF), use shared libs or disable one of them")
+endif()
+
 # Check Golang version for whatsmeow minimum requirement
 set(GO_VERSION_MIN 1.23)
 execute_process(COMMAND bash "-c" "go version 2> /dev/null | cut -c14- | cut -d' ' -f1 | tr -d '\n'" OUTPUT_VARIABLE GO_VERSION)
-if((HAS_WHATSAPP OR HAS_SIGNAL) AND (NOT GO_VERSION VERSION_GREATER_EQUAL GO_VERSION_MIN))
-  message(FATAL_ERROR "Go version ${GO_VERSION} (need >= ${GO_VERSION_MIN} to build WhatsApp or Signal)")
+if((HAS_WHATSAPP OR HAS_SIGNAL OR HAS_MATRIX) AND (NOT GO_VERSION VERSION_GREATER_EQUAL GO_VERSION_MIN))
+  message(FATAL_ERROR "Go version ${GO_VERSION} (need >= ${GO_VERSION_MIN} to build WhatsApp, Signal or Matrix)")
 endif()
 
 # Check Little/Big Endian for tdlib requirement
@@ -499,6 +516,9 @@ endif()
 if(HAS_SIGNAL)
   add_subdirectory(lib/sgchat)
 endif()
+if(HAS_MATRIX)
+  add_subdirectory(lib/mxchat)
+endif()
 
 # Dependency ncurses
 if (${CMAKE_SYSTEM_NAME} MATCHES "OpenBSD")
@@ -559,6 +579,14 @@ if(HAS_SIGNAL)
   endif()
 endif()
 
+if(HAS_MATRIX)
+  target_include_directories(nchat PRIVATE "lib/mxchat/src")
+  target_compile_definitions(nchat PRIVATE HAS_MATRIX="${HAS_MATRIX}")
+  if(NOT HAS_DYNAMICLOAD)
+    target_link_libraries(nchat PUBLIC mxchat)
+  endif()
+endif()
+
 # Features
 if(HAS_MULTIPROTOCOL)
   target_compile_definitions(nchat PRIVATE HAS_MULTIPROTOCOL="${HAS_MULTIPROTOCOL}")
@@ -616,6 +644,9 @@ if(HAS_WHATSAPP)
 endif()
 if(HAS_SIGNAL)
   list(APPEND TPL_FRAGMENTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/sgchat/THIRD_PARTY_LICENSES")
+endif()
+if(HAS_MATRIX)
+  list(APPEND TPL_FRAGMENTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/mxchat/THIRD_PARTY_LICENSES")
 endif()
 if(HAS_STATIC_EXTLIBS)
   list(APPEND TPL_FRAGMENTS "${CMAKE_CURRENT_SOURCE_DIR}/utils/dist/THIRD_PARTY_LICENSES.static")
