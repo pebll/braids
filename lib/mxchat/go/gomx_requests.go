@@ -100,13 +100,18 @@ func mentionsToMarkdown(text string, mentionsJson string) (string, []id.UserID) 
 			continue
 		}
 
-		display := strings.TrimPrefix(name, "@")
-		needle := "@" + display
-		if !strings.Contains(text, needle) {
+		// ui inserts @[Name With Spaces] (mentions_quoted) or @Name
+		link := format.MarkdownMentionWithName(name, userID)
+		bracketPattern := "@[" + name + "]"
+		atPattern := "@" + name
+		if strings.Contains(text, bracketPattern) {
+			text = strings.ReplaceAll(text, bracketPattern, link)
+		} else if strings.Contains(text, atPattern) {
+			text = strings.ReplaceAll(text, atPattern, link)
+		} else {
 			continue
 		}
 
-		text = strings.ReplaceAll(text, needle, format.MarkdownMentionWithName(display, userID))
 		userIDs = append(userIDs, userID)
 	}
 
@@ -224,9 +229,11 @@ func MxSendMessage(connId int, chatId string, text string, quotedId string, file
 		return -1
 	}
 
-	conn.mu.Lock()
-	conn.sentEvents[resp.EventID] = true
-	conn.mu.Unlock()
+	if filePath != "" {
+		conn.mu.Lock()
+		conn.sentFiles[resp.EventID] = filePath
+		conn.mu.Unlock()
+	}
 	LOG_DEBUG(fmt.Sprintf("sent %s", resp.EventID))
 	return 0
 }

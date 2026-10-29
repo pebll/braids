@@ -83,6 +83,11 @@ var htmlParser = &format.HTMLParser{
 				name = id.UserID(mxid).Localpart()
 			}
 
+			if strings.Contains(name, " ") {
+				// same format as nchat mention insertion (mentions_quoted)
+				return "@[" + name + "]"
+			}
+
 			return "@" + name
 		}
 
@@ -244,7 +249,12 @@ func (conn *MxConn) fileInfoFor(evt *event.Event, content *event.MessageEventCon
 	}
 
 	ext = strings.TrimPrefix(unsafeFileChars.ReplaceAllString(ext, ""), ".")
-	targetPath := fmt.Sprintf("%s/%s_%s", tmpPath(conn.path), base, evtPart)
+	// per-event dir keeps the original file name (shown in ui) and avoids collisions
+	if base == "" {
+		base = "file"
+	}
+
+	targetPath := fmt.Sprintf("%s/%s/%s", tmpPath(conn.path), evtPart, base)
 	if ext != "" {
 		targetPath += "." + ext
 	}
@@ -341,6 +351,16 @@ func (conn *MxConn) messageEvent(ctx context.Context, evt *event.Event, mode int
 	}
 
 	fileId, filePath, fileStatus := conn.fileInfoFor(evt, content)
+	if fromMe && fileId != "" {
+		// own attachment sent from this device: refer to the local file
+		conn.mu.Lock()
+		localPath, ok := conn.sentFiles[evt.ID]
+		conn.mu.Unlock()
+		if ok {
+			filePath = localPath
+			fileStatus = FileStatusDownloaded
+		}
+	}
 	quotedId := string(content.RelatesTo.GetReplyTo())
 	text := conn.renderContent(ctx, evt.RoomID, evt.Sender, content)
 

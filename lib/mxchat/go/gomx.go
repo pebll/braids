@@ -125,15 +125,15 @@ type MxConn struct {
 	state      *PersistState
 	stateDirty bool
 
-	directs    map[id.RoomID]id.UserID
-	pushRules  *pushrules.PushRuleset
-	typing     map[id.RoomID]map[id.UserID]bool
-	decrypted  map[id.EventID]*event.Event
-	utdShown   map[id.EventID]bool
-	ownMsgs    map[id.RoomID][]OwnMsg
-	contacts   map[string]string
-	requested  map[id.SessionID]bool
-	sentEvents map[id.EventID]bool
+	directs   map[id.RoomID]id.UserID
+	pushRules *pushrules.PushRuleset
+	typing    map[id.RoomID]map[id.UserID]bool
+	decrypted map[id.EventID]*event.Event
+	utdShown  map[id.EventID]bool
+	ownMsgs   map[id.RoomID][]OwnMsg
+	contacts  map[string]string
+	requested map[id.SessionID]bool
+	sentFiles map[id.EventID]string
 
 	reactionQueue []queuedReaction
 
@@ -185,17 +185,17 @@ func MxGetVersion() string {
 
 func MxInit(path string) int {
 	conn := &MxConn{
-		connId:     -1,
-		path:       path,
-		ready:      make(chan struct{}),
-		directs:    make(map[id.RoomID]id.UserID),
-		typing:     make(map[id.RoomID]map[id.UserID]bool),
-		decrypted:  make(map[id.EventID]*event.Event),
-		utdShown:   make(map[id.EventID]bool),
-		ownMsgs:    make(map[id.RoomID][]OwnMsg),
-		contacts:   make(map[string]string),
-		requested:  make(map[id.SessionID]bool),
-		sentEvents: make(map[id.EventID]bool),
+		connId:    -1,
+		path:      path,
+		ready:     make(chan struct{}),
+		directs:   make(map[id.RoomID]id.UserID),
+		typing:    make(map[id.RoomID]map[id.UserID]bool),
+		decrypted: make(map[id.EventID]*event.Event),
+		utdShown:  make(map[id.EventID]bool),
+		ownMsgs:   make(map[id.RoomID][]OwnMsg),
+		contacts:  make(map[string]string),
+		requested: make(map[id.SessionID]bool),
+		sentFiles: make(map[id.EventID]string),
 	}
 
 	_ = os.MkdirAll(path, 0700)
