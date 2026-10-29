@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/event"
@@ -359,6 +360,7 @@ func (conn *MxConn) handleJoinedRoom(ctx context.Context, roomID id.RoomID, room
 	initial bool) {
 	conn.mu.Lock()
 	ri := conn.getRoom(roomID)
+	wasInvite := ri.IsInvite
 	ri.IsInvite = false
 	ri.Inviter = ""
 	prevPinned := ri.Pinned
@@ -476,6 +478,11 @@ func (conn *MxConn) handleJoinedRoom(ctx context.Context, roomID id.RoomID, room
 		CMxUpdatePinNotify(conn.connId, string(roomID), BoolToInt(pinned), lastTs)
 	}
 
+	if wasInvite {
+		// invite accepted (from another client), remove local invite message
+		CMxDeleteMessageNotify(conn.connId, string(roomID), "invite:"+string(roomID), 1)
+	}
+
 	// sender names
 	for _, msg := range msgs {
 		if msg.SenderID != "" {
@@ -518,8 +525,13 @@ func (conn *MxConn) handleInvitedRoom(roomID id.RoomID, room *mautrix.SyncInvite
 		}
 	}
 
+	if inviteTs == 0 {
+		// stripped invite state has no timestamps
+		inviteTs = time.Now().UnixMilli()
+	}
+
 	conn.mu.Lock()
-	if inviteTs > ri.LastTs {
+	if ri.LastTs == 0 {
 		ri.LastTs = inviteTs
 	}
 	lastTs := ri.LastTs
