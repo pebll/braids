@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+
+# mautrix-update
+#
+# Copyright (c) 2026 nchat contributors
+# All rights reserved.
+#
+# mautrix-update is distributed under the MIT license.
+#
+# Update the mautrix-go dependency of the Matrix protocol (lib/mxchat). Unlike
+# whatsmeow and signal, mautrix-go is not vendored or patched, it is a pinned Go
+# module dependency.
+
+MODULE="maunium.net/go/mautrix"
+GODIRS="lib/mxchat/go lib/mxchat/test/peer"
+VERSIONFILE="lib/mxchat/go/gomx.go"
+
+if [[ "${1}" == "-h" ]]; then
+  echo "usage: ./utils/mautrix-update [version]"
+  echo ""
+  echo "version defaults to latest, ex: v0.32.0"
+  exit 0
+fi
+
+exiterr()
+{
+  >&2 echo "${1}"
+  exit 1
+}
+
+REPOROOT="$(git rev-parse --show-toplevel)"
+if [[ "${REPOROOT}" == "" ]]; then
+  exit 1
+fi
+
+cd "${REPOROOT}" || exiterr "cd failed"
+
+VERSION="${1:-latest}"
+OLDVERSION="$(grep "^require ${MODULE} \|	${MODULE} " lib/mxchat/go/go.mod | awk '{print $NF}' | head -1)"
+
+# Update module in all mxchat go dirs
+for GODIR in ${GODIRS}; do
+  echo "Update ${GODIR}"
+  pushd "${GODIR}" > /dev/null || exiterr "pushd failed"
+  go get "${MODULE}@${VERSION}" || exiterr "go get failed"
+  go mod tidy || exiterr "go mod tidy failed"
+  popd > /dev/null || exiterr "popd failed"
+done
+
+NEWVERSION="$(grep "^require ${MODULE} \|	${MODULE} " lib/mxchat/go/go.mod | awk '{print $NF}' | head -1)"
+[[ "${NEWVERSION}" != "" ]] || exiterr "could not determine new version"
+
+# Update version string reported in logs
+sed -i.bak -e "s/^var mautrixVersion = \".*\"/var mautrixVersion = \"${NEWVERSION}\"/" "${VERSIONFILE}" && \
+  rm -f "${VERSIONFILE}.bak" || exiterr "version update failed"
+
+# Build check
+echo "Build check"
+pushd lib/mxchat/go > /dev/null || exiterr "pushd failed"
+go vet -tags goolm ./... || exiterr "go vet failed"
+popd > /dev/null || exiterr "popd failed"
+
+# Signal (mautrix-signal) also depends on mautrix-go; a mismatch is harmless for
+# the default shared library build, but notify for awareness.
+SGVERSION="$(grep "	${MODULE} " lib/sgchat/go/ext/signal/go.mod 2> /dev/null | awk '{print $2}' | head -1)"
+if [[ "${SGVERSION}" != "" ]] && [[ "${SGVERSION}" != "${NEWVERSION}" ]]; then
+  echo "Note: mautrix-signal uses ${MODULE} ${SGVERSION}, mxchat now uses ${NEWVERSION}"
+fi
+
+echo "Updated ${MODULE} ${OLDVERSION} -> ${NEWVERSION}"
+echo "Review the mautrix-go CHANGELOG for API changes, rebuild and run the"
+echo "manual test checklist in lib/mxchat/README.md."
+exit 0

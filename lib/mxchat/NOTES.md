@@ -63,8 +63,8 @@ exit:          Logout(); CloseProfile()
 - **Static builds**: two Go c-archives cannot both link into one executable (duplicate Go
   runtime and go-sqlite3 symbols). Upstream solves this for WhatsApp+Signal with
   `lib/gostat` (one combined module). Matrix in a fully static build (`HAS_SHARED_LIBS=OFF`)
-  together with WhatsApp/Signal would need to be added to gostat. Phase 1 will refuse that
-  combination in CMake; the default shared-lib build is unaffected.
+  together with WhatsApp/Signal would need to be added to gostat. mxchat's CMake setup refuses that
+  combination; the default shared-lib build is unaffected.
 - The Go toolchain: upstream go.mod files say `go 1.26.0`; the container has 1.24.7, with
   `GOTOOLCHAIN=auto` to fetch newer. mautrix-signal pins `maunium.net/go/mautrix v0.32.0`
   (current latest), so mxchat pins the same version to keep a future combined build consistent.
@@ -121,24 +121,55 @@ Message conventions (from wmchat):
   `false` because they receive all history by push. **Matrix should use `true`**: after a
   restart, `/sync` with a stored token may report `limited` timelines, leaving gaps. The cache
   then falls back to us for those ranges, and we backfill via `/messages`.
-- Backfill: for `GetMessages(fromMsgId)` on a cache miss, call `/rooms/{id}/messages?dir=b`
-  starting from a stored pagination token for that event. Plan: keep `eventId -> prev_batch`
-  (the token of the batch the event came in) in the Go store. For `fromMsgId=""`, use the
-  room's latest `prev_batch` from sync. Use `/context/{eventId}` when no token is known.
+- Backfill: for `GetMessages(fromMsgId)` on a cache miss, mxchat calls
+  `/context/{fromMsgId}` to get the pagination token before that event, then
+  `/messages?dir=b` (from latest when `fromMsgId` is empty). See section 5.
 
-## 5. Mapping decisions taken for Matrix (to confirm in phase 2)
+## 5. Decisions and deviations from the original plan
 
 - chatId = room id (`!abc:server`), msgId = event id (`$...`), userId = mxid.
-- Invites: shown as a chat named `[Invite] <room name>` with no messages. They are **not**
-  auto-accepted. Accepting is a later feature; for now they are just visible.
-- DM detection: `m.direct` account data, else a room with 2 joined members and no name.
+- Invites: shown as a chat `[Invite] <name>` with a local info message (id
+  `invite:<roomid>`), never auto-accepted; accepting/declining is done from
+  another client. The info message is removed once the room is joined.
+- DM detection: `m.direct` account data, else an unnamed room with 2 members.
+- History: no stored pagination tokens; `/context/{event}` gives the token
+  before `fromMsgId`, then `/messages?dir=b`. Edits in backfill are taken from
+  the server-bundled latest edit (`unsigned.m.relations.m.replace`).
+- Message batches: Go emits messages with a batch flag and then
+  `MxNewMessagesBatchDone`, so a sync/backfill page reaches MessageCache as one
+  `NewMessagesNotify` (needed for `checkSequence` gap detection).
+- Edit feature flag: the UI only allows editing with
+  `FeatureEditMessagesWithinTwoDays` / `...FifteenMins`; Matrix has no limit,
+  mxchat sets TwoDays. A `FeatureEditMessagesAnytime` would need a protocol.h
+  change.
+- `Logout()` in nchat is called on every exit, so it only stops the sync loop;
+  the access token is kept. Token invalidation on `nchat --remove` is not
+  possible (no protocol callback); doc/MATRIX.md tells users to remove the
+  device from another client.
+- Recovery key "command": nchat has no protocol-specific command mechanism, so
+  the recovery prompt is shown at setup and at startup (via
+  ProtocolUiControl) while the device is unverified or backup is not enabled;
+  `never` disables it (`recovery_prompt=0` in `matrix.conf`).
+- mautrix-go has no automatic upload of new room keys to key backup; mxchat
+  does it on `OlmMachine.SessionReceived` (skipping keys imported from backup).
+- Fatal errors (revoked token, crypto init failure) are shown on the terminal
+  via ProtocolUiControl until acknowledged.
+- SAS (emoji) verification not implemented; the recovery-key path covers
+  verification and history.
+- Mentions: nchat inserts `@Name` / `@[Name With Spaces]`; mxchat converts
+  both to matrix.to pills plus `m.mentions`, and renders received pills back
+  in the same form.
+- Static builds: Matrix is not part of `lib/gostat`; CMake refuses
+  `HAS_SHARED_LIBS=OFF` with Matrix plus WhatsApp/Signal.
 
 ## 6. Test environment
 
-- Local Synapse in Docker (server name `localhost`, `http://localhost:8008`, `.well-known`
-  served). Accounts `@alice:localhost` and `@bob:localhost`. Reproduce with
+- Local Synapse in Docker (server name `localhost`, `http://localhost:8008`,
+  `.well-known` served). Accounts `@alice:localhost`, `@bob:localhost`
+  (create more with `register_new_matrix_user`). Reproduce with
   `lib/mxchat/test/homeserver.sh`.
-- Element Web is not usable headless in the agent container. The "other side" is a scripted
-  mautrix-go peer (`lib/mxchat/test/peer`) that can send, edit, react, redact, and later
-  encrypt. Element remains the manual interop check against a real server (see the README
-  checklist, phase 5).
+- Element Web is not usable headless in the agent container. The "other side"
+  is the scripted mautrix-go peer (`lib/mxchat/test/peer`), which can send,
+  edit, react, redact, send files, and bootstrap cross-signing + key backup
+  like Element. Element remains the manual interop check against a real
+  server (see the checklist in README.md).

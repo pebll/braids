@@ -602,21 +602,36 @@ func MxCreateChat(connId int, userId string) int {
 	}
 	conn.mu.Unlock()
 
+	// chat with self (nchat "Saved Messages"): a private room without invitees
+	isSelf := (userID == conn.session.UserID)
+
 	go func() {
 		ctx, cancel := conn.requestContext()
 		defer cancel()
-		resp, err := conn.client.CreateRoom(ctx, &mautrix.ReqCreateRoom{
+		req := &mautrix.ReqCreateRoom{
 			Preset:   "trusted_private_chat",
-			IsDirect: true,
-			Invite:   []id.UserID{userID},
+			IsDirect: !isSelf,
 			InitialState: []*event.Event{{
 				Type:    event.StateEncryption,
 				Content: event.Content{Parsed: &event.EncryptionEventContent{Algorithm: id.AlgorithmMegolmV1}},
 			}},
-		})
+		}
+		if isSelf {
+			req.Name = "Saved Messages"
+		} else {
+			req.Invite = []id.UserID{userID}
+		}
+
+		resp, err := conn.client.CreateRoom(ctx, req)
 		if err != nil {
 			LOG_WARNING(fmt.Sprintf("create room failed: %v", err))
 			CMxCreateChatNotify(conn.connId, "", 0)
+			return
+		}
+
+		if isSelf {
+			conn.updateContact(string(resp.RoomID), req.Name)
+			CMxCreateChatNotify(conn.connId, string(resp.RoomID), 1)
 			return
 		}
 

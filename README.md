@@ -251,9 +251,10 @@ By default nchat requires ~3.5GB RAM to build using G++ and ~1.5GB RAM with
 clang++, but it is possible to reduce the memory needed,
 see [Building on Low Memory Systems](/doc/LOWMEMORY.md).
 
-When building from source, all features except Signal support are enabled by
-default. To enable Signal, see [Signal](/doc/SIGNAL.md); for other feature
-flags, see [Feature Flags](/doc/FLAGS.md).
+When building from source, all features except Signal and Matrix support are
+enabled by default. To enable Signal, see [Signal](/doc/SIGNAL.md); to enable
+Matrix (experimental), see [Matrix](/doc/MATRIX.md); for other feature flags,
+see [Feature Flags](/doc/FLAGS.md).
 
 
 Getting Started

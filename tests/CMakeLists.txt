@@ -33,3 +33,11 @@ endmacro()
 # Unit tests
 add_unit_test(test001)
 add_unit_test(test002)
+
+# Go unit tests for the Matrix protocol
+if(HAS_MATRIX)
+  add_test(NAME mxchat_go
+           COMMAND go test -tags goolm -modcacherw -buildvcs=false ./...
+           WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../lib/mxchat/go)
+  set_tests_properties(mxchat_go PROPERTIES TIMEOUT 600)
+endif()

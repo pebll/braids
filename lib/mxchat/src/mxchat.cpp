@@ -754,12 +754,29 @@ void MxChat::ReportError(const std::string& p_Message)
   if (m_IsSetup)
   {
     std::cout << p_Message << "\n";
+    return;
   }
-  else
+
+  // wait for ui to be set up
+  for (int i = 0; (i < 100) && !m_MessageHandler; ++i)
   {
-    // shown when nchat exits
-    std::cerr << "matrix: " << p_Message << "\n";
+    TimeUtil::Sleep(0.100);
   }
+
+  if (!m_MessageHandler)
+  {
+    std::cerr << "matrix: " << p_Message << "\n";
+    return;
+  }
+
+  // fatal errors only: show on terminal until acknowledged
+  std::unique_lock<std::mutex> lock(m_RecoveryMutex);
+  SetProtocolUiControl(true);
+  std::cout << "\nMatrix " << GetSelfId() << " error:\n" << p_Message << "\n\nPress ENTER to continue.";
+  std::cout.flush();
+  std::string line;
+  std::getline(std::cin, line);
+  SetProtocolUiControl(false);
 }
 
 void MxChat::SetStatus(int p_Flags)

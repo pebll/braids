@@ -31,6 +31,8 @@ The protocols supported by nchat is controlled by the following cmake flags:
     HAS_DUMMY=ON
     HAS_TELEGRAM=ON
     HAS_WHATSAPP=ON
+    HAS_SIGNAL=OFF
+    HAS_MATRIX=OFF
 
 It is possible to enable / disable protocols by passing one or multiple flags
 to cmake:
