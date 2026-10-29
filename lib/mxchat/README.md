@@ -78,6 +78,10 @@ Setup and session
 - [x] Restart reconnects without login, no new device created
 - [x] Invalid/revoked token: clear error shown, status offline
 - [x] Network loss: status Connecting, recovers when server returns
+- [x] Start while server is down: chats (named) from cache, history loads
+      once connected
+- [x] Shared-lib build with WhatsApp + Matrix: both Go runtimes in one
+      process, Matrix syncs while WhatsApp shows QR, clean exit
 - [ ] `.well-known` discovery against a real server (code path from mautrix)
 
 Unencrypted rooms

@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 	"sync"
@@ -563,6 +564,26 @@ func MxWaitReady(connId int, timeoutSec int) int {
 	}
 }
 
+// waitReady blocks until crypto is initialized, the connection stops or the
+// timeout expires.
+func (conn *MxConn) waitReady(timeout time.Duration) bool {
+	conn.mu.Lock()
+	ctx := conn.ctx
+	conn.mu.Unlock()
+	if ctx == nil {
+		return conn.isReady()
+	}
+
+	select {
+	case <-conn.ready:
+		return true
+	case <-ctx.Done():
+		return false
+	case <-time.After(timeout):
+		return false
+	}
+}
+
 func (conn *MxConn) isReady() bool {
 	select {
 	case <-conn.ready:
@@ -615,6 +636,9 @@ func (conn *MxConn) run(pickleKey []byte) {
 	conn.crypto = helper
 	conn.mu.Unlock()
 
+	// names known from previous runs, so chats are named also when offline
+	conn.sendAllContacts()
+
 	// crypto init needs the network (device key check); retry with backoff
 	CMxSetStatus(conn.connId, FlagConnecting)
 	for attempt := 0; ; attempt++ {
@@ -634,16 +658,14 @@ func (conn *MxConn) run(pickleKey []byte) {
 			return
 		}
 
-		var httpErr mautrix.HTTPError
-		if !errors.As(err, &httpErr) || httpErr.IsStatus(0) {
-			// network error, retry
-			LOG_WARNING(fmt.Sprintf("crypto init failed (attempt %d): %v", attempt+1, err))
-		} else if httpErr.Response != nil && httpErr.Response.StatusCode >= 500 {
-			LOG_WARNING(fmt.Sprintf("crypto init failed (attempt %d): %v", attempt+1, err))
-		} else {
+		if !isTransientError(err) {
 			CMxClearStatus(conn.connId, FlagConnecting)
 			CMxReportError(conn.connId, fmt.Sprintf("crypto init failed: %v", err))
 			return
+		}
+
+		if attempt == 0 {
+			LOG_WARNING(fmt.Sprintf("crypto init failed, retrying: %v", err))
 		}
 
 		select {
@@ -689,6 +711,22 @@ func (conn *MxConn) run(pickleKey []byte) {
 
 	CMxClearStatus(conn.connId, FlagConnecting|FlagSyncing|FlagOnline)
 	conn.saveState(false)
+}
+
+// isTransientError returns true for network errors (no response), server
+// errors and rate limiting, which are retried. Other errors are fatal.
+func isTransientError(err error) bool {
+	var httpErr mautrix.HTTPError
+	if !errors.As(err, &httpErr) {
+		return false
+	}
+
+	if httpErr.Response == nil {
+		return true
+	}
+
+	code := httpErr.Response.StatusCode
+	return (code >= 500) || (code == http.StatusTooManyRequests)
 }
 
 func (conn *MxConn) reportTokenInvalid() {

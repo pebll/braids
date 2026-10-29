@@ -387,7 +387,7 @@ func MxSendStatus(connId int, isOnline int) int {
 
 func MxGetStatus(connId int, userId string) int {
 	conn := GetConn(connId)
-	if conn == nil || !conn.isReady() {
+	if conn == nil {
 		return -1
 	}
 
@@ -409,6 +409,10 @@ func MxGetStatus(connId int, userId string) int {
 	}
 
 	go func() {
+		if !conn.waitReady(time.Minute) {
+			return
+		}
+
 		ctx, cancel := conn.requestContext()
 		defer cancel()
 		resp, err := conn.client.GetPresence(ctx, userID)
@@ -476,11 +480,16 @@ func MxSendReaction(connId int, chatId string, msgId string, emoji string) int {
 
 func MxDownloadFile(connId int, chatId string, msgId string, fileId string, action int) int {
 	conn := GetConn(connId)
-	if conn == nil || !conn.isReady() {
+	if conn == nil {
 		return -1
 	}
 
 	go func() {
+		if !conn.waitReady(time.Minute) {
+			CMxNewMessageFileNotify(conn.connId, chatId, msgId, fileId, "", FileStatusDownloadFailed, action)
+			return
+		}
+
 		filePath, fileStatus := conn.downloadFile(fileId)
 		CMxNewMessageFileNotify(conn.connId, chatId, msgId, fileId, filePath, fileStatus, action)
 	}()
@@ -544,11 +553,15 @@ func jsonEscape(s string) string {
 
 func MxGetGroupMembers(connId int, chatId string) int {
 	conn := GetConn(connId)
-	if conn == nil || !conn.isReady() {
+	if conn == nil {
 		return -1
 	}
 
 	go func() {
+		if !conn.waitReady(time.Minute) {
+			return
+		}
+
 		ctx, cancel := conn.requestContext()
 		defer cancel()
 		roomID := id.RoomID(chatId)
@@ -580,7 +593,7 @@ func MxGetGroupMembers(connId int, chatId string) int {
 // created encrypted direct room. Room ids are passed through.
 func MxCreateChat(connId int, userId string) int {
 	conn := GetConn(connId)
-	if conn == nil || !conn.isReady() {
+	if conn == nil {
 		return -1
 	}
 
@@ -606,6 +619,11 @@ func MxCreateChat(connId int, userId string) int {
 	isSelf := (userID == conn.session.UserID)
 
 	go func() {
+		if !conn.waitReady(time.Minute) {
+			CMxCreateChatNotify(conn.connId, "", 0)
+			return
+		}
+
 		ctx, cancel := conn.requestContext()
 		defer cancel()
 		req := &mautrix.ReqCreateRoom{

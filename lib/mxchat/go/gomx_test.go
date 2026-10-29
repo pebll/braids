@@ -13,10 +13,14 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
 
+	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/event"
 	"maunium.net/go/mautrix/format"
 	"maunium.net/go/mautrix/id"
@@ -198,6 +202,19 @@ func TestIsReadLocked(t *testing.T) {
 	}
 	if conn.isReadLocked("!r:localhost", "@alice:localhost", 600) {
 		t.Error("outgoing after other receipt should be unread")
+	}
+}
+
+func TestIsTransientError(t *testing.T) {
+	network := fmt.Errorf("wrapped: %w", mautrix.HTTPError{Message: "request error", WrappedError: errors.New("refused")})
+	server := mautrix.HTTPError{Response: &http.Response{StatusCode: 502}}
+	limited := mautrix.HTTPError{Response: &http.Response{StatusCode: 429}}
+	forbidden := mautrix.HTTPError{Response: &http.Response{StatusCode: 403}}
+	if !isTransientError(network) || !isTransientError(server) || !isTransientError(limited) {
+		t.Error("expected transient")
+	}
+	if isTransientError(forbidden) || isTransientError(errors.New("mismatching identity key")) {
+		t.Error("expected fatal")
 	}
 }
 

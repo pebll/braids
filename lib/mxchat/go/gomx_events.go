@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/event"
@@ -477,11 +478,21 @@ func (conn *MxConn) emitMessage(m *OutMsg, batch int) {
 // via /context and /messages.
 func MxGetMessages(connId int, chatId string, fromMsgId string, limit int) int {
 	conn := GetConn(connId)
-	if conn == nil || !conn.isReady() {
+	if conn == nil {
 		return -1
 	}
 
-	go conn.backfill(id.RoomID(chatId), id.EventID(fromMsgId), limit)
+	go func() {
+		// requests arriving during startup wait for the connection, as the ui
+		// does not repeat a history request for the same message
+		if !conn.waitReady(2 * time.Minute) {
+			CMxNewMessagesBatchDone(conn.connId, chatId, fromMsgId)
+			return
+		}
+
+		conn.backfill(id.RoomID(chatId), id.EventID(fromMsgId), limit)
+	}()
+
 	return 0
 }
 
