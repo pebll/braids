@@ -1,7 +1,7 @@
 braids — Architecture
 =====================
 
-Status: draft v0.3 (milestone M2). See [REQUIREMENTS.md](REQUIREMENTS.md) for
+Status: draft v0.4 (milestone M3). See [REQUIREMENTS.md](REQUIREMENTS.md) for
 scope and [API.md](API.md) for the daemon API.
 
 Overview
@@ -34,8 +34,10 @@ Overview
   `AppConfig`, logging, file utils.
 - **braidsd** (`src/braidsd`): the core daemon, see "Core daemon" below. It
   serves its API on a Unix socket (and on stdin/stdout with `--stdio`).
-- **braids app** (`app/`, M3): Tauri; the Rust side connects to (and if needed
-  starts) braidsd; the web UI renders everything.
+- **braids app** (`app/`, M3): Tauri 2; the Rust side (`src-tauri/`)
+  connects to (and if needed starts) braidsd and forwards requests and events;
+  the Svelte 5 + TypeScript web UI renders everything and keeps a mirror of
+  the core model, updated by API events. See [app/README.md](../app/README.md).
 
 Process model
 -------------
@@ -169,8 +171,10 @@ Build and packaging
 
 - C++/Go core: CMake, `./make.sh build` (all protocols ON by default;
   `--no-telegram` etc. for faster local builds).
-- App (M3): `app/` with Tauri + Vite + TypeScript; bundles `braidsd` and the
-  protocol libraries as sidecar resources.
+- App (M3): `app/` with Tauri 2 + Vite + Svelte 5 + TypeScript (`npm run
+  tauri dev` / `build`). Bundling braidsd and the protocol libraries as
+  sidecar resources is M4 (packaging); until then the app finds braidsd next
+  to its binary, in `build/bin` or in `PATH`.
 - Linux: AppImage and Flatpak (+ deb); macOS: dmg.
 
 Milestones

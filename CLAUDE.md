@@ -4,8 +4,8 @@ braids: open source desktop messenger (Telegram, WhatsApp, Signal, Matrix),
 Linux + macOS, Tauri GUI on top of a C++ core daemon. Forked from nchat
 (terminal client). Read `doc/REQUIREMENTS.md` and `doc/ARCHITECTURE.md` first;
 they hold the agreed decisions and the milestone plan (M0 done, M1 core done
-pending real-account checks of Telegram/WhatsApp/Signal, M2 API done, M3 GUI
-in `app/`). The daemon
+pending real-account checks of Telegram/WhatsApp/Signal, M2 API done, M3 GUI v1
+in `app/` implemented, pending daily use by the maintainer; next: M4). The daemon
 API is in `doc/API.md`; the GUI design brief in `doc/DESIGN_BRIEF.md`, and
 the finished GUI design (tokens, icons, mockups, screenshots) in
 `doc/design/README.md` — follow it when building the Tauri app.
@@ -27,6 +27,10 @@ the finished GUI design (tokens, icons, mockups, screenshots) in
   Integration CI workflow); `utils/braids-cli` — one-shot commands against a
   running braidsd; `utils/braids-console` — interactive console for manual
   login/chat tests (QR via `qrencode`).
+- `app/` — the Tauri GUI (M3): `src-tauri/` Rust shell (socket client,
+  tray), `src/` Svelte 5 + TypeScript UI (`lib/store.svelte.ts` client
+  state from API events, `components/`). Runs in a browser too via the Vite
+  dev bridge (`dev/bridge.ts`). See `app/README.md`.
 - `reference/nchat-ui` — nchat's ncurses UI and its docs/tooling. NOT built.
   Source material for the chat model port (done in M1); delete once the
   remaining protocols are verified through braidsd.
@@ -45,6 +49,12 @@ the finished GUI design (tokens, icons, mockups, screenshots) in
     utils/braids-cli -c /tmp/braidsconf status       # one-shot commands
     utils/braids-console --connect --confdir /tmp/braidsconf   # interactive
     ./build/bin/braidsd --stdio -c /tmp/braidsconf   # JSON-RPC on stdin/stdout
+
+App (see `app/README.md`; Linux needs `libwebkit2gtk-4.1-dev` etc.):
+
+    cd app && npm install
+    npm run check && npm run test:ui # type check; UI e2e (braidsd + Chromium)
+    npm run tauri dev                # app window
 
 Matrix integration testing without real accounts:
 `lib/mxchat/test/homeserver.sh start` (Synapse in Docker on localhost:8008,
@@ -86,3 +96,5 @@ started by hand. `./make.sh deps` asks for apt confirmation; install
   but not yet verified with real accounts (needs the maintainer; use
   `utils/braids-console`).
 - Account removal does not log out the device remotely yet.
+- App: no unread counts (protocols report unread state only), no mute
+  request, message list not virtualized; vim mode and packaging are M4.

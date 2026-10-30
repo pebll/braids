@@ -1,0 +1,60 @@
+name: App
+
+# The Tauri app (app/): type check, frontend build, UI end-to-end test against
+# braidsd with the Dummy protocol, and the Rust shell build.
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+      - main
+      - dev/*
+
+jobs:
+  app-linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v5
+    - name: Setup ccache
+      uses: ./.github/actions/setup-ccache
+      with:
+        cache_key_prefix: app
+    - name: Setup Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: 22
+        cache: npm
+        cache-dependency-path: app/package-lock.json
+    - name: System dependencies
+      run: |
+        ./make.sh deps -y
+        sudo apt-get install -y libwebkit2gtk-4.1-dev librsvg2-dev libayatana-appindicator3-dev libxdo-dev
+    - name: Build braidsd (Dummy only)
+      run: ./make.sh --no-telegram --no-whatsapp --no-signal --no-matrix build
+    - name: Install
+      working-directory: app
+      run: |
+        npm ci
+        npx playwright install --with-deps chromium
+    - name: Check and build frontend
+      working-directory: app
+      run: |
+        npm run check
+        npm run build
+    - name: UI test
+      working-directory: app
+      run: npm run test:ui -- --braidsd ../build/bin/braidsd
+    - name: Rust cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          app/src-tauri/target
+        key: cargo-${{ runner.os }}-${{ hashFiles('app/src-tauri/Cargo.lock') }}
+    - name: Build Tauri shell
+      working-directory: app/src-tauri
+      run: cargo build --locked
