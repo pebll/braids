@@ -410,13 +410,25 @@ endif()
 
 # Application: core daemon
 add_executable(braidsd
+  src/braidsd/api.h
+  src/braidsd/authbridge.cpp
+  src/braidsd/authbridge.h
+  src/braidsd/chatmodel.cpp
+  src/braidsd/chatmodel.h
+  src/braidsd/core.cpp
+  src/braidsd/core.h
+  src/braidsd/eventloop.cpp
+  src/braidsd/eventloop.h
   src/braidsd/main.cpp
+  src/braidsd/protocolfactory.cpp
+  src/braidsd/protocolfactory.h
 )
 install(TARGETS braidsd DESTINATION bin)
 
 # Headers
 target_include_directories(braidsd PRIVATE "lib/common/src")
 target_include_directories(braidsd PRIVATE "lib/ncutil/src")
+target_include_directories(braidsd SYSTEM PRIVATE "src/braidsd/ext")
 
 # Compiler flags
 set_target_properties(braidsd PROPERTIES COMPILE_FLAGS
@@ -514,6 +526,7 @@ set(TPL_PREAMBLE "${CMAKE_CURRENT_SOURCE_DIR}/utils/licenses/preamble-agpl.txt")
 
 set(TPL_FRAGMENTS
   "${TPL_PREAMBLE}"
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/braidsd/THIRD_PARTY_LICENSES"
   "${CMAKE_CURRENT_SOURCE_DIR}/lib/ncutil/THIRD_PARTY_LICENSES")
 if(HAS_TELEGRAM)
   list(APPEND TPL_FRAGMENTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/tgchat/THIRD_PARTY_LICENSES")

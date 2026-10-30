@@ -41,3 +41,12 @@ if(HAS_MATRIX)
            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../lib/mxchat/go)
   set_tests_properties(mxchat_go PROPERTIES TIMEOUT 600)
 endif()
+
+# braidsd core tests (stdio api, Dummy protocol)
+find_package(Python3 COMPONENTS Interpreter)
+if(HAS_DUMMY AND Python3_FOUND)
+  add_test(NAME braidsd_dummy
+           COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/braidsd/test_dummy.py
+                   --braidsd $<TARGET_FILE:braidsd>)
+  set_tests_properties(braidsd_dummy PROPERTIES TIMEOUT 120)
+endif()
