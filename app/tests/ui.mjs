@@ -149,8 +149,8 @@ try {
   fs.rmSync(png, { force: true });
   await page.getByRole('option', { name: /The Office/ }).click();
 
-  // groups have an octagonal avatar, people a round one
-  check(await page.getByRole('option', { name: /The Office/ }).locator('.circle.group').count() === 1, 'group avatar is octagonal');
+  // groups have a rounded-square avatar, people a round one
+  check(await page.getByRole('option', { name: /The Office/ }).locator('.circle.group').count() === 1, 'group avatar is a rounded square');
   check(await page.getByRole('option', { name: /Michael/ }).locator('.circle.group').count() === 0, 'person avatar is round');
 
   // categories: favorite, default, archived
