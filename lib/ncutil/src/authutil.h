@@ -30,6 +30,9 @@ public:
                        const std::string& p_Data = std::string());
   static void ShowError(std::shared_ptr<AuthHandler> p_AuthHandler, const std::string& p_Message);
 
+  // True if the authentication was cancelled through the handler.
+  static bool IsCancelled(std::shared_ptr<AuthHandler> p_AuthHandler);
+
   // Asks for a phone number and returns it with only digits and a leading '+' kept.
   static bool InputPhoneNumber(std::shared_ptr<AuthHandler> p_AuthHandler, std::string& p_PhoneNumber);
 

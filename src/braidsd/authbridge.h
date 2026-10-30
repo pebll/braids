@@ -36,6 +36,7 @@ public:
   void Cancel();
   void Reset();
 
+  bool IsCancelled() const override;
   bool IsInputPending() const;
   std::string GetPendingField() const;
 

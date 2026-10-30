@@ -122,6 +122,11 @@ void AuthUtil::ShowError(std::shared_ptr<AuthHandler> p_AuthHandler, const std::
   Show(p_AuthHandler, prompt);
 }
 
+bool AuthUtil::IsCancelled(std::shared_ptr<AuthHandler> p_AuthHandler)
+{
+  return p_AuthHandler && p_AuthHandler->IsCancelled();
+}
+
 bool AuthUtil::InputPhoneNumber(std::shared_ptr<AuthHandler> p_AuthHandler, std::string& p_PhoneNumber)
 {
   std::string str;

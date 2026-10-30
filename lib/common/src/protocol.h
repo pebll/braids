@@ -82,6 +82,10 @@ public:
 
   // Show a non-blocking step (qr, info, error).
   virtual void Show(const AuthPrompt& p_Prompt) = 0;
+
+  // True once the user cancelled; protocols waiting for something else than
+  // input (e.g. a qr scan) poll it to abort the setup.
+  virtual bool IsCancelled() const { return false; }
 };
 
 class Protocol

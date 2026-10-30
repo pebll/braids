@@ -156,24 +156,7 @@ void Core::Cleanup()
     }
   });
 
-  while (true)
-  {
-    std::vector<std::thread> threads;
-    {
-      std::unique_lock<std::mutex> lock(m_ThreadsMutex);
-      threads.swap(m_Threads);
-    }
-
-    if (threads.empty()) break;
-
-    for (auto& thread : threads)
-    {
-      if (thread.joinable())
-      {
-        thread.join();
-      }
-    }
-  }
+  JoinBackground();
 
   m_Loop.Invoke([&]()
   {
@@ -192,6 +175,7 @@ void Core::Cleanup()
   }
 
   m_Loop.Stop();
+  JoinBackground(); // tasks run while stopping the loop may have started more
   MessageCache::SetMessageHandler(nullptr);
 
   for (auto& account : m_Accounts)
@@ -605,12 +589,23 @@ void Core::OnSetupDone(const std::string& p_SetupId, bool p_Success, const std::
     m_Accounts.erase(ait);
   }
 
-  RunBackground([protocol]()
+  // remove data the failed setup left behind (never that of an existing account)
+  const bool removeData = !p_ProfileId.empty() && (p_ProfileId.find('_') != std::string::npos) &&
+    (m_Accounts.find(p_ProfileId) == m_Accounts.end());
+  const std::string profileDir = m_ProfilesDir + "/" + p_ProfileId;
+  RunBackground([protocol, removeData, profileDir, p_ProfileId]()
   {
     protocol->Logout();
+    if (removeData)
+    {
+      LOG_DEBUG("remove data of failed setup %s", p_ProfileId.c_str());
+      MessageCache::RemoveProfile(p_ProfileId);
+      FileUtil::RmDir(profileDir);
+    }
   });
 
-  EmitDirect("account.setupFailed", json{ { "setupId", p_SetupId } });
+  EmitDirect("account.setupFailed", json{ { "setupId", p_SetupId },
+               { "message", "Account setup failed or was cancelled." } });
 }
 
 void Core::AuthInput(const json& p_Params)
@@ -883,6 +878,28 @@ void Core::EmitDirect(const std::string& p_Method, const json& p_Params)
   if (m_EventSink)
   {
     m_EventSink(p_Method, p_Params);
+  }
+}
+
+void Core::JoinBackground()
+{
+  while (true)
+  {
+    std::vector<std::thread> threads;
+    {
+      std::unique_lock<std::mutex> lock(m_ThreadsMutex);
+      threads.swap(m_Threads);
+    }
+
+    if (threads.empty()) break;
+
+    for (auto& thread : threads)
+    {
+      if (thread.joinable())
+      {
+        thread.join();
+      }
+    }
   }
 }
 

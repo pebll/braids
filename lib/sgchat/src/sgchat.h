@@ -136,6 +136,7 @@ void SgUpdatePinNotify(int p_ConnId, char* p_ChatId, int p_IsPinned, int p_TimeP
 void SgReinit(int p_ConnId);
 void SgSetProtocolUiControl(int p_ConnId, int p_IsTakeControl);
 void SgAuthShow(int p_ConnId, int p_Step, char* p_Message, char* p_Data);
+int SgAuthIsCancelled(int p_ConnId);
 char* SgAuthInput(int p_ConnId, char* p_Field, char* p_Message, int p_IsSecret);
 void SgSetStatus(int p_ConnId, int p_Flags);
 void SgClearStatus(int p_ConnId, int p_Flags);

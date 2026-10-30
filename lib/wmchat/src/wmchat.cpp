@@ -1290,6 +1290,12 @@ void WmAuthShow(int p_ConnId, int p_Step, char* p_Message, char* p_Data)
   AuthUtil::Show((instance != nullptr) ? instance->GetAuthHandler() : nullptr, prompt);
 }
 
+int WmAuthIsCancelled(int p_ConnId)
+{
+  WmChat* instance = WmChat::GetInstance(p_ConnId);
+  return ((instance != nullptr) && AuthUtil::IsCancelled(instance->GetAuthHandler())) ? 1 : 0;
+}
+
 char* WmAuthInput(int p_ConnId, char* p_Field, char* p_Message, int p_IsSecret)
 {
   AuthPrompt prompt;

@@ -1402,6 +1402,12 @@ void SgAuthShow(int p_ConnId, int p_Step, char* p_Message, char* p_Data)
   AuthUtil::Show((instance != nullptr) ? instance->GetAuthHandler() : nullptr, prompt);
 }
 
+int SgAuthIsCancelled(int p_ConnId)
+{
+  SgChat* instance = SgChat::GetInstance(p_ConnId);
+  return ((instance != nullptr) && AuthUtil::IsCancelled(instance->GetAuthHandler())) ? 1 : 0;
+}
+
 char* SgAuthInput(int p_ConnId, char* p_Field, char* p_Message, int p_IsSecret)
 {
   AuthPrompt prompt;

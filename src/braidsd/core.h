@@ -88,6 +88,7 @@ private:
   void Emit(const std::string& p_Method, const json& p_Params);
   void EmitDirect(const std::string& p_Method, const json& p_Params);
   void RunBackground(const std::function<void()>& p_Task);
+  void JoinBackground();
 
 private:
   EventLoop m_Loop;

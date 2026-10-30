@@ -109,7 +109,7 @@ Events
 | `ready` | `{apiVersion}` |
 | `account.auth` | `{setupId or accountId, step, field, message, data, isSecret, isOptional}` |
 | `account.added` | `{setupId, account: Account}` |
-| `account.setupFailed` | `{setupId}` |
+| `account.setupFailed` | `{setupId, message}` (details were sent as `account.auth` error steps) |
 | `account.removed` | `{accountId}` |
 | `account.state` | `{accountId, state, error}` |
 | `account.connected` | `{accountId, success}` (protocol login done, chats are being fetched) |

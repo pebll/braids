@@ -74,6 +74,12 @@ void AuthBridge::Reset()
   m_Cancelled = false;
 }
 
+bool AuthBridge::IsCancelled() const
+{
+  std::unique_lock<std::mutex> lock(m_Mutex);
+  return m_Cancelled;
+}
+
 bool AuthBridge::IsInputPending() const
 {
   std::unique_lock<std::mutex> lock(m_Mutex);

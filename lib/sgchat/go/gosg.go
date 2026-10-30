@@ -2002,7 +2002,21 @@ func SgLogin(connId int) int {
 
 		deviceName := GetDeviceName()
 		allowBackup := true
-		provChan := signalmeow.PerformProvisioning(ctx, container, deviceName, allowBackup)
+		// abort provisioning when the user cancels the setup
+		provCtx, provCancel := context.WithCancel(ctx)
+		defer provCancel()
+		go func() {
+			for provCtx.Err() == nil {
+				if CSgAuthIsCancelled(connId) {
+					LOG_INFO("provisioning cancelled")
+					provCancel()
+					return
+				}
+				time.Sleep(200 * time.Millisecond)
+			}
+		}()
+
+		provChan := signalmeow.PerformProvisioning(provCtx, container, deviceName, allowBackup)
 
 		for resp := range provChan {
 			switch resp.State {

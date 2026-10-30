@@ -37,7 +37,6 @@ import (
 	"go.mau.fi/whatsmeow/proto/waWeb"
 	"go.mau.fi/whatsmeow/store"
 
-
 	_ "github.com/mattn/go-sqlite3"
 	"go.mau.fi/libsignal/logger"
 	"go.mau.fi/whatsmeow"
@@ -2832,6 +2831,7 @@ func WmLogin(connId int) int {
 	err = cli.Connect()
 	if err != nil {
 		LOG_WARNING(fmt.Sprintf("failed to connect %#v", err))
+		CWmAuthShow(connId, AuthStepError, "Could not connect to WhatsApp, please check the network connection.", "")
 		CWmClearStatus(connId, FlagConnecting)
 		return -1
 	}
@@ -2842,7 +2842,12 @@ func WmLogin(connId int) int {
 	LOG_DEBUG("wait start")
 	waitedMs := 0
 	for GetState(connId) == Connecting {
-		if GetPasskeyWait(connId) {
+		if CWmAuthIsCancelled(connId) {
+			LOG_INFO("login cancelled")
+			cli.Disconnect()
+			SetState(connId, Disconnected)
+			break
+		} else if GetPasskeyWait(connId) {
 			// Suspend the pairing timeout while awaiting an interactive passkey
 			// response, as that involves a manual browser step by the user.
 			waitedMs = 0

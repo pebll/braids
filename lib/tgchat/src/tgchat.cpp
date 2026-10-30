@@ -397,7 +397,7 @@ bool TgChat::Impl::SetupProfile(const std::string& p_ProfilesDir, std::string& p
   Cleanup();
   CleanupConfig();
 
-  bool rv = m_IsSetup;
+  bool rv = m_IsSetup && m_Authorized;
   if (rv)
   {
     m_IsSetup = false;
@@ -1852,6 +1852,14 @@ void TgChat::Impl::ProcessService()
 {
   while (m_Running)
   {
+    if (m_IsSetup && AuthUtil::IsCancelled(m_AuthHandler))
+    {
+      LOG_INFO("setup cancelled");
+      m_IsSetup = false;
+      m_Running = false;
+      break;
+    }
+
     auto response = m_ClientManager->receive(0.1);
     if (response.object)
     {

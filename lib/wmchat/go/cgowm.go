@@ -29,6 +29,7 @@ package main
 // extern void WmSetProtocolUiControl(int p_ConnId, int p_IsTakeControl);
 // extern void WmAuthShow(int p_ConnId, int p_Step, char* p_Message, char* p_Data);
 // extern char* WmAuthInput(int p_ConnId, char* p_Field, char* p_Message, int p_IsSecret);
+// extern int WmAuthIsCancelled(int p_ConnId);
 // extern void WmSetStatus(int p_ConnId, int p_Flags);
 // extern void WmClearStatus(int p_ConnId, int p_Flags);
 // extern int WmAppConfigGetNum(char* p_Param);
@@ -222,6 +223,10 @@ const (
 	AuthFieldPasskeyResponse = "passkeyResponse"
 	AuthFieldConfirm         = "confirm"
 )
+
+func CWmAuthIsCancelled(connId int) bool {
+	return C.WmAuthIsCancelled(C.int(connId)) == 1
+}
 
 func CWmAuthShow(connId int, step int, message string, data string) {
 	C.WmAuthShow(C.int(connId), C.int(step), C.CString(message), C.CString(data))

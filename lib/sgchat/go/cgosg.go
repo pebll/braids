@@ -28,6 +28,7 @@ package main
 // extern void SgReinit(int p_ConnId);
 // extern void SgSetProtocolUiControl(int p_ConnId, int p_IsTakeControl);
 // extern void SgAuthShow(int p_ConnId, int p_Step, char* p_Message, char* p_Data);
+// extern int SgAuthIsCancelled(int p_ConnId);
 // extern void SgSetStatus(int p_ConnId, int p_Flags);
 // extern void SgClearStatus(int p_ConnId, int p_Flags);
 // extern int SgAppConfigGetNum(char* p_Param);
@@ -219,6 +220,10 @@ const (
 	AuthStepInfo  = 2
 	AuthStepError = 3
 )
+
+func CSgAuthIsCancelled(connId int) bool {
+	return C.SgAuthIsCancelled(C.int(connId)) == 1
+}
 
 func CSgAuthShow(connId int, step int, message string, data string) {
 	C.SgAuthShow(C.int(connId), C.int(step), C.CString(message), C.CString(data))
