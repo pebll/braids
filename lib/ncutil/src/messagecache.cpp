@@ -263,6 +263,18 @@ void MessageCache::AddFromServiceMessage(const std::string& p_ProfileId,
   }
 }
 
+void MessageCache::RemoveProfile(const std::string& p_ProfileId)
+{
+  std::unique_lock<std::mutex> lock(m_DbMutex);
+  m_Dbs.erase(p_ProfileId);
+  m_CheckSequence.erase(p_ProfileId);
+  m_UpdatedSequence.erase(p_ProfileId);
+  if (!m_HistoryDir.empty() && !p_ProfileId.empty())
+  {
+    FileUtil::RmDir(m_HistoryDir + "/" + p_ProfileId);
+  }
+}
+
 void MessageCache::AddProfile(const std::string& p_ProfileId, bool p_CheckSequence, int p_DirVersion, bool p_IsSetup,
                               bool p_AllowReadOnly, bool* p_IsRemoved /*= nullptr*/)
 {

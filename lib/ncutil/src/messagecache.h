@@ -263,6 +263,7 @@ public:
 
   static void AddProfile(const std::string& p_ProfileId, bool p_CheckSequence, int p_DirVersion, bool p_IsSetup,
                          bool p_AllowReadOnly, bool* p_IsRemoved = nullptr);
+  static void RemoveProfile(const std::string& p_ProfileId); // braids: closes the db and deletes its dir
   static void AddMessages(const std::string& p_ProfileId, const std::string& p_ChatId, const std::string& p_FromMsgId,
                           const std::vector<ChatMessage>& p_ChatMessages);
   static void AddChats(const std::string& p_ProfileId, const std::vector<ChatInfo>& p_ChatInfos);

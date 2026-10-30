@@ -26,9 +26,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/google/uuid"
-	"github.com/mdp/qrterminal"
 	"github.com/rs/zerolog"
-	"github.com/skip2/go-qrcode"
 	"go.mau.fi/util/dbutil"
 	"google.golang.org/protobuf/proto"
 
@@ -1982,7 +1980,6 @@ func SgLogin(connId int) int {
 		return -1
 	}
 
-	path := GetPath(connId)
 	client := GetClient(connId)
 	device := GetDevice(connId)
 	container := GetContainer(connId)
@@ -2000,32 +1997,18 @@ func SgLogin(connId int) int {
 		LOG_TRACE(fmt.Sprintf("acquire console"))
 		CSgSetProtocolUiControl(connId, 1)
 
-		fmt.Printf("\n")
-		fmt.Printf("Open Signal on your phone, go to Settings > Linked devices.\n")
-		fmt.Printf("Click on \"Link a device\", unlock the phone and aim its camera at the\n")
-		fmt.Printf("QR code displayed on the computer screen.\n")
-		fmt.Printf("\n")
-		fmt.Printf("Scan the QR code to authenticate, or press CTRL-C to abort.\n")
+		const qrCodeMsg = "Open Signal on your phone, go to Settings > Linked devices.\n" +
+			"Tap \"Link a device\", unlock the phone and scan this QR code."
 
 		deviceName := GetDeviceName()
 		allowBackup := true
 		provChan := signalmeow.PerformProvisioning(ctx, container, deviceName, allowBackup)
 
-		hasGUI := HasGUI()
-		qrDisplayed := false
-
 		for resp := range provChan {
 			switch resp.State {
 			case signalmeow.StateProvisioningURLReceived:
 				LOG_DEBUG("provisioning URL received")
-				if hasGUI {
-					qrPath := path + "/tmp/qr.png"
-					qrcode.WriteFile(resp.ProvisioningURL, qrcode.Medium, 512, qrPath)
-					ShowImage(qrPath)
-				} else {
-					qrterminal.GenerateHalfBlock(resp.ProvisioningURL, qrterminal.L, os.Stdout)
-				}
-				qrDisplayed = true
+				CSgAuthShow(connId, AuthStepQr, qrCodeMsg, resp.ProvisioningURL)
 
 			case signalmeow.StateProvisioningDataReceived:
 				LOG_DEBUG("provisioning data received")
@@ -2061,11 +2044,6 @@ func SgLogin(connId int) int {
 				SetState(connId, Disconnected)
 				return -1
 			}
-		}
-
-		// delete temporary image file
-		if qrDisplayed {
-			_ = os.Remove(path + "/tmp/qr.png")
 		}
 
 		LOG_TRACE(fmt.Sprintf("release console"))

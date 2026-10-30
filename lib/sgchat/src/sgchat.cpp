@@ -7,12 +7,14 @@
 
 #include "sgchat.h"
 
+#include <cstring>
 #include <iostream>
 #include <limits>
 
 #include <sys/stat.h>
 
 #include "appconfig.h"
+#include "authutil.h"
 #include "fileutil.h"
 #include "libcgosg.h"
 #include "log.h"
@@ -96,13 +98,15 @@ bool SgChat::SetupProfile(const std::string& p_ProfilesDir, std::string& p_Profi
 {
   m_IsSetup = true;
 
-  std::cout << "\n";
-  std::cout << "NOTICE:\n";
-  std::cout << "This is an unofficial Signal client implementation.\n";
-  std::cout << "Use at your own risk. You may abort this setup wizard by pressing CTRL-C.\n";
-  std::cout << "\n";
+  AuthUtil::ShowInfo(m_AuthHandler, "This is an unofficial Signal client implementation. Use at your own risk.");
 
-  std::string phoneNumber = StrUtil::GetPhoneNumber();
+  std::string phoneNumber;
+  if (!AuthUtil::InputPhoneNumber(m_AuthHandler, phoneNumber))
+  {
+    m_IsSetup = false;
+    return false;
+  }
+
   m_ProfileId = m_ProfileId + "_" + phoneNumber;
   std::string profileDir = p_ProfilesDir + "/" + m_ProfileId;
 
@@ -747,6 +751,8 @@ std::string SgChat::GetProxyUrl() const
 
 void SgChat::SetProtocolUiControl(bool p_IsTakeControl)
 {
+  if (m_AuthHandler) return; // auth steps go through the auth handler, not the terminal
+
   if (m_IsSetup)
   {
     LOG_TRACE("set protocol ui control %d ignored during setup", p_IsTakeControl);
@@ -1382,6 +1388,41 @@ void SgSetProtocolUiControl(int p_ConnId, int p_IsTakeControl)
   {
     instance->SetProtocolUiControl(p_IsTakeControl == 1);
   }
+}
+
+void SgAuthShow(int p_ConnId, int p_Step, char* p_Message, char* p_Data)
+{
+  AuthPrompt prompt;
+  prompt.step = static_cast<AuthStep>(p_Step);
+  prompt.message = std::string(p_Message);
+  prompt.data = std::string(p_Data);
+  free(p_Message);
+  free(p_Data);
+
+  SgChat* instance = SgChat::GetInstance(p_ConnId);
+  AuthUtil::Show((instance != nullptr) ? instance->GetAuthHandler() : nullptr, prompt);
+}
+
+char* SgAuthInput(int p_ConnId, char* p_Field, char* p_Message, int p_IsSecret)
+{
+  AuthPrompt prompt;
+  prompt.step = AuthStepInput;
+  prompt.field = std::string(p_Field);
+  prompt.message = std::string(p_Message);
+  prompt.isSecret = (p_IsSecret == 1);
+  free(p_Field);
+  free(p_Message);
+
+  SgChat* instance = SgChat::GetInstance(p_ConnId);
+  std::string value;
+  if (!AuthUtil::Input((instance != nullptr) ? instance->GetAuthHandler() : nullptr, prompt, value))
+  {
+    return nullptr;
+  }
+
+  char* rv = strdup(value.c_str());
+  AuthUtil::SecureClear(value);
+  return rv;
 }
 
 void SgSetStatus(int p_ConnId, int p_Flags)

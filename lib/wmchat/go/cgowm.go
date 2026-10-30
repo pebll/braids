@@ -9,6 +9,7 @@ package main
 
 // #cgo linux LDFLAGS: -Wl,-unresolved-symbols=ignore-all
 // #cgo darwin LDFLAGS: -Wl,-undefined,dynamic_lookup
+// #include <stdlib.h>
 // extern void WmNewContactsNotify(int p_ConnId, char* p_ChatId, char* p_Name, char* p_Phone, int p_IsSelf, int p_IsAlias, int p_Notify);
 // extern void WmNewChatsNotify(int p_ConnId, char* p_ChatId, int p_IsUnread, int p_IsMuted, int p_IsPinned, int p_IsArchived, int p_LastMessageTime);
 // extern void WmNewGroupMembersNotify(int p_ConnId, char* p_ChatId, char* p_MembersJson);
@@ -26,6 +27,8 @@ package main
 // extern void WmUpdatePinNotify(int p_ConnId, char* p_ChatId, int p_IsPinned, int p_TimePinned);
 // extern void WmReinit(int p_ConnId);
 // extern void WmSetProtocolUiControl(int p_ConnId, int p_IsTakeControl);
+// extern void WmAuthShow(int p_ConnId, int p_Step, char* p_Message, char* p_Data);
+// extern char* WmAuthInput(int p_ConnId, char* p_Field, char* p_Message, int p_IsSecret);
 // extern void WmSetStatus(int p_ConnId, int p_Flags);
 // extern void WmClearStatus(int p_ConnId, int p_Flags);
 // extern int WmAppConfigGetNum(char* p_Param);
@@ -41,6 +44,7 @@ import "C"
 import (
 	"path/filepath"
 	"runtime"
+	"unsafe"
 )
 
 //export CWmInit
@@ -204,6 +208,38 @@ func CWmReinit(connId int) {
 
 func CWmSetProtocolUiControl(connId int, isTakeControl int) {
 	C.WmSetProtocolUiControl(C.int(connId), C.int(isTakeControl))
+}
+
+// keep in sync with AuthStep / s_AuthField* in protocol.h
+const (
+	AuthStepInput = 0
+	AuthStepQr    = 1
+	AuthStepInfo  = 2
+	AuthStepError = 3
+)
+
+const (
+	AuthFieldPasskeyResponse = "passkeyResponse"
+	AuthFieldConfirm         = "confirm"
+)
+
+func CWmAuthShow(connId int, step int, message string, data string) {
+	C.WmAuthShow(C.int(connId), C.int(step), C.CString(message), C.CString(data))
+}
+
+// CWmAuthInput asks the user for input (blocking); ok is false if cancelled.
+func CWmAuthInput(connId int, field string, message string, isSecret bool) (value string, ok bool) {
+	secret := 0
+	if isSecret {
+		secret = 1
+	}
+	cvalue := C.WmAuthInput(C.int(connId), C.CString(field), C.CString(message), C.int(secret))
+	if cvalue == nil {
+		return "", false
+	}
+	value = C.GoString(cvalue)
+	C.free(unsafe.Pointer(cvalue))
+	return value, true
 }
 
 func CWmSetStatus(connId int, flags int) {

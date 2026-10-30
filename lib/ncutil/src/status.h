@@ -8,6 +8,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <mutex>
 #include <string>
@@ -34,6 +35,10 @@ public:
   static void Clear(const std::string& p_ProfileId, uint32_t p_Flags);
   static std::string ToString(uint32_t p_Mask);
 
+  // braids: per-profile flags, and a handler called on each change (outside the lock)
+  static uint32_t GetProfile(const std::string& p_ProfileId);
+  static void SetHandler(const std::function<void(const std::string&, uint32_t)>& p_Handler);
+
 private:
   static void UpdateCombined();
 
@@ -41,4 +46,5 @@ private:
   static uint32_t m_Flags;
   static std::map<std::string, uint32_t> m_ProfileFlags;
   static std::mutex m_Mutex;
+  static std::function<void(const std::string&, uint32_t)> m_Handler;
 };

@@ -36,6 +36,8 @@ endif()
 # Library
 add_library(ncutil ${LIBRARY_LINKING_TYPE}
   src/appconfig.cpp
+  src/authutil.cpp
+  src/authutil.h
   src/appconfig.h
   src/apputil.cpp
   src/apputil.h

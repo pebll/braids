@@ -13,6 +13,7 @@
 
 #include <sys/stat.h>
 
+#include "authutil.h"
 #include "log.h"
 #include "status.h"
 #include "strutil.h"
@@ -63,7 +64,19 @@ std::string DuChat::GetProfileDisplayName() const
 
 bool DuChat::SetupProfile(const std::string& p_ProfilesDir, std::string& p_ProfileId)
 {
-  std::string phoneNumber = StrUtil::GetPhoneNumber();
+  // exercises the auth flow: phone number, then a verification code ("000000" is rejected)
+  std::string phoneNumber;
+  if (!AuthUtil::InputPhoneNumber(m_AuthHandler, phoneNumber)) return false;
+
+  std::string code;
+  while (true)
+  {
+    if (!AuthUtil::Input(m_AuthHandler, s_AuthFieldCode, "Verification code (any, except 000000)", code)) return false;
+
+    if (!code.empty() && (code != "000000")) break;
+
+    AuthUtil::ShowError(m_AuthHandler, "Invalid code, please try again.");
+  }
 
   m_ProfileId = m_ProfileId + "_" + phoneNumber;
   std::string profileDir = p_ProfilesDir + "/" + m_ProfileId;

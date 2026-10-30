@@ -10,6 +10,7 @@
 uint32_t Status::m_Flags = 0;
 std::map<std::string, uint32_t> Status::m_ProfileFlags;
 std::mutex Status::m_Mutex;
+std::function<void(const std::string&, uint32_t)> Status::m_Handler;
 
 uint32_t Status::Get(uint32_t p_Mask)
 {
@@ -19,16 +20,55 @@ uint32_t Status::Get(uint32_t p_Mask)
 
 void Status::Set(const std::string& p_ProfileId, uint32_t p_Flags)
 {
-  std::unique_lock<std::mutex> lock(m_Mutex);
-  m_ProfileFlags[p_ProfileId] |= p_Flags;
-  UpdateCombined();
+  std::function<void(const std::string&, uint32_t)> handler;
+  uint32_t oldFlags = 0;
+  uint32_t newFlags = 0;
+  {
+    std::unique_lock<std::mutex> lock(m_Mutex);
+    oldFlags = m_ProfileFlags[p_ProfileId];
+    m_ProfileFlags[p_ProfileId] |= p_Flags;
+    newFlags = m_ProfileFlags[p_ProfileId];
+    UpdateCombined();
+    handler = m_Handler;
+  }
+
+  if (handler && (oldFlags != newFlags))
+  {
+    handler(p_ProfileId, newFlags);
+  }
 }
 
 void Status::Clear(const std::string& p_ProfileId, uint32_t p_Flags)
 {
+  std::function<void(const std::string&, uint32_t)> handler;
+  uint32_t oldFlags = 0;
+  uint32_t newFlags = 0;
+  {
+    std::unique_lock<std::mutex> lock(m_Mutex);
+    oldFlags = m_ProfileFlags[p_ProfileId];
+    m_ProfileFlags[p_ProfileId] &= ~p_Flags;
+    newFlags = m_ProfileFlags[p_ProfileId];
+    UpdateCombined();
+    handler = m_Handler;
+  }
+
+  if (handler && (oldFlags != newFlags))
+  {
+    handler(p_ProfileId, newFlags);
+  }
+}
+
+uint32_t Status::GetProfile(const std::string& p_ProfileId)
+{
   std::unique_lock<std::mutex> lock(m_Mutex);
-  m_ProfileFlags[p_ProfileId] &= ~p_Flags;
-  UpdateCombined();
+  auto it = m_ProfileFlags.find(p_ProfileId);
+  return (it != m_ProfileFlags.end()) ? it->second : 0;
+}
+
+void Status::SetHandler(const std::function<void(const std::string&, uint32_t)>& p_Handler)
+{
+  std::unique_lock<std::mutex> lock(m_Mutex);
+  m_Handler = p_Handler;
 }
 
 std::string Status::ToString(uint32_t p_Flags)

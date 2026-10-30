@@ -15,6 +15,7 @@
 #include <sys/stat.h>
 
 #include "appconfig.h"
+#include "authutil.h"
 #include "fileutil.h"
 #include "libcgomx.h"
 #include "log.h"
@@ -44,8 +45,7 @@ static std::string TakeCString(char* p_Str)
 
 static void SecureClear(std::string& p_Str)
 {
-  std::fill(p_Str.begin(), p_Str.end(), '\0');
-  p_Str.clear();
+  AuthUtil::SecureClear(p_Str);
 }
 
 extern "C" MxChat* CreateMxChat()
@@ -76,7 +76,7 @@ bool MxChat::HasFeature(ProtocolFeature p_ProtocolFeature) const
 {
   // Matrix has no edit time limit; two days is the most permissive option the ui offers.
   static int customFeatures =
-    FeatureEditMessagesWithinTwoDays |
+    FeatureEditMessagesAnytime |
     FeatureAutoGetContactsOnLogin |
     FeaturePinChat;
   return (p_ProtocolFeature & customFeatures);
@@ -119,40 +119,49 @@ bool MxChat::SetupProfile(const std::string& p_ProfilesDir, std::string& p_Profi
 {
   m_IsSetup = true;
 
-  std::cout << "\n";
-  std::cout << "Matrix setup (password login). Press CTRL-C to abort.\n";
-  std::cout << "\n";
-
   std::string userIdInput;
-  std::cout << "Matrix user ID (ex. @alice:matrix.org): ";
-  std::getline(std::cin, userIdInput);
-  const std::string userId = TakeCString(CMxNormalizeUserId(const_cast<char*>(userIdInput.c_str())));
-  if (userId.empty())
+  if (!AuthUtil::Input(m_AuthHandler, s_AuthFieldUserId, "Matrix user ID (ex. @alice:matrix.org)", userIdInput))
   {
-    std::cout << "Invalid user ID, expected format @user:server (ex. @alice:matrix.org).\n";
     m_IsSetup = false;
     return false;
   }
 
-  std::cout << "Looking up homeserver...\n";
+  const std::string userId = TakeCString(CMxNormalizeUserId(const_cast<char*>(userIdInput.c_str())));
+  if (userId.empty())
+  {
+    AuthUtil::ShowError(m_AuthHandler, "Invalid user ID, expected format @user:server (ex. @alice:matrix.org).");
+    m_IsSetup = false;
+    return false;
+  }
+
+  AuthUtil::ShowInfo(m_AuthHandler, "Looking up homeserver...");
   const std::string discovered = TakeCString(CMxDiscoverHomeserver(const_cast<char*>(userId.c_str())));
   std::string homeserver;
-  std::cout << "Homeserver URL (" << discovered << "): ";
-  std::getline(std::cin, homeserver);
+  if (!AuthUtil::Input(m_AuthHandler, s_AuthFieldHomeserver, "Homeserver URL", homeserver,
+                       false /*p_IsSecret*/, true /*p_IsOptional*/, discovered))
+  {
+    m_IsSetup = false;
+    return false;
+  }
+
   StrUtil::Trim(homeserver);
   if (homeserver.empty())
   {
     homeserver = discovered;
   }
 
-  std::cout << "Password: ";
-  std::string password = StrUtil::GetPass();
+  std::string password;
+  if (!AuthUtil::Input(m_AuthHandler, s_AuthFieldPassword, "Password", password, true /*p_IsSecret*/))
+  {
+    m_IsSetup = false;
+    return false;
+  }
 
   m_ProfileId = GetName() + "_" + SanitizeProfileId(userId);
   m_ProfileDir = p_ProfilesDir + "/" + m_ProfileId;
   if (FileUtil::Exists(m_ProfileDir))
   {
-    std::cout << "Profile " << m_ProfileId << " already exists. Remove it first (nchat --remove).\n";
+    AuthUtil::ShowError(m_AuthHandler, "Account " + userId + " already exists. Remove it first.");
     SecureClear(password);
     m_IsSetup = false;
     return false;
@@ -163,14 +172,14 @@ bool MxChat::SetupProfile(const std::string& p_ProfilesDir, std::string& p_Profi
   m_ConnId = CMxInit(const_cast<char*>(m_ProfileDir.c_str()));
   AddInstance(m_ConnId, this);
 
-  std::cout << "Logging in...\n";
+  AuthUtil::ShowInfo(m_AuthHandler, "Logging in...");
   const std::string loginError =
     TakeCString(CMxSetupLogin(m_ConnId, const_cast<char*>(homeserver.c_str()),
                               const_cast<char*>(userId.c_str()), const_cast<char*>(password.c_str())));
   SecureClear(password);
   if (!loginError.empty())
   {
-    std::cout << loginError << "\n";
+    AuthUtil::ShowError(m_AuthHandler, loginError);
     CMxCleanup(m_ConnId);
     RemoveInstance(m_ConnId);
     m_ConnId = -1;
@@ -195,7 +204,7 @@ bool MxChat::SetupProfile(const std::string& p_ProfilesDir, std::string& p_Profi
     return false;
   }
 
-  std::cout << "Setting up encryption...\n";
+  AuthUtil::ShowInfo(m_AuthHandler, "Setting up encryption...");
   if (CMxWaitReady(m_ConnId, 60) == 0)
   {
     if (CMxNeedsRecovery(m_ConnId) == 1)
@@ -205,7 +214,7 @@ bool MxChat::SetupProfile(const std::string& p_ProfilesDir, std::string& p_Profi
   }
   else
   {
-    std::cout << "Encryption setup not completed yet, it will be retried in the background.\n";
+    AuthUtil::ShowInfo(m_AuthHandler, "Encryption setup not completed yet, it will be retried in the background.");
   }
 
   m_IsSetup = false;
@@ -672,22 +681,30 @@ bool MxChat::RunRecoveryPrompt(bool p_IsSetup)
 
   if (m_Config.Get("recovery_prompt") == "0") return false;
 
-  if (!p_IsSetup)
+  // the terminal fallback needs the terminal released by the ui
+  const bool useTerminal = !p_IsSetup && !m_AuthHandler;
+  if (useTerminal)
   {
     SetProtocolUiControl(true);
+    std::cout << "\n";
   }
 
-  std::cout << "\n";
-  std::cout << "Matrix " << GetSelfId() << ": this device is not verified yet.\n";
-  std::cout << "Enter your recovery key (or security passphrase) to verify this device and to\n";
-  std::cout << "decrypt older encrypted messages using server-side key backup.\n";
-  std::cout << "Leave empty to skip for now, or enter 'never' to stop asking.\n";
+  AuthUtil::ShowInfo(m_AuthHandler,
+                     "Matrix " + GetSelfId() + ": this device is not verified yet.\n"
+                     "Enter your recovery key (or security passphrase) to verify this device and to\n"
+                     "decrypt older encrypted messages using server-side key backup.\n"
+                     "Leave empty to skip for now, or enter 'never' to stop asking.");
 
   bool verified = false;
   for (int attempt = 0; attempt < 3; ++attempt)
   {
-    std::cout << "Recovery key: ";
-    std::string key = StrUtil::GetPass();
+    std::string key;
+    if (!AuthUtil::Input(m_AuthHandler, s_AuthFieldRecoveryKey, "Recovery key", key,
+                         true /*p_IsSecret*/, true /*p_IsOptional*/))
+    {
+      break;
+    }
+
     StrUtil::Trim(key);
     if (key.empty())
     {
@@ -701,20 +718,20 @@ bool MxChat::RunRecoveryPrompt(bool p_IsSetup)
       break;
     }
 
-    std::cout << "Verifying...\n";
+    AuthUtil::ShowInfo(m_AuthHandler, "Verifying...");
     const std::string error = TakeCString(CMxRecover(m_ConnId, const_cast<char*>(key.c_str())));
     SecureClear(key);
     if (error.empty())
     {
-      std::cout << "Device verified. Older messages are decrypted in the background.\n";
+      AuthUtil::ShowInfo(m_AuthHandler, "Device verified. Older messages are decrypted in the background.");
       verified = true;
       break;
     }
 
-    std::cout << "Failed: " << error << "\n";
+    AuthUtil::ShowError(m_AuthHandler, "Failed: " + error);
   }
 
-  if (!p_IsSetup)
+  if (useTerminal)
   {
     TimeUtil::Sleep(1.5);
     SetProtocolUiControl(false);
@@ -751,9 +768,9 @@ void MxChat::RecoveryPrompt()
 void MxChat::ReportError(const std::string& p_Message)
 {
   LOG_ERROR("%s", p_Message.c_str());
-  if (m_IsSetup)
+  if (m_IsSetup || m_AuthHandler)
   {
-    std::cout << p_Message << "\n";
+    AuthUtil::ShowError(m_AuthHandler, p_Message);
     return;
   }
 

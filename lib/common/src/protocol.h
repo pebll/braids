@@ -34,6 +34,54 @@ enum ProtocolFeature
   FeatureArchiveChat = (1 << 8),
   FeaturePinMessage = (1 << 9),
   FeaturePresenceRequiresOnline = (1 << 10),
+  FeatureEditMessagesAnytime = (1 << 11), // braids extension
+};
+
+// Interactive authentication (account setup and re-login), braids extension.
+// Protocols do not talk to the terminal directly; they describe each step as an
+// AuthPrompt and pass it to the AuthHandler of the protocol instance (or, when
+// none is set, to the terminal fallback in AuthUtil, lib/ncutil).
+enum AuthStep
+{
+  AuthStepInput = 0, // ask the user for a value (blocking)
+  AuthStepQr = 1,    // show qr code with payload in data (non-blocking)
+  AuthStepInfo = 2,  // show informational text, e.g. a pairing code in data (non-blocking)
+  AuthStepError = 3, // show an error message (non-blocking)
+};
+
+// Well-known AuthPrompt fields
+static const std::string s_AuthFieldPhone = "phone";
+static const std::string s_AuthFieldCode = "code";
+static const std::string s_AuthFieldPassword = "password";
+static const std::string s_AuthFieldUserId = "userId";
+static const std::string s_AuthFieldHomeserver = "homeserver";
+static const std::string s_AuthFieldRecoveryKey = "recoveryKey";
+static const std::string s_AuthFieldFirstName = "firstName";
+static const std::string s_AuthFieldLastName = "lastName";
+static const std::string s_AuthFieldPasskeyResponse = "passkeyResponse";
+static const std::string s_AuthFieldConfirm = "confirm";
+
+struct AuthPrompt
+{
+  AuthStep step = AuthStepInput;
+  std::string field;       // input: one of s_AuthField*
+  std::string message;     // human readable label, instructions or error text
+  std::string data;        // qr payload, pairing code, or default value for input
+  bool isSecret = false;   // input must be masked and never logged
+  bool isOptional = false; // input may be left empty (skip)
+};
+
+class AuthHandler
+{
+public:
+  virtual ~AuthHandler() { }
+
+  // Ask the user for input; blocks until it is available. Returns false if the
+  // user cancelled the authentication.
+  virtual bool Input(const AuthPrompt& p_Prompt, std::string& p_Value) = 0;
+
+  // Show a non-blocking step (qr, info, error).
+  virtual void Show(const AuthPrompt& p_Prompt) = 0;
 };
 
 class Protocol
@@ -62,6 +110,20 @@ public:
 
   virtual void SendRequest(std::shared_ptr<RequestMessage> p_Request) = 0;
   virtual void SetMessageHandler(const std::function<void(std::shared_ptr<ServiceMessage>)>& p_MessageHandler) = 0;
+
+  // Set before SetupProfile() / Login(); used for setup and for prompts at runtime.
+  void SetAuthHandler(std::shared_ptr<AuthHandler> p_AuthHandler)
+  {
+    m_AuthHandler = p_AuthHandler;
+  }
+
+  std::shared_ptr<AuthHandler> GetAuthHandler() const
+  {
+    return m_AuthHandler;
+  }
+
+protected:
+  std::shared_ptr<AuthHandler> m_AuthHandler;
 };
 
 // Request and notify message types

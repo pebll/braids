@@ -37,10 +37,8 @@ import (
 	"go.mau.fi/whatsmeow/proto/waWeb"
 	"go.mau.fi/whatsmeow/store"
 
-	"github.com/mdp/qrterminal"
 
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/skip2/go-qrcode"
 	"go.mau.fi/libsignal/logger"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/appstate"
@@ -2671,29 +2669,33 @@ func ReadPastedJson(r io.Reader) ([]byte, error) {
 // be produced by nchat itself, so the user must run navigator.credentials.get()
 // in a signed-in web.whatsapp.com browser tab and paste the result back here.
 // See doc/WMPASSKEY.md for details.
-func GetPasskeyResponse(publicKey *types.WebAuthnPublicKey) (*types.WebAuthnResponse, error) {
+func GetPasskeyResponse(connId int, publicKey *types.WebAuthnPublicKey) (*types.WebAuthnResponse, error) {
 	pubKeyJson, err := json.Marshal(publicKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal passkey request options: %w", err)
 	}
 
-	fmt.Printf("\n")
-	fmt.Printf("This WhatsApp account requires passkey authentication to link a new device.\n")
-	fmt.Printf("nchat cannot access your passkey directly, so please complete these steps:\n")
-	fmt.Printf("\n")
-	fmt.Printf("1. In a browser, open https://web.whatsapp.com signed in to (or able to\n")
-	fmt.Printf("   authenticate with the passkey of) this WhatsApp account.\n")
-	fmt.Printf("2. Open the browser developer console (F12 / Cmd-Opt-J) and run:\n")
-	fmt.Printf("\n")
-	fmt.Printf("   const opts = PublicKeyCredential.parseRequestOptionsFromJSON(%s);\n", string(pubKeyJson))
-	fmt.Printf("   const cred = await navigator.credentials.get({ publicKey: opts });\n")
-	fmt.Printf("   console.log(JSON.stringify(cred.toJSON()));\n")
-	fmt.Printf("\n")
-	fmt.Printf("3. Approve the passkey prompt, then copy the single JSON line it prints.\n")
-	fmt.Printf("4. Paste that JSON below and press Enter (or press CTRL-C to abort):\n")
-	fmt.Printf("\n")
+	msg := "This WhatsApp account requires passkey authentication to link a new device.\n" +
+		"braids cannot access your passkey directly, so please complete these steps:\n" +
+		"\n" +
+		"1. In a browser, open https://web.whatsapp.com signed in to (or able to\n" +
+		"   authenticate with the passkey of) this WhatsApp account.\n" +
+		"2. Open the browser developer console (F12 / Cmd-Opt-J) and run:\n" +
+		"\n" +
+		"   const opts = PublicKeyCredential.parseRequestOptionsFromJSON(" + string(pubKeyJson) + ");\n" +
+		"   const cred = await navigator.credentials.get({ publicKey: opts });\n" +
+		"   console.log(JSON.stringify(cred.toJSON()));\n" +
+		"\n" +
+		"3. Approve the passkey prompt, then copy the single JSON line it prints.\n" +
+		"4. Paste that JSON below."
+	CWmAuthShow(connId, AuthStepInfo, msg, "")
 
-	respJson, err := ReadPastedJson(os.Stdin)
+	input, ok := CWmAuthInput(connId, AuthFieldPasskeyResponse, "Passkey response JSON", false)
+	if !ok {
+		return nil, fmt.Errorf("passkey authentication cancelled")
+	}
+
+	respJson, err := ReadPastedJson(strings.NewReader(input + "\n"))
 	if err != nil {
 		return nil, err
 	}
@@ -2712,15 +2714,12 @@ func GetPasskeyResponse(publicKey *types.WebAuthnPublicKey) (*types.WebAuthnResp
 // When SkipHandoffUX is true the QR channel confirms automatically and this is
 // not reached.
 func ConfirmPasskeyHandoff(connId int, cli *whatsmeow.Client, confirmation *events.PairPasskeyConfirmation) {
-	fmt.Printf("\n")
-	fmt.Printf("Verify that your phone shows the following pairing code:\n")
-	fmt.Printf("\n")
-	fmt.Printf("    %s\n", confirmation.Code)
-	fmt.Printf("\n")
-	fmt.Printf("Press Enter to confirm the codes match (or press CTRL-C to abort):\n")
-
-	reader := bufio.NewReader(os.Stdin)
-	_, _ = reader.ReadString('\n')
+	CWmAuthShow(connId, AuthStepInfo, "Verify that your phone shows the following pairing code:", confirmation.Code)
+	if _, ok := CWmAuthInput(connId, AuthFieldConfirm, "Confirm that the codes match", false); !ok {
+		LOG_WARNING("passkey confirmation cancelled")
+		SetState(connId, Disconnected)
+		return
+	}
 
 	if err := cli.SendPasskeyConfirmation(context.TODO()); err != nil {
 		LOG_WARNING(fmt.Sprintf("send passkey confirmation error %#v", err))
@@ -2761,26 +2760,15 @@ func WmLogin(connId int) int {
 	} else {
 		timeoutMs = 60000 // 60 sec timeout during setup / qr code scan
 		go func() {
-			hasGUI := HasGUI()
 			usePairingCode := GetConfigOrEnvFlag("USE_PAIRING_CODE")
 
 			LOG_TRACE(fmt.Sprintf("acquire console"))
 			CWmSetProtocolUiControl(connId, 1)
 
-			if usePairingCode {
-				fmt.Printf("\n")
-				fmt.Printf("Open the WhatsApp notification \"Enter code to link new device\" on your phone,\n")
-				fmt.Printf("click \"Confirm\" and enter below pairing code on your phone, or press CTRL-C\n")
-				fmt.Printf("to abort.\n")
-				fmt.Printf("\n")
-			} else {
-				fmt.Printf("\n")
-				fmt.Printf("Open WhatsApp on your phone, click the menu bar and select \"Linked devices\".\n")
-				fmt.Printf("Click on \"Link a device\", unlock the phone and aim its camera at the\n")
-				fmt.Printf("Qr code displayed on the computer screen.\n")
-				fmt.Printf("\n")
-				fmt.Printf("Scan the Qr code to authenticate, or press CTRL-C to abort.\n")
-			}
+			const pairingCodeMsg = "Open the WhatsApp notification \"Enter code to link new device\" on your phone,\n" +
+				"tap \"Confirm\" and enter this pairing code on your phone."
+			const qrCodeMsg = "Open WhatsApp on your phone, open the menu and select \"Linked devices\".\n" +
+				"Tap \"Link a device\", unlock the phone and scan this QR code."
 
 			passkeyRequired := false
 			for evt := range ch {
@@ -2800,22 +2788,15 @@ func WmLogin(connId int) int {
 							LOG_WARNING(fmt.Sprintf("pair phone error %#v", pairErr))
 							SetState(connId, Disconnected)
 						} else {
-							fmt.Printf("Code: %s\n", pairCode)
-							fmt.Printf("\n")
+							CWmAuthShow(connId, AuthStepInfo, pairingCodeMsg, pairCode)
 						}
 					} else {
-						if hasGUI {
-							qrPath := path + "/tmp/qr.png"
-							qrcode.WriteFile(evt.Code, qrcode.Medium, 512, qrPath)
-							ShowImage(qrPath)
-						} else {
-							qrterminal.GenerateHalfBlock(evt.Code, qrterminal.L, os.Stdout)
-						}
+						CWmAuthShow(connId, AuthStepQr, qrCodeMsg, evt.Code)
 					}
 				} else if evt.Event == whatsmeow.QRChannelEventPasskeyRequest {
 					passkeyRequired = true
 					SetPasskeyWait(connId, true)
-					resp, respErr := GetPasskeyResponse(evt.PasskeyRequest.PublicKey)
+					resp, respErr := GetPasskeyResponse(connId, evt.PasskeyRequest.PublicKey)
 					SetPasskeyWait(connId, false)
 					if respErr != nil {
 						LOG_WARNING(fmt.Sprintf("get passkey response error %#v", respErr))
@@ -2824,8 +2805,7 @@ func WmLogin(connId int) int {
 						LOG_WARNING(fmt.Sprintf("send passkey response error %#v", sendErr))
 						SetState(connId, Disconnected)
 					} else {
-						fmt.Printf("\n")
-						fmt.Printf("Passkey response sent, completing pairing...\n")
+						CWmAuthShow(connId, AuthStepInfo, "Passkey response sent, completing pairing...", "")
 					}
 				} else if evt.Event == whatsmeow.QRChannelEventPasskeyResponse {
 					// Reached only when SkipHandoffUX is false; otherwise the QR
@@ -2881,22 +2861,11 @@ func WmLogin(connId int) int {
 	if GetState(connId) != Connected {
 		LOG_WARNING(fmt.Sprintf("state not connected %#v", GetState(connId)))
 
-		LOG_TRACE(fmt.Sprintf("acquire console"))
-		CWmSetProtocolUiControl(connId, 1)
-
-		fmt.Printf("\n")
 		if GetState(connId) == Outdated {
-			fmt.Printf("ERROR:\n")
-			fmt.Printf("WhatsApp client is outdated, please update nchat to a newer version. See:\n")
-			fmt.Printf("https://github.com/d99kris/nchat/blob/master/doc/WMOUTDATED.md\n")
+			CWmAuthShow(connId, AuthStepError, "WhatsApp client is outdated, please update braids to a newer version.", "")
 		} else {
-			fmt.Printf("ERROR:\n")
-			fmt.Printf("Please see the log for details.\n")
+			CWmAuthShow(connId, AuthStepError, "WhatsApp connection failed, please see the log for details.", "")
 		}
-		fmt.Printf("\n")
-
-		LOG_TRACE(fmt.Sprintf("release console"))
-		CWmSetProtocolUiControl(connId, 0)
 
 		CWmClearStatus(connId, FlagConnecting)
 		return -1

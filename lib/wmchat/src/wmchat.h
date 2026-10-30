@@ -128,6 +128,8 @@ void WmUpdateArchivedNotify(int p_ConnId, char* p_ChatId, int p_IsArchived);
 void WmUpdatePinNotify(int p_ConnId, char* p_ChatId, int p_IsPinned, int p_TimePinned);
 void WmReinit(int p_ConnId);
 void WmSetProtocolUiControl(int p_ConnId, int p_IsTakeControl);
+void WmAuthShow(int p_ConnId, int p_Step, char* p_Message, char* p_Data);
+char* WmAuthInput(int p_ConnId, char* p_Field, char* p_Message, int p_IsSecret);
 void WmSetStatus(int p_ConnId, int p_Flags);
 void WmClearStatus(int p_ConnId, int p_Flags);
 int WmAppConfigGetNum(char* p_Param);
