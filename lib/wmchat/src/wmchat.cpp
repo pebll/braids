@@ -68,7 +68,8 @@ bool WmChat::HasFeature(ProtocolFeature p_ProtocolFeature) const
     FeatureAutoGetContactsOnLogin |
     FeaturePinChat |
     FeatureArchiveChat |
-    FeaturePresenceRequiresOnline;
+    FeaturePresenceRequiresOnline |
+    FeatureAvatars;
   return (p_ProtocolFeature & customFeatures);
 }
 
@@ -677,6 +678,14 @@ void WmChat::PerformRequest(std::shared_ptr<RequestMessage> p_RequestMessage)
       }
       break;
 
+    case GetAvatarRequestType:
+      {
+        std::shared_ptr<GetAvatarRequest> getAvatarRequest =
+          std::static_pointer_cast<GetAvatarRequest>(p_RequestMessage);
+        CWmGetAvatar(m_ConnId, const_cast<char*>(getAvatarRequest->id.c_str()));
+      }
+      break;
+
     case GetGroupMembersRequestType:
       {
         LOG_DEBUG("get group members");
@@ -872,6 +881,24 @@ void WmNewChatsNotify(int p_ConnId, char* p_ChatId, int p_IsUnread, int p_IsMute
   }
 
   free(p_ChatId);
+}
+
+void WmNewAvatarNotify(int p_ConnId, char* p_Id, char* p_FilePath)
+{
+  WmChat* instance = WmChat::GetInstance(p_ConnId);
+  if (instance != nullptr)
+  {
+    std::shared_ptr<NewAvatarNotify> notify = std::make_shared<NewAvatarNotify>(instance->GetProfileId());
+    notify->id = std::string(p_Id);
+    notify->filePath = std::string(p_FilePath);
+
+    std::shared_ptr<DeferNotifyRequest> deferNotifyRequest = std::make_shared<DeferNotifyRequest>();
+    deferNotifyRequest->serviceMessage = notify;
+    instance->SendRequest(deferNotifyRequest);
+  }
+
+  free(p_Id);
+  free(p_FilePath);
 }
 
 void WmNewGroupMembersNotify(int p_ConnId, char* p_ChatId, char* p_MembersJson)

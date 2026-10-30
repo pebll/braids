@@ -1,7 +1,7 @@
 braidsd API
 ===========
 
-Status: draft, API version `0.3.0` (milestone M3). The API is JSON-RPC 2.0
+Status: draft, API version `0.4.0` (milestone M3). The API is JSON-RPC 2.0
 with one JSON object per line, served on a Unix socket and/or stdin/stdout.
 
 Transport
@@ -56,7 +56,8 @@ Objects
      "error": "<message if state is error>",
      "capabilities": {"editWindowSec": -1 (unlimited) | 0 (none) | seconds,
                       "pinChat", "archiveChat", "pinMessage",
-                      "limitedReactions", "readReceiptsPerMessage"}}
+                      "limitedReactions", "readReceiptsPerMessage",
+                      "avatars"}}
 
 **Chat**
 
@@ -104,6 +105,7 @@ Methods
 | `chats.archive` | `accountId`, `chatId`, `isArchived`? (true) | `{}` (error 4 if unsupported) |
 | `chats.delete` | `accountId`, `chatId` | `{}`, then `chat.removed` (Matrix: leave + forget) |
 | `contacts.list` | `accountId` | `[Contact]` |
+| `avatars.get` | `accountId`, `ids` ([user or chat id]) | `{accountId, avatars: {id: path}}` with the known ones (`""`: no picture); the others are fetched once per session and arrive as `avatar.updated` |
 | `members.get` | `accountId`, `chatId` | `{accountId, chatId, members: [Contact]}` (async) |
 | `messages.get` | `accountId`, `chatId`, `fromMsgId`? (latest), `limit`? (30) | `{accountId, chatId, fromMsgId, messages: [Message] oldest first, timedOut}` (async, from cache or server) |
 | `messages.send` | `accountId`, `chatId`, `text`?, `quotedId`?, `filePath`? (absolute) | `{}`; the message arrives as `message.added` |
@@ -139,6 +141,7 @@ Events
 | `chat.removed` | `{accountId, chatId}` |
 | `chat.moved` | `{accountId, chatId, newChatId}` (e.g. Telegram group upgraded) |
 | `contacts.updated` | `{accountId, fullSync, contacts: [Contact]}` |
+| `avatar.updated` | `{accountId, id, path}` (local image file, `""` if none; also sent when a picture changes) |
 | `members.updated` | `{accountId, chatId, members: [Contact]}` |
 | `message.added` | `Message` |
 | `message.updated` | `Message` |

@@ -85,7 +85,7 @@
         {/if}
         {#each contacts as c (c.id)}
           <button class="contact" onclick={() => start(c.id)} disabled={!!busy}>
-            <Avatar name={c.name || c.id} id={c.id} size={36} online={store.isOnline(accountId, c.id)} ring="var(--surface)" />
+            <Avatar name={c.name || c.id} id={c.id} size={36} owner={accountId} online={store.isOnline(accountId, c.id)} ring="var(--surface)" />
             <span class="cname">{c.name || c.id}<small>{c.phone || (c.name ? c.id : '')}</small></span>
             {#if busy === c.id}<LoaderCircle size={16} class="spin" />{/if}
           </button>

@@ -475,6 +475,17 @@ void ChatModel::OnServiceMessage(std::shared_ptr<ServiceMessage> p_ServiceMessag
       }
       break;
 
+    case NewAvatarNotifyType:
+      {
+        std::shared_ptr<NewAvatarNotify> notify = std::static_pointer_cast<NewAvatarNotify>(p_ServiceMessage);
+        auto ait = account.avatars.find(notify->id);
+        if ((ait != account.avatars.end()) && (ait->second == notify->filePath)) break;
+
+        account.avatars[notify->id] = notify->filePath;
+        Emit("avatar.updated", json{ { "accountId", accountId }, { "id", notify->id }, { "path", notify->filePath } });
+      }
+      break;
+
     case NewGroupMembersNotifyType:
       {
         std::shared_ptr<NewGroupMembersNotify> notify =
@@ -1367,6 +1378,31 @@ void ChatModel::SendTyping(const std::string& p_AccountId, const std::string& p_
   SendProtocolRequest(p_AccountId, sendTypingRequest);
 }
 
+// Known avatars of the given users / chats; the others are requested once per
+// session from the protocol and arrive as avatar.updated events.
+json ChatModel::GetAvatars(const std::string& p_AccountId, const std::vector<std::string>& p_Ids)
+{
+  AccountState& account = GetAccountOrThrow(p_AccountId);
+  const bool hasAvatars = HasFeature(p_AccountId, FeatureAvatars);
+  json avatars = json::object();
+  for (const auto& id : p_Ids)
+  {
+    auto ait = account.avatars.find(id);
+    if (ait != account.avatars.end())
+    {
+      avatars[id] = ait->second;
+    }
+    else if (hasAvatars && account.avatarsRequested.insert(id).second)
+    {
+      std::shared_ptr<GetAvatarRequest> getAvatarRequest = std::make_shared<GetAvatarRequest>();
+      getAvatarRequest->id = id;
+      SendProtocolRequest(p_AccountId, getAvatarRequest);
+    }
+  }
+
+  return json{ { "accountId", p_AccountId }, { "avatars", avatars } };
+}
+
 void ChatModel::GetMembers(const std::string& p_AccountId, const std::string& p_ChatId, const Reply& p_Reply)
 {
   GetAccountOrThrow(p_AccountId);
@@ -1739,6 +1775,7 @@ json ChatModel::CapabilitiesToJson(std::shared_ptr<Protocol> p_Protocol, const s
     { "pinChat", p_Protocol->HasFeature(FeaturePinChat) },
     { "archiveChat", p_Protocol->HasFeature(FeatureArchiveChat) },
     { "pinMessage", p_Protocol->HasFeature(FeaturePinMessage) },
+    { "avatars", p_Protocol->HasFeature(FeatureAvatars) },
     { "limitedReactions", p_Protocol->HasFeature(FeatureLimitedReactions) },
     { "readReceiptsPerMessage", HasPerMessageReadReceipts(p_ProtocolName) },
   };

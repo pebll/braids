@@ -168,7 +168,7 @@
 >
   {#if showAvatar}
     {#if last}
-      <Avatar name={store.senderName(m)} id={m.senderId} size={30} />
+      <Avatar name={store.senderName(m)} id={m.senderId} size={30} owner={m.accountId} />
     {:else}
       <span class="avatar-space"></span>
     {/if}

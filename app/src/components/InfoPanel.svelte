@@ -93,7 +93,7 @@
         <div class="members">
           {#each members.slice(0, 200) as member (member.id)}
             <div class="member">
-              <Avatar name={member.name || member.id} id={member.id} size={30} online={store.isOnline(accountId, member.id)} ring="var(--bg-1)" />
+              <Avatar name={member.name || member.id} id={member.id} size={30} owner={accountId} online={store.isOnline(accountId, member.id)} ring="var(--bg-1)" />
               <span class="member-name">{member.isSelf ? 'You' : member.name || member.id}</span>
             </div>
           {/each}

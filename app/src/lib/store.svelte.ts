@@ -73,6 +73,7 @@ class Store {
   members = $state<Record<string, Contact[]>>({});
   typing = $state<Record<string, Record<string, string>>>({}); // key -> userId -> name
   presence = $state<Record<string, { isOnline: boolean; timeSeen: number }>>({}); // accountId\u0001userId
+  avatars = $state<Record<string, string>>({}); // accountId\u0001user or chat id -> image path ('' none)
   setups = $state<Record<string, Setup>>({});
   accountPrompts = $state<Record<string, AuthPrompt>>({}); // runtime prompts per account
 
@@ -86,6 +87,9 @@ class Store {
   focused = $state(true);
 
   private typingTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  private avatarAsked = new Set<string>();
+  private avatarBatch = new Map<string, Set<string>>(); // accountId -> ids
+  private avatarTimer: ReturnType<typeof setTimeout> | undefined;
   private toastId = 1;
 
   // ---- derived ----
@@ -209,6 +213,32 @@ class Store {
     return Object.values(this.typing[key] ?? {});
   }
 
+  // Avatar image of a user or chat; asks braidsd once (batched), the picture
+  // arrives later as avatar.updated. '' while unknown or without a picture.
+  avatar(accountId: string, id: string): string {
+    const key = chatKey(accountId, id);
+    const path = this.avatars[key];
+    if (path === undefined && !this.avatarAsked.has(key) && this.accounts[accountId]?.capabilities.avatars) {
+      this.avatarAsked.add(key);
+      if (!this.avatarBatch.has(accountId)) this.avatarBatch.set(accountId, new Set());
+      this.avatarBatch.get(accountId)!.add(id);
+      clearTimeout(this.avatarTimer);
+      this.avatarTimer = setTimeout(() => this.flushAvatars(), 50);
+    }
+    return path ?? '';
+  }
+
+  private flushAvatars() {
+    for (const [accountId, ids] of this.avatarBatch) {
+      api.call('avatars.get', { accountId, ids: [...ids] })
+        .then((r) => {
+          for (const [id, path] of Object.entries(r.avatars as Record<string, string>)) this.avatars[chatKey(accountId, id)] = path;
+        })
+        .catch(() => {});
+    }
+    this.avatarBatch.clear();
+  }
+
   isOnline(accountId: string, userId: string): boolean {
     return this.presence[`${accountId}\u0001${userId}`]?.isOnline ?? false;
   }
@@ -262,6 +292,8 @@ class Store {
         this.messages[this.current] = emptyList();
         await this.loadOlder(this.current);
       }
+      // avatars are asked for again after a reconnect
+      this.avatarAsked.clear();
       this.synced = true;
     } catch (e) {
       console.error('resync failed', e);
@@ -368,6 +400,9 @@ class Store {
       case 'typing':
         this.onTyping(p);
         break;
+      case 'avatar.updated':
+        this.avatars[chatKey(p.accountId, p.id)] = p.path;
+        break;
       case 'presence':
         this.presence[`${p.accountId}\u0001${p.userId}`] = { isOnline: p.isOnline, timeSeen: p.timeSeen };
         break;
@@ -465,6 +500,9 @@ class Store {
     }
     if (this.current && splitKey(this.current)[0] === accountId) this.current = '';
     if (this.filter.kind === 'account' && this.filter.accountId === accountId) this.filter = { kind: 'all' };
+    for (const key of Object.keys(this.avatars)) {
+      if (splitKey(key)[0] === accountId) delete this.avatars[key];
+    }
     for (const key of Object.keys(settings.categories)) {
       if (splitKey(key)[0] === accountId) delete settings.categories[key];
     }

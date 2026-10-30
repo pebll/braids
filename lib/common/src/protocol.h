@@ -35,6 +35,7 @@ enum ProtocolFeature
   FeaturePinMessage = (1 << 9),
   FeaturePresenceRequiresOnline = (1 << 10),
   FeatureEditMessagesAnytime = (1 << 11), // braids extension
+  FeatureAvatars = (1 << 12), // braids extension: handles GetAvatarRequest
 };
 
 // Interactive authentication (account setup and re-login), braids extension.
@@ -165,6 +166,7 @@ enum MessageType
   ReinitRequestType,
   FindMessageRequestType,
   GetGroupMembersRequestType,
+  GetAvatarRequestType, // braids extension
   // Service messages
   ServiceMessageType,
   NewContactsNotifyType,
@@ -193,6 +195,7 @@ enum MessageType
   NewGroupMembersNotifyType,
   UpdateArchivedNotifyType,
   MoveChatNotifyType,
+  NewAvatarNotifyType, // braids extension
 };
 
 struct ContactInfo
@@ -530,6 +533,16 @@ public:
   std::string chatId;
 };
 
+// Profile picture of a user or chat (for a one-to-one chat the other user's),
+// answered with NewAvatarNotify. Protocols cache the image under their
+// profile dir and may answer from there.
+class GetAvatarRequest : public RequestMessage
+{
+public:
+  virtual MessageType GetMessageType() const { return GetAvatarRequestType; }
+  std::string id; // user id or chat id
+};
+
 // Service messages
 class ServiceMessage
 {
@@ -731,6 +744,18 @@ public:
   virtual MessageType GetMessageType() const { return MoveChatNotifyType; }
   std::string chatId;
   std::string newChatId;
+};
+
+// Avatar of a user or chat: a local image file, empty if there is none. Sent
+// for GetAvatarRequest and when the protocol learns of a change.
+class NewAvatarNotify : public ServiceMessage
+{
+public:
+  explicit NewAvatarNotify(const std::string& p_ProfileId)
+    : ServiceMessage(p_ProfileId) { }
+  virtual MessageType GetMessageType() const { return NewAvatarNotifyType; }
+  std::string id;
+  std::string filePath;
 };
 
 class UpdateMuteNotify : public ServiceMessage

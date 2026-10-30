@@ -45,6 +45,7 @@ private:
 
 private:
   std::string m_ProfileId;
+  std::string m_ProfileDir;
   std::function<void(std::shared_ptr<ServiceMessage>)> m_MessageHandler;
 
   bool m_Running = false;

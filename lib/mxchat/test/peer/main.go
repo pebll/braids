@@ -21,6 +21,8 @@
 //   react <room> <event> <key>        send reaction
 //   redact <room> <event>             redact event
 //   topic <room> <text...>            set the room topic (a state event)
+//   avatar <path>                     set own avatar from an image file
+//   roomavatar <room> <path>          set the room avatar from an image file
 //   typing <room> on|off              typing notification
 //   read <room> <event>               send read receipt
 //   sendfile <room> <path>            send attachment (encrypted in e2ee rooms)
@@ -310,6 +312,26 @@ func (p *peer) command(ctx context.Context, line string) (map[string]any, error)
 			return nil, err
 		}
 		return map[string]any{"event": resp.EventID}, nil
+
+	case "avatar", "roomavatar":
+		file := arg(1)
+		if f[0] == "roomavatar" {
+			file = arg(2)
+		}
+		data, err := os.ReadFile(file)
+		if err != nil {
+			return nil, err
+		}
+		up, err := cli.UploadMedia(ctx, mautrix.ReqUploadMedia{ContentBytes: data, ContentType: http.DetectContentType(data)})
+		if err != nil {
+			return nil, err
+		}
+		if f[0] == "avatar" {
+			return map[string]any{"uri": up.ContentURI.String()}, cli.SetAvatarURL(ctx, up.ContentURI)
+		}
+		_, err = cli.SendStateEvent(ctx, id.RoomID(arg(1)), event.StateRoomAvatar, "",
+			&event.RoomAvatarEventContent{URL: up.ContentURI.CUString()})
+		return map[string]any{"uri": up.ContentURI.String()}, err
 
 	case "topic":
 		_, err := cli.SendStateEvent(ctx, id.RoomID(arg(1)), event.StateTopic, "", &event.TopicEventContent{Topic: rest(2)})

@@ -82,6 +82,11 @@ try {
   // chat list
   await page.getByRole('option', { name: /The Office/ }).waitFor({ timeout: 30000 });
   check((await page.getByRole('option').count()) >= 2, 'chat list shows the chats');
+  // profile pictures: shown where the protocol has one, initials otherwise
+  await page.waitForFunction(() => [...document.querySelectorAll('[role=option]')].some((o) => o.textContent.includes('Michael') && o.querySelector('.circle img')?.naturalWidth > 0));
+  check(true, 'profile picture shown');
+  const dwight = page.locator('.row', { has: page.locator('.name', { hasText: /^Dwight$/ }) });
+  check(await dwight.locator('.circle img').count() === 0 && (await dwight.locator('.circle').textContent()) === 'D', 'initials without a picture');
   await page.fill('input[aria-label="Search chats"]', 'offi');
   check((await page.getByRole('option').count()) === 1, 'search filters chats');
   await page.fill('input[aria-label="Search chats"]', '');

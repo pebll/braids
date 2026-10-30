@@ -65,7 +65,7 @@ std::string SgChat::GetProfileDisplayName() const
 bool SgChat::HasFeature(ProtocolFeature p_ProtocolFeature) const
 {
   // Signal allows editing within ~24 hours
-  ProtocolFeature customFeatures = FeatureEditMessagesWithinTwoDays;
+  int customFeatures = FeatureEditMessagesWithinTwoDays | FeatureAvatars;
   return (p_ProtocolFeature & customFeatures);
 }
 
@@ -705,6 +705,14 @@ void SgChat::PerformRequest(std::shared_ptr<RequestMessage> p_RequestMessage)
       }
       break;
 
+    case GetAvatarRequestType:
+      {
+        std::shared_ptr<GetAvatarRequest> getAvatarRequest =
+          std::static_pointer_cast<GetAvatarRequest>(p_RequestMessage);
+        CSgGetAvatar(m_ConnId, const_cast<char*>(getAvatarRequest->id.c_str()));
+      }
+      break;
+
     case GetGroupMembersRequestType:
       {
         LOG_DEBUG("get group members");
@@ -919,6 +927,24 @@ void SgNewChatsNotify(int p_ConnId, char* p_ChatId, int p_IsUnread, int p_IsMute
   }
 
   free(p_ChatId);
+}
+
+void SgNewAvatarNotify(int p_ConnId, char* p_Id, char* p_FilePath)
+{
+  SgChat* instance = SgChat::GetInstance(p_ConnId);
+  if (instance != nullptr)
+  {
+    std::shared_ptr<NewAvatarNotify> notify = std::make_shared<NewAvatarNotify>(instance->GetProfileId());
+    notify->id = std::string(p_Id);
+    notify->filePath = std::string(p_FilePath);
+
+    std::shared_ptr<DeferNotifyRequest> deferNotifyRequest = std::make_shared<DeferNotifyRequest>();
+    deferNotifyRequest->serviceMessage = notify;
+    instance->SendRequest(deferNotifyRequest);
+  }
+
+  free(p_Id);
+  free(p_FilePath);
 }
 
 void SgNewGroupMembersNotify(int p_ConnId, char* p_ChatId, char* p_MembersJson)

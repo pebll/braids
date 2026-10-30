@@ -198,6 +198,9 @@ private:
   void TdMessageContentConvert(td::td_api::MessageContent& p_TdMessageContent, int64_t p_SenderId,
                                std::string& p_Text, std::string& p_FileInfo);
   void TdMessageConvert(td::td_api::message& p_TdMessage, ChatMessage& p_ChatMessage);
+  void GetAvatar(const std::string& p_AvatarId);
+  void DownloadAvatar(const std::string& p_AvatarId, td::td_api::object_ptr<td::td_api::file>& p_File);
+  void NotifyAvatar(const std::string& p_AvatarId, const std::string& p_FilePath);
   void DownloadFile(std::string p_ChatId, std::string p_MsgId, std::string p_FileId, std::string p_DownloadId,
                     DownloadFileAction p_DownloadFileAction);
   void RequestSponsoredMessagesIfNeeded();
@@ -362,7 +365,8 @@ bool TgChat::Impl::HasFeature(ProtocolFeature p_ProtocolFeature) const
     FeatureAutoGetContactsOnLogin |
     FeaturePinChat |
     FeatureArchiveChat |
-    FeaturePinMessage;
+    FeaturePinMessage |
+    FeatureAvatars;
   return (p_ProtocolFeature & customFeatures);
 }
 
@@ -1710,6 +1714,13 @@ void TgChat::Impl::PerformRequest(std::shared_ptr<RequestMessage> p_RequestMessa
       }
       break;
 
+    case GetAvatarRequestType:
+      {
+        std::shared_ptr<GetAvatarRequest> getAvatarRequest = std::static_pointer_cast<GetAvatarRequest>(p_RequestMessage);
+        GetAvatar(getAvatarRequest->id);
+      }
+      break;
+
     case GetGroupMembersRequestType:
       {
         std::shared_ptr<GetGroupMembersRequest> getGroupMembersRequest =
@@ -1911,6 +1922,13 @@ void TgChat::Impl::ProcessUpdate(td::td_api::object_ptr<td::td_api::Object> upda
       std::make_shared<NewContactsNotify>(m_ProfileId);
     newContactsNotify->contactInfos = std::vector<ContactInfo>({ contactInfo });
     CallMessageHandler(newContactsNotify);
+  },
+  [this](td::td_api::updateChatPhoto& update_chat_photo)
+  {
+    LOG_TRACE("chat photo update");
+
+    // fetch the new photo (or report its removal)
+    GetAvatar(StrUtil::NumToHex(update_chat_photo.chat_id_));
   },
   [this](td::td_api::updateChatTitle& update_chat_title)
   {
@@ -3720,6 +3738,97 @@ void TgChat::Impl::TdMessageConvert(td::td_api::message& p_TdMessage, ChatMessag
   {
     GetMsgReactions(p_TdMessage.interaction_info_, p_ChatMessage.reactions);
   }
+}
+
+// Avatar of a chat (for a private chat, which has the user's id, the user's
+// photo) or of a user without a chat: the small photo, downloaded by tdlib
+// into its file cache.
+void TgChat::Impl::GetAvatar(const std::string& p_AvatarId)
+{
+  const int64_t idNum = StrUtil::NumFromHex<int64_t>(p_AvatarId);
+  auto get_chat = td::td_api::make_object<td::td_api::getChat>();
+  get_chat->chat_id_ = idNum;
+  SendQuery(std::move(get_chat), [this, p_AvatarId, idNum](Object object)
+  {
+    if (object->get_id() == td::td_api::chat::ID)
+    {
+      auto tchat = td::move_tl_object_as<td::td_api::chat>(object);
+      if (tchat->photo_ && tchat->photo_->small_)
+      {
+        DownloadAvatar(p_AvatarId, tchat->photo_->small_);
+      }
+      else
+      {
+        NotifyAvatar(p_AvatarId, "");
+      }
+
+      return;
+    }
+
+    if (idNum <= 0)
+    {
+      NotifyAvatar(p_AvatarId, "");
+      return;
+    }
+
+    // a user without a private chat (e.g. a group member)
+    auto get_user = td::td_api::make_object<td::td_api::getUser>();
+    get_user->user_id_ = idNum;
+    SendQuery(std::move(get_user), [this, p_AvatarId](Object userObject)
+    {
+      if (userObject->get_id() != td::td_api::user::ID)
+      {
+        NotifyAvatar(p_AvatarId, "");
+        return;
+      }
+
+      auto user = td::move_tl_object_as<td::td_api::user>(userObject);
+      if (user->profile_photo_ && user->profile_photo_->small_)
+      {
+        DownloadAvatar(p_AvatarId, user->profile_photo_->small_);
+      }
+      else
+      {
+        NotifyAvatar(p_AvatarId, "");
+      }
+    });
+  });
+}
+
+void TgChat::Impl::DownloadAvatar(const std::string& p_AvatarId, td::td_api::object_ptr<td::td_api::file>& p_File)
+{
+  if (p_File->local_ && p_File->local_->is_downloading_completed_ && !p_File->local_->path_.empty())
+  {
+    NotifyAvatar(p_AvatarId, p_File->local_->path_);
+    return;
+  }
+
+  auto download_file = td::td_api::make_object<td::td_api::downloadFile>();
+  download_file->file_id_ = p_File->id_;
+  download_file->priority_ = 1; // below message files
+  download_file->synchronous_ = true;
+  SendQuery(std::move(download_file), [this, p_AvatarId](Object object)
+  {
+    std::string path;
+    if (object->get_id() == td::td_api::file::ID)
+    {
+      auto file = td::move_tl_object_as<td::td_api::file>(object);
+      if (file->local_ && file->local_->is_downloading_completed_)
+      {
+        path = file->local_->path_;
+      }
+    }
+
+    NotifyAvatar(p_AvatarId, path);
+  });
+}
+
+void TgChat::Impl::NotifyAvatar(const std::string& p_AvatarId, const std::string& p_FilePath)
+{
+  std::shared_ptr<NewAvatarNotify> newAvatarNotify = std::make_shared<NewAvatarNotify>(m_ProfileId);
+  newAvatarNotify->id = p_AvatarId;
+  newAvatarNotify->filePath = p_FilePath;
+  CallMessageHandler(newAvatarNotify);
 }
 
 void TgChat::Impl::DownloadFile(std::string p_ChatId, std::string p_MsgId, std::string p_FileId,

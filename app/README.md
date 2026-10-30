@@ -74,6 +74,8 @@ Layout
   Categories (favorite / default / archived) are kept by the app; without
   one, a chat archived in the messenger counts as archived, and archiving in
   braids is mirrored to messengers that support it (Telegram, WhatsApp).
+  Profile pictures are requested in batches (`avatars.get`) when an
+  `Avatar` is shown and arrive by `avatar.updated`; initials are the fallback.
 - `src/lib/format.ts` — message markup to safe HTML, times, initials, colors.
 - `src/components/` — `Sidebar`, `ChatList`, `Conversation` (+ `MessageItem`,
   `Composer`), `InfoPanel`, `Wizard` / `AuthStep` (login flows), `Settings`,

@@ -12,6 +12,7 @@ package main
 // extern void SgNewContactsNotify(int p_ConnId, char* p_ChatId, char* p_Name, char* p_Phone, int p_IsSelf, int p_IsAlias, int p_Notify);
 // extern void SgNewChatsNotify(int p_ConnId, char* p_ChatId, int p_IsUnread, int p_IsMuted, int p_IsPinned, int p_IsArchived, int p_LastMessageTime);
 // extern void SgNewGroupMembersNotify(int p_ConnId, char* p_ChatId, char* p_MembersJson);
+// extern void SgNewAvatarNotify(int p_ConnId, char* p_Id, char* p_FilePath);
 // extern void SgNewMessagesNotify(int p_ConnId, char* p_ChatId, char* p_MsgId, char* p_SenderId, char* p_Text, int p_FromMe, char* p_QuotedId, char* p_FileId, char* p_FilePath, int p_FileStatus, int p_TimeSent, int p_IsRead, int p_IsEdited);
 // extern void SgNewHistoryMessagesNotify(int p_ConnId, char* p_ChatId, char* p_MsgId, char* p_SenderId, char* p_Text, int p_FromMe, char* p_QuotedId, char* p_FileId, char* p_FilePath, int p_FileStatus, int p_TimeSent, int p_IsRead, int p_IsEdited, char* p_FromMsgId, int p_Notify);
 // extern void SgNewStatusNotify(int p_ConnId, char* p_UserId, int p_IsOnline, int p_TimeSeen);
@@ -81,6 +82,11 @@ func CSgSendMessage(connId int, chatId *C.char, text *C.char, quotedId *C.char, 
 	return SgSendMessage(connId, C.GoString(chatId), C.GoString(text), C.GoString(quotedId), C.GoString(quotedText), C.GoString(quotedSender), C.GoString(filePath), C.GoString(fileType), C.GoString(editMsgId), editMsgSent, C.GoString(mentionsJson))
 }
 
+//export CSgGetAvatar
+func CSgGetAvatar(connId int, avatarId *C.char) int {
+	return SgGetAvatar(connId, C.GoString(avatarId))
+}
+
 //export CSgGetGroupMembers
 func CSgGetGroupMembers(connId int, chatId *C.char) int {
 	return SgGetGroupMembers(connId, C.GoString(chatId))
@@ -147,6 +153,10 @@ func CSgNewContactsNotify(connId int, chatId string, name string, phone string, 
 
 func CSgNewChatsNotify(connId int, chatId string, isUnread int, isMuted int, isPinned int, isArchived int, lastMessageTime int) {
 	C.SgNewChatsNotify(C.int(connId), C.CString(chatId), C.int(isUnread), C.int(isMuted), C.int(isPinned), C.int(isArchived), C.int(lastMessageTime))
+}
+
+func CSgNewAvatarNotify(connId int, avatarId string, filePath string) {
+	C.SgNewAvatarNotify(C.int(connId), C.CString(avatarId), C.CString(filePath))
 }
 
 func CSgNewGroupMembersNotify(connId int, chatId string, membersJson string) {

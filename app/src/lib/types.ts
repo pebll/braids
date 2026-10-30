@@ -16,6 +16,7 @@ export interface Capabilities {
   pinMessage: boolean;
   limitedReactions: boolean;
   readReceiptsPerMessage: boolean;
+  avatars: boolean;
 }
 
 export interface Account {

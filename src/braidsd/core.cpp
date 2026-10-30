@@ -26,7 +26,7 @@
 #include "timeutil.h"
 
 // semver of the API; clients must match the major version
-static const std::string s_ApiVersion = "0.3.0";
+static const std::string s_ApiVersion = "0.4.0";
 static const int64_t s_StartTime = TimeUtil::GetCurrentTimeMSec();
 
 static const char* AuthStepToString(AuthStep p_Step)
@@ -388,6 +388,21 @@ void Core::Dispatch(const std::string& p_Method, const json& p_Params, const Rep
     m_ChatModel->SendTyping(ParamStr(params, "accountId"), ParamStr(params, "chatId"),
                             ParamBool(params, "isTyping", true));
     p_Reply.Ok(json::object());
+  }
+  else if (p_Method == "avatars.get")
+  {
+    if (!params.contains("ids") || !params["ids"].is_array())
+    {
+      throw ApiException(ApiErrorInvalidParams, "missing array param 'ids'");
+    }
+
+    std::vector<std::string> ids;
+    for (const auto& id : params["ids"])
+    {
+      if (id.is_string()) ids.push_back(id.get<std::string>());
+    }
+
+    p_Reply.Ok(m_ChatModel->GetAvatars(ParamStr(params, "accountId"), ids));
   }
   else if (p_Method == "members.get")
   {

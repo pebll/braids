@@ -257,6 +257,22 @@ def main():
         # members
         members = d.call("members.get", {"accountId": account_id, "chatId": room})
         check({alice_id, bob_id} <= {m["id"] for m in members["members"]}, "members of room")
+
+        # avatars: bob's own and the room's
+        bob_peer.cmd(f"avatar {png}")
+        bob_peer.cmd(f"roomavatar {room} {png}")
+        got = d.call("avatars.get", {"accountId": account_id, "ids": [bob_id, room, alice_id]})
+        check(got["avatars"] == {}, "avatars requested from the protocol")
+        avatars = {}
+        while len(avatars) < 3:
+            ev = d.wait_event("avatar.updated", lambda p: p["accountId"] == account_id, timeout=60)
+            avatars[ev["id"]] = ev["path"]
+        for who in (bob_id, room):
+            with open(avatars[who], "rb") as f:
+                check(f.read(4) == b"\x89PNG", f"avatar of {'bob' if who == bob_id else 'room'} downloaded")
+        check(avatars[alice_id] == "", "no avatar: empty path")
+        again = d.call("avatars.get", {"accountId": account_id, "ids": [bob_id, alice_id]})
+        check(again["avatars"] == {bob_id: avatars[bob_id], alice_id: ""}, "known avatars returned directly")
         check(d.close() == 0, "clean exit")
 
         # while braidsd is stopped: a message, pages of state events only, then

@@ -887,6 +887,14 @@ func (handler *WmEventHandler) HandleEvent(rawEvt interface{}) {
 		LOG_TRACE(fmt.Sprintf("%#v", evt))
 		handler.HandleArchive(evt)
 
+	case *events.Picture:
+		// a contact or group changed its picture: fetch it again
+		LOG_TRACE(fmt.Sprintf("%#v", evt))
+		if evt.Remove {
+			forgetAvatar(handler.connId, evt.JID.String())
+		}
+		WmGetAvatar(handler.connId, evt.JID.String())
+
 	case *events.Pin:
 		LOG_TRACE(fmt.Sprintf("%#v", evt))
 		handler.HandlePin(evt)

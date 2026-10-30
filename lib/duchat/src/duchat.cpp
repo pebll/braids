@@ -14,6 +14,7 @@
 #include <sys/stat.h>
 
 #include "authutil.h"
+#include "fileutil.h"
 #include "log.h"
 #include "status.h"
 #include "strutil.h"
@@ -43,7 +44,7 @@ std::string DuChat::GetProfileId() const
 bool DuChat::HasFeature(ProtocolFeature p_ProtocolFeature) const
 {
   static int customFeatures =
-    FeatureAutoGetContactsOnLogin | FeatureEditMessagesAnytime;
+    FeatureAutoGetContactsOnLogin | FeatureEditMessagesAnytime | FeatureAvatars;
   return (p_ProtocolFeature & customFeatures);
 }
 
@@ -83,6 +84,7 @@ bool DuChat::SetupProfile(const std::string& p_ProfilesDir, std::string& p_Profi
   std::string profileDir = p_ProfilesDir + "/" + m_ProfileId;
 
   mkdir(profileDir.c_str(), 0777);
+  m_ProfileDir = profileDir;
 
   p_ProfileId = m_ProfileId;
 
@@ -92,8 +94,8 @@ bool DuChat::SetupProfile(const std::string& p_ProfilesDir, std::string& p_Profi
 bool DuChat::LoadProfile(const std::string& p_ProfilesDir, const std::string& p_ProfileId)
 {
   LOG_INFO("load dummy profile");
-  (void)p_ProfilesDir;
   m_ProfileId = p_ProfileId;
+  m_ProfileDir = p_ProfilesDir + "/" + p_ProfileId;
   return true;
 }
 
@@ -537,6 +539,39 @@ void DuChat::PerformRequest(std::shared_ptr<RequestMessage> p_RequestMessage)
           newMessageReactionsNotify->reactions = reactions;
           m_MessageHandler(newMessageReactionsNotify);
         }
+      }
+      break;
+
+    case GetAvatarRequestType:
+      {
+        // demo pictures for a few contacts and the group, none for the others
+        std::shared_ptr<GetAvatarRequest> getAvatarRequest =
+          std::static_pointer_cast<GetAvatarRequest>(p_RequestMessage);
+        static const std::map<std::string, std::pair<std::string, std::string>> s_Pictures = {
+          { "Michael_0", { "#2F64C8", "#F5C26B" } },
+          { "Pam_0", { "#C0396B", "#FBE3CF" } },
+          { "Jim_0", { "#0F7678", "#E3F2E8" } },
+          { s_GroupId, { "#A84A1A", "#F7E8DD" } },
+        };
+
+        std::shared_ptr<NewAvatarNotify> newAvatarNotify = std::make_shared<NewAvatarNotify>(m_ProfileId);
+        newAvatarNotify->id = getAvatarRequest->id;
+        auto pit = s_Pictures.find(getAvatarRequest->id);
+        if ((pit != s_Pictures.end()) && !m_ProfileDir.empty())
+        {
+          const std::string dir = m_ProfileDir + "/avatars";
+          mkdir(dir.c_str(), 0700);
+          const std::string path = dir + "/" + getAvatarRequest->id + ".svg";
+          const std::string svg =
+            "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\">"
+            "<rect width=\"64\" height=\"64\" fill=\"" + pit->second.first + "\"/>"
+            "<circle cx=\"32\" cy=\"26\" r=\"12\" fill=\"" + pit->second.second + "\"/>"
+            "<path d=\"M10 64c2-14 11-22 22-22s20 8 22 22z\" fill=\"" + pit->second.second + "\"/></svg>";
+          FileUtil::WriteFile(path, svg);
+          newAvatarNotify->filePath = path;
+        }
+
+        m_MessageHandler(newAvatarNotify);
       }
       break;
 
