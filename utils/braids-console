@@ -1,0 +1,226 @@
+#!/usr/bin/env python3
+# braids-console
+#
+# Copyright (c) 2026 braids contributors
+#
+# braids is distributed under the GNU AGPL v3 license, see LICENSE for details.
+
+"""Interactive console for braidsd (manual testing until the GUI exists).
+
+Starts braidsd --stdio, shows events in a readable form and walks through
+login flows: QR codes are rendered with `qrencode` when installed (otherwise
+the payload is printed), secret inputs are read without echo.
+
+Usage: utils/braids-console [--braidsd build/bin/braidsd] [--confdir DIR] [--raw]
+
+Commands:
+  add <protocol>              add account (Telegram, WhatsAppMd, Signal, Matrix, Dummy)
+  accounts                    list accounts
+  remove <accountId>          remove account
+  chats                       list chats (numbered)
+  open <n>                    open chat n, show latest messages
+  more                        load older messages in the open chat
+  send <text>                 send to the open chat
+  reply <#n> <text>           reply to message #n in the open chat
+  react <#n> <emoji>          react to message #n ('-' removes)
+  read                        mark the open chat read
+  call <method> [json]        raw API call
+  quit
+"""
+
+import argparse
+import getpass
+import json
+import os
+import queue
+import shutil
+import subprocess
+import sys
+import threading
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tests", "braidsd"))
+from braidsclient import ApiError, Braidsd  # noqa: E402
+
+QUIET = {"chat.updated", "contacts.updated", "presence", "members.updated", "account.connected"}
+
+
+class Console:
+    def __init__(self, d, raw):
+        self.d = d
+        self.raw = raw
+        self.chats = []
+        self.current = None
+        self.oldest = None
+        self.inputs = queue.Queue()
+        self.nums = {}
+        self.ids = {}
+        self.closing = False
+        self.lock = threading.Lock()
+        threading.Thread(target=self.events, daemon=True).start()
+
+    def out(self, text):
+        with self.lock:
+            print(text, flush=True)
+
+    def events(self):
+        while True:
+            msg = self.d.events.get()
+            if msg is None:
+                if not self.closing:
+                    self.out("braidsd exited")
+                    os._exit(1)
+                return
+            method, params = msg.get("method"), msg.get("params", {})
+            if self.raw:
+                self.out(json.dumps(msg, ensure_ascii=False))
+            if method == "account.auth":
+                self.auth(params)
+            elif method in QUIET or self.raw:
+                pass
+            elif method == "message.added" and self.current and params["chatId"] == self.current[1]:
+                self.out(self.fmt_msg(params))
+            elif method == "notification":
+                self.out(f"[notification] {params['chatName']}: {params['senderName']}: {params['text']}")
+            elif method == "typing":
+                if params["isTyping"]:
+                    self.out(f"[typing] {params['userName'] or params['userId']} in {params['chatId']}")
+            elif method in ("message.added", "message.updated"):
+                pass
+            else:
+                self.out(f"[{method}] {json.dumps(params, ensure_ascii=False)}")
+
+    def auth(self, p):
+        scope = {k: p[k] for k in ("setupId", "accountId") if k in p}
+        if p["step"] == "qr":
+            self.out("\n" + p["message"])
+            if shutil.which("qrencode"):
+                subprocess.run(["qrencode", "-t", "ANSIUTF8", p["data"]])
+            else:
+                self.out(f"(install qrencode to render) {p['data']}")
+        elif p["step"] in ("info", "error"):
+            self.out(f"\n[{p['step']}] {p['message']}" + (f"\n    {p['data']}" if p["data"] else ""))
+        elif p["step"] == "input":
+            # read on the main thread, which owns the terminal
+            self.inputs.put((scope, p))
+            self.out(f"\n[input] {p['message']} - press Enter to answer")
+
+    def answer_inputs(self):
+        while not self.inputs.empty():
+            scope, p = self.inputs.get()
+            label = p["message"] + (f" [{p['data']}]" if p["data"] else "") + (" (optional)" if p["isOptional"] else "")
+            value = getpass.getpass(label + ": ") if p["isSecret"] else input(label + ": ")
+            if not value and p["data"] and not p["isSecret"]:
+                value = p["data"]
+            try:
+                self.d.call("accounts.authInput", dict(scope, field=p["field"], value=value))
+            except ApiError as e:
+                self.out(f"error: {e.message}")
+
+    def fmt_msg(self, m):
+        quote = f" (re: {m['quoted']['text'][:30]!r})" if m.get("quoted") else ""
+        file = f" [file {m['file']['name']} {m['file']['status']}]" if m.get("file") else ""
+        reactions = " " + " ".join(f"{k}{v}" for k, v in m["reactions"]["counts"].items()) \
+            if m["reactions"]["counts"] else ""
+        flags = (" (edited)" if m["isEdited"] else "") + (" (deleted)" if m["isDeleted"] else "")
+        num = self.number(m["id"])
+        return f"  {num:>5} {m['senderName'] or m['senderId']}: {m['text']}{quote}{file}{reactions}{flags}"
+
+    def run_command(self, line):
+        cmd, _, arg = line.strip().partition(" ")
+        d = self.d
+        if cmd == "add":
+            d.call("accounts.add", {"protocol": arg})
+        elif cmd == "accounts":
+            for a in d.call("accounts.list"):
+                self.out(f"  {a['accountId']} {a['state']} {a['error']}")
+        elif cmd == "remove":
+            d.call("accounts.remove", {"accountId": arg})
+        elif cmd == "chats":
+            self.chats = d.call("chats.list")
+            for i, c in enumerate(self.chats):
+                last = c["lastMessage"]["text"][:40] if c["lastMessage"] else ""
+                flags = ("*" if c["isUnread"] else " ") + ("P" if c["isPinned"] else " ") + ("M" if c["isMuted"] else " ")
+                self.out(f"  {i:3} {flags} {c['name'] or c['id']} [{c['accountId']}] {last}")
+        elif cmd == "open":
+            c = self.chats[int(arg)]
+            self.current = (c["accountId"], c["id"])
+            d.call("chats.setCurrent", {"accountId": c["accountId"], "chatId": c["id"]})
+            self.load("")
+        elif cmd == "more" and self.current:
+            self.load(self.oldest or "")
+        elif cmd == "send" and self.current:
+            d.call("messages.send", {"accountId": self.current[0], "chatId": self.current[1], "text": arg})
+        elif cmd == "reply" and self.current:
+            msg_id, _, text = arg.partition(" ")
+            d.call("messages.send", {"accountId": self.current[0], "chatId": self.current[1], "text": text,
+                                     "quotedId": self.resolve(msg_id)})
+        elif cmd == "react" and self.current:
+            msg_id, _, emoji = arg.partition(" ")
+            d.call("reactions.send", {"accountId": self.current[0], "chatId": self.current[1],
+                                      "msgId": self.resolve(msg_id), "emoji": "" if emoji == "-" else emoji})
+        elif cmd == "read" and self.current and self.newest:
+            d.call("messages.markRead", {"accountId": self.current[0], "chatId": self.current[1],
+                                         "msgId": self.newest})
+        elif cmd == "call":
+            method, _, params = arg.partition(" ")
+            self.out(json.dumps(d.call(method, json.loads(params) if params else {}), ensure_ascii=False, indent=1))
+        elif cmd:
+            self.out(__doc__.split("Commands:")[1])
+
+    def load(self, from_id):
+        page = self.d.call("messages.get", {"accountId": self.current[0], "chatId": self.current[1],
+                                            "fromMsgId": from_id, "limit": 20})
+        for m in page["messages"]:
+            self.out(self.fmt_msg(m))
+        if page["messages"]:
+            self.oldest = page["messages"][0]["id"]
+            if not from_id:
+                self.newest = page["messages"][-1]["id"]
+
+    def number(self, msg_id):
+        # short message references (#n) for reply/react
+        if msg_id not in self.nums:
+            self.nums[msg_id] = f"#{len(self.nums) + 1}"
+            self.ids[self.nums[msg_id]] = msg_id
+        return self.nums[msg_id]
+
+    def resolve(self, ref):
+        return self.ids.get(ref, self.ids.get("#" + ref, ref))
+
+
+def main():
+    root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+    parser = argparse.ArgumentParser(description="interactive braidsd console")
+    parser.add_argument("--braidsd", default=os.path.join(root, "build", "bin", "braidsd"))
+    parser.add_argument("--confdir", default=os.path.expanduser("~/.config/braids"))
+    parser.add_argument("--raw", action="store_true", help="print all events as json")
+    args = parser.parse_args()
+
+    d = Braidsd(args.braidsd, args.confdir)
+    console = Console(d, args.raw)
+    console.newest = None
+    print("braids console, type 'help' for commands")
+    while True:
+        console.answer_inputs()
+        try:
+            line = input("> ")
+        except EOFError:
+            break
+        console.answer_inputs()
+        if line.strip() in ("quit", "exit"):
+            break
+        if line.strip() == "help":
+            print(__doc__.split("Commands:")[1])
+            continue
+        try:
+            console.run_command(line)
+        except ApiError as e:
+            print(f"error: {e.message}")
+        except (IndexError, ValueError) as e:
+            print(f"error: {e}")
+    console.closing = True
+    d.close()
+
+
+if __name__ == "__main__":
+    main()

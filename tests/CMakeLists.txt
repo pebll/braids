@@ -50,3 +50,13 @@ if(HAS_DUMMY AND Python3_FOUND)
                    --braidsd $<TARGET_FILE:braidsd>)
   set_tests_properties(braidsd_dummy PROPERTIES TIMEOUT 120)
 endif()
+
+# braidsd Matrix integration test, needs lib/mxchat/test/homeserver.sh running
+# (skipped otherwise)
+if(HAS_MATRIX AND Python3_FOUND)
+  add_test(NAME braidsd_matrix
+           COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/braidsd/test_matrix.py
+                   --braidsd $<TARGET_FILE:braidsd>
+                   --peer-src ${CMAKE_CURRENT_SOURCE_DIR}/../lib/mxchat/test/peer)
+  set_tests_properties(braidsd_matrix PROPERTIES TIMEOUT 900 SKIP_RETURN_CODE 77)
+endif()

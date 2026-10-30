@@ -1,8 +1,8 @@
 braids — Architecture
 =====================
 
-Status: draft v0.1 (milestone M0). See [REQUIREMENTS.md](REQUIREMENTS.md) for
-scope.
+Status: draft v0.2 (milestone M1). See [REQUIREMENTS.md](REQUIREMENTS.md) for
+scope and [API.md](API.md) for the daemon API.
 
 Overview
 --------
@@ -32,8 +32,8 @@ Overview
 - **lib/ncutil**: shared utilities from nchat, including `MessageCache`
   (per-account SQLite under `~/.config/braids/history/<accountId>/`),
   `AppConfig`, logging, file utils.
-- **braidsd** (`src/braidsd`): the core daemon. Today (M0) only a skeleton that
-  loads the protocol libraries (`braidsd --list-protocols`).
+- **braidsd** (`src/braidsd`): the core daemon, see "Core daemon" below. In
+  M1 it serves its API on stdin/stdout (`braidsd --stdio`).
 - **braids app** (`app/`, M3): Tauri; the Rust side connects to (and if needed
   starts) braidsd; the web UI renders everything.
 
@@ -48,11 +48,40 @@ Process model
 - Socket: `$XDG_RUNTIME_DIR/braids/braidsd.sock` (fallback
   `~/.config/braids/braidsd.sock`), mode 0600, owner only.
 
-Core daemon responsibilities (M1)
----------------------------------
+Core daemon (M1)
+----------------
 
-The chat model currently lives in nchat's ncurses UI
-(`reference/nchat-ui/src/uimodel.cpp`, `UiModel::Impl`). braidsd takes over
+```
+ stdin/stdout (M1) / socket (M2)
+        │ JSON-RPC
+ main.cpp ── Core::Call ──► EventLoop thread ◄── protocol notifications (Post)
+                              │                ◄── MessageCache results, Status changes
+                              ├─ Core: accounts, setups, dispatcher
+                              └─ ChatModel: chats, contacts, messages, events
+ setup threads: Protocol::SetupProfile + Login, AuthBridge blocks on input
+```
+
+- `core.{h,cpp}`: account manager and API dispatcher. Loads all profiles at
+  start (as nchat's `main.cpp` did) and logs them in on a background thread;
+  `accounts.add` runs `SetupProfile()` + `Login()` on a setup thread with an
+  `AuthBridge`; `accounts.remove` logs out and deletes profile and history.
+- `chatmodel.{h,cpp}`: the chat model, ported from nchat's
+  `UiModel::Impl::MessageHandler` and helpers (table below). It applies
+  `ServiceMessage`s and emits API events; requests become `RequestMessage`s.
+  Asynchronous replies (`messages.get`, `members.get`, ...) wait for the
+  matching notification, with a 15 s timeout.
+- `eventloop.{h,cpp}`: one thread owns all core state; protocol callbacks,
+  MessageCache results and API calls are posted to it, so the model needs no
+  locks and sees everything in order.
+- `authbridge.{h,cpp}`: `AuthHandler` implementation turning auth steps into
+  `account.auth` events and waiting for `accounts.authInput`.
+- Events of an account that is still being set up are held back until
+  `account.added`; chat list previews are fetched with a `GetMessages` of
+  limit 1 per chat; `chat.updated` is only sent when the chat's visible data
+  changed.
+
+The chat model came from nchat's ncurses UI
+(`reference/nchat-ui/src/uimodel.cpp`, `UiModel::Impl`); braidsd took over
 its non-UI parts:
 
 | From UiModel::Impl | braidsd component |
@@ -68,12 +97,17 @@ its non-UI parts:
 | desktop notify / bell logic | notification events (shown by the app) |
 
 Not carried over: everything about terminal geometry, input buffers
-(`m_EntryStr`), dialogs and key handling — that becomes GUI state.
+(`m_EntryStr`), dialogs and key handling — that becomes GUI state. Also not
+carried over: nchat's per-chat config (force hidden/muted chats), "home fetch
+all", terminal bell and desktop notification config (the GUI decides from the
+`notification` event).
 
-API (M2)
---------
+API (M1 stdio, M2 socket)
+-------------------------
 
-JSON-RPC 2.0, one JSON object per line over the Unix socket.
+JSON-RPC 2.0, one JSON object per line; in M1 over stdin/stdout, in M2 over
+the Unix socket. The implemented methods and events are documented in
+[API.md](API.md); the list below was the plan.
 
 - `hello` handshake returns `apiVersion` (semver; the major must match).
 - **Requests** map 1:1 to `RequestMessage` types, scoped by `accountId`:
@@ -94,10 +128,9 @@ JSON-RPC 2.0, one JSON object per line over the Unix socket.
 Login flows as events (M1)
 --------------------------
 
-Each protocol's setup is currently interactive on the terminal (stdin prompts,
-QR code printed or opened in an image viewer, `ProtocolUiControlNotify` to
-take over the terminal). For braids, `SetupProfile`/`Login` become event
-driven:
+nchat's setup was interactive on the terminal (stdin prompts, QR code printed
+or opened in an image viewer, `ProtocolUiControlNotify` to take over the
+terminal). In braids, `SetupProfile`/`Login` are event driven:
 
 ```
 app → accounts.add {protocol}
@@ -107,9 +140,16 @@ app → accounts.authInput {field, value}
 core → account.state {state: "online"} | account.auth {step: "error", message}
 ```
 
-This needs a small extension of `protocol.h` (an auth request/notify pair)
-and changes in each protocol's setup code (`tgchat.cpp`, `gowm.go`,
-`gosg.go`, `mxchat.cpp`). Secrets passed through the API are never logged.
+Implementation: `protocol.h` has `AuthPrompt` (step `input|qr|info|error`,
+field, message, data, isSecret, isOptional) and `AuthHandler` (blocking
+`Input()`, non-blocking `Show()`), set per protocol instance with
+`Protocol::SetAuthHandler()`. Protocols call `AuthUtil` (`lib/ncutil`), which
+forwards to the handler, or falls back to the terminal when none is set. The
+Go protocols call back into C++ (`WmAuthShow`/`WmAuthInput`, `SgAuthShow`).
+`SetupProfile()` still runs synchronously, on a braidsd setup thread, so the
+protocols' setup code kept its structure. When an auth handler is set,
+protocols no longer send `ProtocolUiControlNotify`. Secrets passed through
+the API are never logged.
 
 Storage
 -------
@@ -135,7 +175,7 @@ Milestones
 | | Scope | Done when |
 |---|---|---|
 | **M0** | Repo, rename, licence, nchat UI moved to `reference/`, braidsd skeleton, CI, these docs | CI green; `braidsd --list-protocols` loads all protocols |
-| **M1** | braidsd core: AccountManager, ChatModel ported from `UiModel::Impl`, event-based login flows | all four protocols can be added and used through an internal test harness |
+| **M1** | braidsd core: AccountManager, ChatModel ported from `UiModel::Impl`, event-based login flows | all four protocols can be added and used through an internal test harness (`braidsd --stdio`, `utils/braids-console`; automated: Dummy and Matrix) |
 | **M2** | JSON-RPC API, API docs, `braids-cli` test client, integration tests (local Synapse + `lib/mxchat/test/peer`) | API covers all requests/events; tests run in CI |
 | **M3** | Tauri GUI v1 (REQUIREMENTS.md section 2) | daily-driver usable for the maintainer |
 | **M4** | Notifications, settings incl. vim mode, packaging, release | first public release |

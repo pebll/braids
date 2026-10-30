@@ -740,7 +740,7 @@ func (conn *MxConn) reportTokenInvalid() {
 	CMxClearStatus(conn.connId, FlagOnline|FlagConnecting|FlagSyncing)
 	CMxSetStatus(conn.connId, FlagOffline)
 	CMxReportError(conn.connId, "Matrix session is no longer valid (access token expired or device "+
-		"logged out). Remove and set up the profile again: nchat --remove, nchat --setup")
+		"logged out). Remove the account and add it again.")
 }
 
 // MxSyncer wraps DefaultSyncer: crypto and state store handlers run first

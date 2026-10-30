@@ -78,7 +78,8 @@ class Braidsd:
             if msg is None:
                 self.events.put(None)
                 raise EOFError(f"braidsd exited while waiting for {method}")
-            if msg.get("method") == method and (predicate is None or predicate(msg["params"])):
+            methods = method if isinstance(method, tuple) else (method,)
+            if msg.get("method") in methods and (predicate is None or predicate(msg["params"])):
                 return msg["params"]
 
     def close(self, timeout=30):

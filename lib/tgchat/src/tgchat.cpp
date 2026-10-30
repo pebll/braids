@@ -423,9 +423,8 @@ bool TgChat::Impl::LoadProfile(const std::string& p_ProfilesDir, const std::stri
   if (s_TdlibDate < m_ProfileDirVersion)
   {
     std::string versionWarning =
-      "downgrading nchat without clean setup is not supported.\n"
-      "consider performing a clean setup if issues are encountered:\n"
-      "nchat --setup";
+      "downgrading braids without clean setup is not supported.\n"
+      "consider removing and adding the account again if issues are encountered.";
     LOG_WARNING("tdlib downgrade from %d:\n%s", m_ProfileDirVersion, versionWarning.c_str());
     std::cerr << "warning: " << versionWarning << "\n";
   }
@@ -2779,7 +2778,7 @@ void TgChat::Impl::AuthInputLoop()
           SetProtocolUiControl(true);
           std::cout << "\n";
           std::cout << "WARNING: Session terminated by other device.\n";
-          std::cout << "Please restart nchat to reauthenticate. Press ENTER to continue.\n";
+          std::cout << "Please restart to reauthenticate. Press ENTER to continue.\n";
           std::string str;
           std::getline(std::cin, str);
           SetProtocolUiControl(false);

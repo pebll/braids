@@ -1,5 +1,10 @@
 # mxchat development notes
 
+> braids: sections 1-4 describe nchat's lifecycle and UI expectations, which braidsd's
+> core (`src/braidsd/core.cpp`, `chatmodel.cpp`) now implements in place of nchat's
+> `main.cpp` / `uimodel.cpp`. braidsd sets the message handler before `SetupProfile()`
+> and calls `Login()` after it (idempotent).
+
 Orientation notes for the Matrix backend, from reading `lib/common/src/protocol.h`,
 `lib/duchat`, `lib/wmchat`, `lib/sgchat`, `src/main.cpp`, `src/uimodel.cpp` and
 `lib/ncutil/src/messagecache.cpp` (upstream commit e424aea1).
@@ -22,8 +27,9 @@ exit:          Logout(); CloseProfile()
   (wmchat guards it with `m_Running`). wmchat calls Login() inside SetupProfile so that
   authentication happens during setup.
 - `GetSetupMessage()` is printed before SetupProfile (used for warnings).
-- Prompts: plain `std::cout`/`std::getline(std::cin)`. `StrUtil::GetPass()` reads without
-  echo. Use it for the password and recovery key.
+- Prompts (braids): through `AuthUtil::Input/Show` with the protocol's `AuthHandler`
+  (braidsd turns them into `account.auth` API events); without a handler AuthUtil falls
+  back to the terminal. Never use `std::cin`/`std::cout` directly.
 - Files: `~/.config/nchat/profiles/<ProfileId>/` holds protocol state (wmchat: `whatsappmd.conf`
   through `Config`, plus whatsmeow's sqlite store). **Message cache is NOT there**: it is at
   `~/.config/nchat/history/<ProfileId>/db.sqlite` (the plan said profiles dir; corrected).
