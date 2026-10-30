@@ -13,7 +13,7 @@
   import { tick } from 'svelte';
   import { chatMenu } from '../lib/actions';
   import * as api from '../lib/api';
-  import { dayLabel, isSameDay, lastSeen } from '../lib/format';
+  import { dayLabel, isSameDay, lastSeen, startOfDay } from '../lib/format';
   import { splitKey, store } from '../lib/store.svelte';
   import type { Message } from '../lib/types';
   import { ui } from '../lib/ui.svelte';
@@ -29,6 +29,15 @@
   const account = $derived(store.accounts[accountId]);
   const list = $derived(store.messages[chatKey]);
   const items = $derived(list?.items ?? []);
+  // index ranges [from, to) of items per day
+  const days = $derived.by(() => {
+    const out: { key: number; from: number; to: number }[] = [];
+    items.forEach((m, i) => {
+      if (i === 0 || !isSameDay(items[i - 1].time, m.time)) out.push({ key: startOfDay(m.time), from: i, to: i + 1 });
+      else out[out.length - 1].to = i + 1;
+    });
+    return out;
+  });
   const typing = $derived(store.typingNames(chatKey));
   const members = $derived(store.members[chatKey]);
 
@@ -194,7 +203,7 @@
     composer?.addFiles(paths);
   }
 
-  function groupInfo(i: number): { first: boolean; last: boolean; day: boolean } {
+  function groupInfo(i: number): { first: boolean; last: boolean } {
     const m = items[i];
     const prev = items[i - 1];
     const next = items[i + 1];
@@ -202,7 +211,7 @@
     const unreadHere = list?.firstUnreadId === m.id;
     const nextUnread = next && list?.firstUnreadId === next.id;
     const same = (a?: Message, b?: Message) => !!a && !!b && a.senderId === b.senderId && a.isOutgoing === b.isOutgoing && Math.abs(b.time - a.time) < GROUP_GAP && isSameDay(a.time, b.time);
-    return { first: day || unreadHere || !same(prev, m), last: !!nextUnread || !same(m, next), day };
+    return { first: day || unreadHere || !same(prev, m), last: !!nextUnread || !same(m, next) };
   }
 </script>
 
@@ -272,15 +281,18 @@
         <div class="start"><button class="btn ghost" onclick={() => store.loadOlder(chatKey, true)}>Load older messages</button></div>
       {/if}
 
-      {#each items as m, i (m.id)}
-        {@const g = groupInfo(i)}
-        {#if g.day}
-          <div class="day"><span>{dayLabel(m.time)}</span></div>
-        {/if}
-        {#if list?.firstUnreadId === m.id}
-          <div class="unread-marker" role="separator" data-unread-marker><span></span><b>New messages</b><span></span></div>
-        {/if}
-        <MessageItem {m} {chat} {account} first={g.first} last={g.last} onJump={jumpTo} onReact={openReactions} />
+      {#each days as d (d.key)}
+        <!-- one block per day, so its sticky label stays inside the day -->
+        <div class="day-group">
+          <div class="day"><span>{dayLabel(items[d.from].time)}</span></div>
+          {#each items.slice(d.from, d.to) as m, j (m.id)}
+            {@const g = groupInfo(d.from + j)}
+            {#if list?.firstUnreadId === m.id}
+              <div class="unread-marker" role="separator" data-unread-marker><span></span><b>New messages</b><span></span></div>
+            {/if}
+            <MessageItem {m} {chat} {account} first={g.first} last={g.last} onJump={jumpTo} onReact={openReactions} />
+          {/each}
+        </div>
       {/each}
 
       {#if typing.length}
@@ -338,7 +350,9 @@
   .messages { flex: 1; min-height: 0; padding: 4px 16px 8px; }
   .inner { min-height: 100%; display: flex; flex-direction: column; justify-content: flex-end; }
   .start { display: flex; justify-content: center; align-items: center; gap: 6px; padding: 16px 0 8px; font-size: 12px; color: var(--text-muted); }
-  .day { display: flex; justify-content: center; padding: 10px 0 6px; position: sticky; top: 0; z-index: 2; }
+  .day-group { display: flex; flex-direction: column; }
+  .day { display: flex; justify-content: center; padding: 10px 0 6px; position: sticky; top: 0; z-index: 2; pointer-events: none; }
+  .day span { pointer-events: auto; }
   .day span { font-size: 12px; font-weight: 600; color: var(--text-muted); background: var(--bg-2); padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border); }
   .unread-marker { display: flex; align-items: center; gap: 10px; padding: 8px 0; }
   .unread-marker span { flex: 1; height: 1px; background: var(--accent); opacity: 0.6; }

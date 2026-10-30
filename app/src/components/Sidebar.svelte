@@ -5,11 +5,11 @@
 
   braids is distributed under the GNU AGPL v3 license, see LICENSE for details.
 
-  Folders (all, unread), accounts with their state, archive, add account and
+  Folders (all, favorites), accounts with their state, archive, add account and
   settings. 232 px, collapsible to 60 px; a drawer in the narrow layout.
 -->
 <script lang="ts">
-  import { Archive, CircleAlert, Inbox, LoaderCircle, Mail, PanelLeft, Plus, Settings, Star, WifiOff } from '@lucide/svelte';
+  import { Archive, CircleAlert, Inbox, LoaderCircle, Plus, Settings, Star, WifiOff } from '@lucide/svelte';
   import { settings } from '../lib/settings.svelte';
   import { store, type Filter } from '../lib/store.svelte';
   import { ui } from '../lib/ui.svelte';
@@ -46,18 +46,18 @@
 </script>
 
 <nav class="sidebar" class:collapsed aria-label="Folders and accounts">
-  <div class="brand">
-    <Logo size={22} />
-    {#if !collapsed}<span class="name">braids</span>{/if}
-    {#if !drawer}
-      <button class="icon-btn sm" title={collapsed ? 'Expand sidebar (Ctrl+B)' : 'Collapse sidebar (Ctrl+B)'} aria-label="Toggle sidebar" onclick={toggle}>
-        <PanelLeft size={18} strokeWidth={1.75} />
-      </button>
-    {/if}
-  </div>
+  <!-- the logo is the sidebar toggle (not in the narrow-layout drawer) -->
+  {#if drawer}
+    <div class="brand"><Logo size={22} /><span class="name">braids</span></div>
+  {:else}
+    <button class="brand logo-toggle" title={collapsed ? 'Expand sidebar (Ctrl+B)' : 'Collapse sidebar (Ctrl+B)'} aria-label="Toggle sidebar" onclick={toggle}>
+      <Logo size={22} />
+      {#if !collapsed}<span class="name">braids</span>{/if}
+    </button>
+  {/if}
 
   <div class="items">
-    {#each [{ f: { kind: 'all' } as Filter, label: 'All chats', icon: Inbox }, { f: { kind: 'favorites' } as Filter, label: 'Favorites', icon: Star }, { f: { kind: 'unread' } as Filter, label: 'Unread', icon: Mail }] as item}
+    {#each [{ f: { kind: 'all' } as Filter, label: 'All chats', icon: Inbox }, { f: { kind: 'favorites' } as Filter, label: 'Favorites', icon: Star }] as item}
       {@const n = store.unreadCount(item.f)}
       <button class="item" class:active={isActive(item.f)} onclick={() => select(item.f)} title={collapsed ? item.label : undefined}>
         <span class="ico"><item.icon size={18} strokeWidth={1.75} /></span>
@@ -139,8 +139,10 @@
     flex-direction: column; padding: 12px 8px 8px; min-height: 0; overflow-y: auto; overflow-x: hidden;
   }
   .sidebar.collapsed { width: 60px; align-items: stretch; }
-  .brand { display: flex; align-items: center; gap: 8px; padding: 4px 6px 10px; }
-  .collapsed .brand { flex-direction: column; padding: 4px 0 10px; }
+  .brand { display: flex; align-items: center; gap: 8px; padding: 4px 6px; margin-bottom: 6px; height: 34px; }
+  .logo-toggle { border: 0; background: transparent; border-radius: var(--radius-md); color: var(--text); text-align: left; width: 100%; }
+  .logo-toggle:hover { background: var(--hover); }
+  .collapsed .brand { justify-content: center; padding: 0; }
   .name { font-size: 16px; font-weight: 650; letter-spacing: -0.01em; flex: 1; }
   .items { display: flex; flex-direction: column; gap: 2px; }
   .item {

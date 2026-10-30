@@ -35,7 +35,7 @@ export function initials(name: string): string {
   return (first + second).toUpperCase();
 }
 
-function startOfDay(t: number): number {
+export function startOfDay(t: number): number {
   const d = new Date(t);
   d.setHours(0, 0, 0, 0);
   return d.getTime();

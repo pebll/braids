@@ -315,12 +315,15 @@
   .file-name { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
   .file-status { font-size: 12px; color: var(--text-muted); }
 
+  /* margins instead of gap: WebKitGTK leaves gap out of the float's width,
+     the ticks then stick out into the bubble padding */
   .meta {
-    display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-muted); float: right;
+    display: inline-flex; align-items: center; font-size: 11px; color: var(--text-muted); float: right; white-space: nowrap;
     margin: 6px 0 -4px 10px; line-height: 14px; user-select: none;
   }
+  .meta > :global(* + *) { margin-left: 4px; }
   .own .meta { color: var(--own-meta); }
-  .ticks { display: flex; }
+  .ticks { display: flex; flex-shrink: 0; }
   .ticks.read { color: var(--accent); }
 
   .reactions { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }

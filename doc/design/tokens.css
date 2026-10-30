@@ -26,6 +26,7 @@
   --danger-soft: #FCE9E7;
   --warning: #9A5B00;
   --warning-soft: #FDF1DC;
+  --favorite: #C99A1E;      /* border of favorite chats */
   --success: #2D7A4B;
   --success-soft: #E3F2E8;
   --focus: #2F6FEB;
@@ -73,6 +74,7 @@
   --danger-soft: #3D1F1C;
   --warning: #E7A94A;
   --warning-soft: #3A2C17;
+  --favorite: #D9AE3F;
   --success: #62C38B;
   --success-soft: #1C3326;
   --focus: #7FA8FF;

@@ -23,13 +23,9 @@
   let cursor = $state(-1); // keyboard cursor, distinct from selection
 
   const chats = $derived(store.chatList);
-  // section headers when favorites and other chats are listed together
-  const sectioned = $derived(store.filter.kind !== 'favorites' && store.filter.kind !== 'archived' &&
-    chats.some((c) => store.category(c) === 'favorite') && chats.some((c) => store.category(c) !== 'favorite'));
 
   const title = $derived.by(() => {
     const f = store.filter;
-    if (f.kind === 'unread') return 'Unread';
     if (f.kind === 'archived') return 'Archived';
     if (f.kind === 'favorites') return 'Favorites';
     if (f.kind === 'account') return store.accountName(f.accountId);
@@ -127,17 +123,14 @@
     {#each chats as c, i (chatKey(c.accountId, c.id))}
       {@const key = chatKey(c.accountId, c.id)}
       {@const p = preview(c)}
-      {#if sectioned && i === 0}
-        <div class="section">Favorites</div>
-      {:else if sectioned && store.category(c) !== 'favorite' && store.category(chats[i - 1]) === 'favorite'}
-        <div class="section">Chats</div>
-      {/if}
       {@const selected = key === store.current}
       <div
         class="row"
         class:selected
         class:cursor={i === cursor}
         class:unread={c.isUnread}
+        class:favorite={store.category(c) === 'favorite'}
+        title={store.category(c) === 'favorite' ? 'Favorite' : undefined}
         role="option"
         aria-selected={selected}
         tabindex="-1"
@@ -177,9 +170,6 @@
           {/each}
         {:else if store.search}
           <p>No chats match “{store.search}”.</p>
-        {:else if store.filter.kind === 'unread'}
-          <Braid width={200} height={28} animated={false} faint />
-          <p><b>All caught up.</b><br />No unread chats.</p>
         {:else if store.filter.kind === 'archived'}
           <p>No archived chats.</p>
         {:else if store.filter.kind === 'favorites'}
@@ -207,10 +197,10 @@
   .search input::placeholder { color: var(--text-muted); }
   kbd { font-family: var(--mono); font-size: 10px; color: var(--text-muted); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; margin-right: 4px; }
   .list { flex: 1; padding: 0 6px 8px; display: flex; flex-direction: column; gap: 1px; outline: none; min-height: 0; }
-  .section { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); padding: 10px 12px 4px; flex-shrink: 0; }
   .row { display: flex; gap: 12px; align-items: center; padding: 9px 12px; border-radius: 10px; cursor: default; flex-shrink: 0; }
   .row:hover { background: var(--hover); }
   .row.selected { background: var(--selected); }
+  .row.favorite { box-shadow: inset 0 0 0 1.5px var(--favorite); }
   .row.cursor { box-shadow: inset 0 0 0 2px var(--focus); }
   .body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
   .line1, .line2 { display: flex; align-items: center; gap: 5px; }
