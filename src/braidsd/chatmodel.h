@@ -50,6 +50,8 @@ public:
   void EditMessage(const std::string& p_AccountId, const std::string& p_ChatId, const std::string& p_MsgId,
                    const std::string& p_Text);
   void DeleteMessage(const std::string& p_AccountId, const std::string& p_ChatId, const std::string& p_MsgId);
+  void PinMessage(const std::string& p_AccountId, const std::string& p_ChatId, const std::string& p_MsgId,
+                  bool p_IsPinned);
   void MarkRead(const std::string& p_AccountId, const std::string& p_ChatId, const std::string& p_MsgId);
   void SendReaction(const std::string& p_AccountId, const std::string& p_ChatId, const std::string& p_MsgId,
                     const std::string& p_Emoji);

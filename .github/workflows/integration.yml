@@ -1,0 +1,44 @@
+name: Integration
+
+# braidsd API tests against a local Synapse homeserver (Matrix end-to-end),
+# plus the Dummy, socket and braids-cli tests. Telegram and Signal are left
+# out to keep the build fast; the Linux and macOS workflows build everything.
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+      - main
+      - dev/*
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v5
+    - name: Setup ccache
+      uses: ./.github/actions/setup-ccache
+      with:
+        cache_key_prefix: integration
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: lib/mxchat/go/go.mod
+        cache-dependency-path: |
+          lib/mxchat/go/go.sum
+          lib/wmchat/go/go.sum
+          lib/mxchat/test/peer/go.sum
+    - name: Dependencies
+      run: ./make.sh deps -y
+    - name: Start Synapse
+      run: lib/mxchat/test/homeserver.sh start
+    - name: Build and test
+      env:
+        BRAIDS_REQUIRE_HOMESERVER: "1"
+      run: ./make.sh --no-telegram --no-signal tests
+    - name: Synapse log
+      if: failure()
+      run: docker logs nchat-mx-synapse 2>&1 | tail -200

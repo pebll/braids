@@ -42,13 +42,26 @@ if(HAS_MATRIX)
   set_tests_properties(mxchat_go PROPERTIES TIMEOUT 600)
 endif()
 
-# braidsd core tests (stdio api, Dummy protocol)
+# braidsd core tests (Dummy protocol, over stdio and the unix socket)
 find_package(Python3 COMPONENTS Interpreter)
 if(HAS_DUMMY AND Python3_FOUND)
   add_test(NAME braidsd_dummy
            COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/braidsd/test_dummy.py
                    --braidsd $<TARGET_FILE:braidsd>)
   set_tests_properties(braidsd_dummy PROPERTIES TIMEOUT 120)
+  add_test(NAME braidsd_dummy_socket
+           COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/braidsd/test_dummy.py
+                   --braidsd $<TARGET_FILE:braidsd> --socket)
+  set_tests_properties(braidsd_dummy_socket PROPERTIES TIMEOUT 120)
+  add_test(NAME braidsd_socket
+           COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/braidsd/test_socket.py
+                   --braidsd $<TARGET_FILE:braidsd>)
+  set_tests_properties(braidsd_socket PROPERTIES TIMEOUT 120)
+  add_test(NAME braids_cli
+           COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/braidsd/test_cli.py
+                   --braidsd $<TARGET_FILE:braidsd>
+                   --cli ${CMAKE_CURRENT_SOURCE_DIR}/../utils/braids-cli)
+  set_tests_properties(braids_cli PROPERTIES TIMEOUT 120)
 endif()
 
 # braidsd Matrix integration test, needs lib/mxchat/test/homeserver.sh running

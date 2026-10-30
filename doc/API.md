@@ -1,11 +1,30 @@
 braidsd API
 ===========
 
-Status: draft, API version `0.1.0` (milestone M1). The API is JSON-RPC 2.0
-with one JSON object per line. In M1 it is served on stdin/stdout
-(`braidsd --stdio`, used by the tests and `utils/braids-console`); M2 adds the
-Unix socket transport described in [ARCHITECTURE.md](ARCHITECTURE.md), with
-the same messages.
+Status: draft, API version `0.2.0` (milestone M2). The API is JSON-RPC 2.0
+with one JSON object per line, served on a Unix socket and/or stdin/stdout.
+
+Transport
+---------
+
+- **Unix socket** (default): `$XDG_RUNTIME_DIR/braids/braidsd.sock`, or
+  `<confdir>/braidsd.sock` when braidsd runs with `--confdir` or without
+  `XDG_RUNTIME_DIR` (default confdir `~/.config/braids`). `--socket PATH`
+  overrides it. The socket is mode 0600 (owner only). Any number of clients
+  may connect: replies go to the requesting connection, events to all of
+  them, starting with `ready` as the first line of each connection. A client
+  that stops reading is disconnected once 64 MB of output are pending.
+- **stdio** (`braidsd --stdio`): one client on stdin/stdout, used by the
+  tests; braidsd exits at end of input. No socket unless `--socket` is given
+  as well.
+- One braidsd per config dir (lock file). A second braidsd on a socket that
+  is in use refuses to start; a stale socket file is replaced.
+- Clients: `utils/braids-cli` (one-shot commands and an event stream),
+  `utils/braids-console --connect` (interactive), the braids app (M3), and
+  `tests/braidsd/braidsclient.py` (Python, both transports).
+
+Versioning: `apiVersion` is semver. Clients check the major version (minor
+versions only add methods, events or fields).
 
 Conventions
 -----------
@@ -71,6 +90,7 @@ Methods
 | Method | Params | Result |
 |---|---|---|
 | `hello` | | `{apiVersion, version, protocols: [name]}` |
+| `daemon.shutdown` | | `{}`, then braidsd exits (also on SIGTERM/SIGINT) |
 | `accounts.list` | | `[Account]` |
 | `accounts.add` | `protocol` | `{setupId}`, then `account.auth` events, see below |
 | `accounts.authInput` | `setupId` or `accountId`, `field`, `value` | `{}`; error 5 if no input for `field` is pending |
@@ -89,6 +109,7 @@ Methods
 | `messages.send` | `accountId`, `chatId`, `text`?, `quotedId`?, `filePath`? (absolute) | `{}`; the message arrives as `message.added` |
 | `messages.edit` | `accountId`, `chatId`, `msgId`, `text` | `{}` (error 4 outside the edit window) |
 | `messages.delete` | `accountId`, `chatId`, `msgId` | `{}`, then `message.removed` |
+| `messages.pin` | `accountId`, `chatId`, `msgId`, `isPinned`? (true) | `{}`, then `message.updated` (error 4 if unsupported, see `capabilities.pinMessage`) |
 | `messages.markRead` | `accountId`, `chatId`, `msgId` | `{}`; marks the chat read up to `msgId` |
 | `messages.find` | `accountId`, `chatId`, `text`, `fromMsgId`? | `{found, msgId}` (async, searches the local cache) |
 | `reactions.send` | `accountId`, `chatId`, `msgId`, `emoji` (empty removes) | `{}` |
@@ -161,7 +182,7 @@ for prompts at runtime, e.g. Telegram re-authentication or the Matrix
 recovery key on an unverified device; errors at runtime also set the
 account `state` to `error`.
 
-Known limitations (M1)
+Known limitations
 ----------------------
 
 - `accounts.authCancel` during a setup aborts it (also while waiting for a QR

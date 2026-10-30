@@ -25,7 +25,7 @@
 #include "timeutil.h"
 
 // semver of the API; clients must match the major version
-static const std::string s_ApiVersion = "0.1.0";
+static const std::string s_ApiVersion = "0.2.0";
 
 static const char* AuthStepToString(AuthStep p_Step)
 {
@@ -48,7 +48,8 @@ static bool IsDirEmpty(const std::string& p_Path)
   while (struct dirent* entry = readdir(dir))
   {
     const std::string name = entry->d_name;
-    if ((name != ".") && (name != ".."))
+    // a socket file may be created there before the first start completed
+    if ((name != ".") && (name != "..") && (name != "braidsd.sock"))
     {
       isEmpty = false;
       break;
@@ -345,6 +346,12 @@ void Core::Dispatch(const std::string& p_Method, const json& p_Params, const Rep
   {
     m_ChatModel->DeleteMessage(ParamStr(params, "accountId"), ParamStr(params, "chatId"),
                                ParamStr(params, "msgId"));
+    p_Reply.Ok(json::object());
+  }
+  else if (p_Method == "messages.pin")
+  {
+    m_ChatModel->PinMessage(ParamStr(params, "accountId"), ParamStr(params, "chatId"),
+                            ParamStr(params, "msgId"), ParamBool(params, "isPinned", true));
     p_Reply.Ok(json::object());
   }
   else if (p_Method == "messages.markRead")

@@ -16,7 +16,7 @@ import tempfile
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from braidsclient import ApiError, Braidsd  # noqa: E402
+from braidsclient import ApiError, Braidsd as BraidsdProcess  # noqa: E402
 
 
 def check(cond, msg):
@@ -67,9 +67,14 @@ def add_dummy_account(d, phone):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--braidsd", required=True)
+    parser.add_argument("--socket", action="store_true", help="use the unix socket instead of stdio")
     args = parser.parse_args()
 
     confdir = tempfile.mkdtemp(prefix="braidsd-test-")
+
+    def Braidsd(binary, confdir, sock="braidsd.sock"):
+        return BraidsdProcess(binary, confdir, socket_path=os.path.join(confdir, sock) if args.socket else None)
+
     try:
         d = Braidsd(args.braidsd, confdir)
         hello = d.call("hello")
@@ -118,7 +123,22 @@ def main():
                                         "fromMsgId": msgs[0]["id"], "limit": 3})
         check(all(m["time"] <= msgs[0]["time"] for m in older["messages"]), "older page is older")
 
-        d.call("messages.send", {"accountId": account_id, "chatId": group["id"], "text": "hello"})
+        d.call("messages.send", {"accountId": account_id, "chatId": group["id"], "text": "hello",
+                                 "quotedId": msgs[-1]["id"]})
+        own = d.wait_event("message.added", lambda p: p["text"] == "hello")
+        check(own["isOutgoing"] and own["quoted"]["id"] == msgs[-1]["id"], "sent message echoed with quote")
+        check(account["capabilities"]["editWindowSec"] == -1, "dummy edit window unlimited")
+        d.call("messages.edit", {"accountId": account_id, "chatId": group["id"], "msgId": own["id"],
+                                 "text": "hello!"})
+        edited = d.wait_event("message.updated", lambda p: p["id"] == own["id"] and p["isEdited"])
+        check(edited["text"] == "hello!", "edit applied")
+        d.call("reactions.send", {"accountId": account_id, "chatId": group["id"], "msgId": own["id"],
+                                  "emoji": "👍"})
+        reacted = d.wait_event("message.updated", lambda p: p["id"] == own["id"] and p["reactions"]["counts"])
+        check(reacted["reactions"]["counts"] == {"👍": 1} and reacted["reactions"]["own"] == "👍", "own reaction")
+        d.call("messages.delete", {"accountId": account_id, "chatId": group["id"], "msgId": own["id"]})
+        d.wait_event("message.removed", lambda p: p["msgId"] == own["id"])
+        check(True, "delete applied")
         expect_error(lambda: d.call("messages.send", {"accountId": account_id, "chatId": group["id"]}),
                      -32602, "send without text or file rejected")
         expect_error(lambda: d.call("messages.edit", {"accountId": account_id, "chatId": group["id"],
@@ -126,6 +146,9 @@ def main():
                      4, "editing others' messages unsupported")
         expect_error(lambda: d.call("chats.pin", {"accountId": account_id, "chatId": group["id"]}),
                      4, "pin unsupported by capabilities")
+        expect_error(lambda: d.call("messages.pin", {"accountId": account_id, "chatId": group["id"],
+                                                     "msgId": msgs[-1]["id"]}),
+                     4, "message pin unsupported by capabilities")
         expect_error(lambda: d.call("chats.list", {"accountId": 5}), -32602, "invalid param type rejected")
         d.call("messages.markRead", {"accountId": account_id, "chatId": group["id"], "msgId": msgs[-1]["id"]})
         check(d.call("contacts.list", {"accountId": account_id}), "contacts.list")
@@ -151,10 +174,10 @@ def main():
         # second instance on the same config dir is refused
         d = Braidsd(args.braidsd, confdir)
         try:
-            d2 = Braidsd(args.braidsd, confdir)
+            d2 = Braidsd(args.braidsd, confdir, "second.sock")
             d2.close()
             raise AssertionError("second instance started")
-        except EOFError:
+        except (EOFError, OSError):
             check(True, "second instance on same config dir refused")
         d.close()
     finally:

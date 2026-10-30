@@ -1,7 +1,7 @@
 braids — Architecture
 =====================
 
-Status: draft v0.2 (milestone M1). See [REQUIREMENTS.md](REQUIREMENTS.md) for
+Status: draft v0.3 (milestone M2). See [REQUIREMENTS.md](REQUIREMENTS.md) for
 scope and [API.md](API.md) for the daemon API.
 
 Overview
@@ -32,8 +32,8 @@ Overview
 - **lib/ncutil**: shared utilities from nchat, including `MessageCache`
   (per-account SQLite under `~/.config/braids/history/<accountId>/`),
   `AppConfig`, logging, file utils.
-- **braidsd** (`src/braidsd`): the core daemon, see "Core daemon" below. In
-  M1 it serves its API on stdin/stdout (`braidsd --stdio`).
+- **braidsd** (`src/braidsd`): the core daemon, see "Core daemon" below. It
+  serves its API on a Unix socket (and on stdin/stdout with `--stdio`).
 - **braids app** (`app/`, M3): Tauri; the Rust side connects to (and if needed
   starts) braidsd; the web UI renders everything.
 
@@ -52,9 +52,9 @@ Core daemon (M1)
 ----------------
 
 ```
- stdin/stdout (M1) / socket (M2)
-        │ JSON-RPC
- main.cpp ── Core::Call ──► EventLoop thread ◄── protocol notifications (Post)
+ Unix socket clients / stdin+stdout
+        │ JSON-RPC (server.cpp: poll loop, per-connection output buffers)
+ ApiServer ── Core::Call ──► EventLoop thread ◄── protocol notifications (Post)
                               │                ◄── MessageCache results, Status changes
                               ├─ Core: accounts, setups, dispatcher
                               └─ ChatModel: chats, contacts, messages, events
@@ -102,11 +102,15 @@ carried over: nchat's per-chat config (force hidden/muted chats), "home fetch
 all", terminal bell and desktop notification config (the GUI decides from the
 `notification` event).
 
-API (M1 stdio, M2 socket)
--------------------------
+API
+---
 
-JSON-RPC 2.0, one JSON object per line; in M1 over stdin/stdout, in M2 over
-the Unix socket. The implemented methods and events are documented in
+JSON-RPC 2.0, one JSON object per line, over the Unix socket (several
+clients, events broadcast to all) or stdin/stdout. `server.{h,cpp}` is the
+transport: a poll loop on the main thread reads requests and hands them to
+`Core::Call`; replies and events are appended to per-connection output
+buffers (flushed by the loop), so the core never blocks on a slow client.
+The implemented methods, events and transport details are documented in
 [API.md](API.md); the list below was the plan.
 
 - `hello` handshake returns `apiVersion` (semver; the major must match).

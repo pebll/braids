@@ -422,6 +422,8 @@ add_executable(braidsd
   src/braidsd/main.cpp
   src/braidsd/protocolfactory.cpp
   src/braidsd/protocolfactory.h
+  src/braidsd/server.cpp
+  src/braidsd/server.h
 )
 install(TARGETS braidsd DESTINATION bin)
 

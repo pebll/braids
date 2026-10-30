@@ -1,0 +1,156 @@
+#!/usr/bin/env python3
+# braids-cli
+#
+# Copyright (c) 2026 braids contributors
+#
+# braids is distributed under the GNU AGPL v3 license, see LICENSE for details.
+
+"""Command line client for a running braidsd (Unix socket API).
+
+Usage: braids-cli [--socket PATH | --confdir DIR] COMMAND [ARGS]
+
+Commands:
+  status                              daemon version, protocols and accounts
+  call METHOD [JSON | key=value ...]  call any API method, print the result
+  events [METHOD ...]                 print events as JSON lines (all, or the given ones)
+  accounts                            list accounts
+  chats [ACCOUNT]                     list chats
+  messages ACCOUNT CHAT [LIMIT]       print the latest messages of a chat
+  send ACCOUNT CHAT TEXT              send a text message
+  shutdown                            stop the daemon
+
+Values in key=value are parsed as JSON when possible (n=5, flag=true), else
+taken as strings. Exit status: 0 ok, 1 API error, 2 usage, 3 no daemon.
+For interactive logins use utils/braids-console --connect.
+"""
+
+import argparse
+import datetime
+import json
+import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tests", "braidsd"))
+from braidsclient import ApiError, Client  # noqa: E402
+
+
+def parse_params(args):
+    if not args:
+        return {}
+    if len(args) == 1 and args[0].lstrip().startswith("{"):
+        return json.loads(args[0])
+    params = {}
+    for arg in args:
+        key, sep, value = arg.partition("=")
+        if not sep:
+            raise ValueError(f"expected key=value, got {arg!r}")
+        try:
+            params[key] = json.loads(value)
+        except ValueError:
+            params[key] = value
+    return params
+
+
+def dump(obj):
+    print(json.dumps(obj, ensure_ascii=False, indent=2))
+
+
+def fmt_time(ms):
+    if ms is None or ms < 0:
+        return ""
+    return datetime.datetime.fromtimestamp(ms / 1000).strftime("%Y-%m-%d %H:%M")
+
+
+def main():
+    parser = argparse.ArgumentParser(description="braidsd command line client",
+                                     formatter_class=argparse.RawDescriptionHelpFormatter,
+                                     epilog=__doc__.split("Commands:")[1])
+    parser.add_argument("--socket", help="socket path (default: from --confdir or $XDG_RUNTIME_DIR)")
+    parser.add_argument("-c", "--confdir", help="config dir of the daemon (socket <confdir>/braidsd.sock)")
+    parser.add_argument("--json", action="store_true", help="print raw JSON for list commands")
+    parser.add_argument("command")
+    parser.add_argument("args", nargs="*")
+    args = parser.parse_args()
+
+    path = args.socket or Client.default_socket_path(args.confdir)
+    if not os.path.exists(path) and not args.socket and not args.confdir:
+        fallback = Client.default_socket_path(os.path.expanduser("~/.config/braids"))
+        path = fallback if os.path.exists(fallback) else path
+    try:
+        client = Client.connect(path)
+    except OSError as e:
+        print(f"braids-cli: no braidsd at {path}: {e.strerror or e}", file=sys.stderr)
+        return 3
+
+    cmd, rest = args.command, args.args
+    try:
+        if cmd == "status":
+            hello = client.call("hello")
+            print(f"braidsd {hello['version']} (api {hello['apiVersion']}) at {path}")
+            print(f"protocols: {', '.join(hello['protocols'])}")
+            for a in client.call("accounts.list"):
+                err = f" ({a['error']})" if a.get("error") else ""
+                print(f"  {a['accountId']}  {a['state']}{err}")
+        elif cmd == "call":
+            if not rest:
+                parser.error("call needs a method")
+            dump(client.call(rest[0], parse_params(rest[1:]), timeout=60))
+        elif cmd == "events":
+            methods = set(rest)
+            while True:
+                msg = client.events.get()
+                if msg is None:
+                    return 0
+                if not methods or msg.get("method") in methods:
+                    print(json.dumps(msg, ensure_ascii=False), flush=True)
+        elif cmd == "accounts":
+            accounts = client.call("accounts.list")
+            if args.json:
+                dump(accounts)
+            for a in [] if args.json else accounts:
+                print(f"{a['accountId']}\t{a['protocol']}\t{a['state']}\t{a.get('displayName', '')}")
+        elif cmd == "chats":
+            chats = client.call("chats.list", {"accountId": rest[0]} if rest else {})
+            if args.json:
+                dump(chats)
+            for c in [] if args.json else chats:
+                flags = ("*" if c["isUnread"] else "-") + ("P" if c["isPinned"] else "-") + \
+                    ("M" if c["isMuted"] else "-")
+                print(f"{flags}\t{c['accountId']}\t{c['id']}\t{fmt_time(c['lastActivity'])}\t{c['name']}")
+        elif cmd == "messages":
+            if len(rest) < 2:
+                parser.error("messages needs ACCOUNT CHAT")
+            page = client.call("messages.get", {"accountId": rest[0], "chatId": rest[1],
+                                                "limit": int(rest[2]) if len(rest) > 2 else 20}, timeout=60)
+            if args.json:
+                dump(page)
+            for m in [] if args.json else page["messages"]:
+                who = "me" if m["isOutgoing"] else (m["senderName"] or m["senderId"])
+                file = f" [file: {m['file']['name']}]" if m.get("file") else ""
+                print(f"{fmt_time(m['time'])}  {who}: {m['text']}{file}")
+        elif cmd == "send":
+            if len(rest) < 3:
+                parser.error("send needs ACCOUNT CHAT TEXT")
+            client.call("messages.send", {"accountId": rest[0], "chatId": rest[1], "text": " ".join(rest[2:])})
+        elif cmd == "shutdown":
+            try:
+                client.call("daemon.shutdown")
+            except EOFError:
+                pass
+        else:
+            parser.error(f"unknown command {cmd!r}")
+    except ApiError as e:
+        print(f"braids-cli: error {e.code}: {e.message}", file=sys.stderr)
+        return 1
+    except ValueError as e:
+        print(f"braids-cli: {e}", file=sys.stderr)
+        return 2
+    except KeyboardInterrupt:
+        return 0
+    finally:
+        client.close()
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

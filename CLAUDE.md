@@ -4,7 +4,8 @@ braids: open source desktop messenger (Telegram, WhatsApp, Signal, Matrix),
 Linux + macOS, Tauri GUI on top of a C++ core daemon. Forked from nchat
 (terminal client). Read `doc/REQUIREMENTS.md` and `doc/ARCHITECTURE.md` first;
 they hold the agreed decisions and the milestone plan (M0 done, M1 core done
-pending real-account checks of Telegram/WhatsApp/Signal, next: M2). The daemon
+pending real-account checks of Telegram/WhatsApp/Signal, M2 API done, M3 GUI
+in `app/`). The daemon
 API is in `doc/API.md`; the GUI design brief in `doc/DESIGN_BRIEF.md`, and
 the finished GUI design (tokens, icons, mockups, screenshots) in
 `doc/design/README.md` — follow it when building the Tauri app.
@@ -18,11 +19,14 @@ the finished GUI design (tokens, icons, mockups, screenshots) in
 - `lib/ncutil` — utilities and `MessageCache` (SQLite).
 - `src/braidsd` — core daemon: `core` (accounts, setups, API dispatcher),
   `chatmodel` (port of nchat's `UiModel::Impl` model), `eventloop` (single
-  thread owning all core state), `authbridge` (login steps as API events).
+  thread owning all core state), `authbridge` (login steps as API events),
+  `server` (JSON-RPC transport: Unix socket and stdio).
   JSON via vendored `ext/nlohmann/json.hpp`.
-- `tests/braidsd` — Python stdio API client and tests (Dummy always, Matrix
-  when the local Synapse runs); `utils/braids-console` — interactive console
-  for manual login/chat tests (QR via `qrencode`).
+- `tests/braidsd` — Python API client (stdio and socket) and tests (Dummy,
+  socket, CLI always; Matrix when the local Synapse runs, required in the
+  Integration CI workflow); `utils/braids-cli` — one-shot commands against a
+  running braidsd; `utils/braids-console` — interactive console for manual
+  login/chat tests (QR via `qrencode`).
 - `reference/nchat-ui` — nchat's ncurses UI and its docs/tooling. NOT built.
   Source material for the chat model port (done in M1); delete once the
   remaining protocols are verified through braidsd.
@@ -37,8 +41,10 @@ the finished GUI design (tokens, icons, mockups, screenshots) in
     ./make.sh --no-telegram build      # much faster (tdlib compile is ~1 h)
     ./make.sh --no-telegram tests      # ctest incl. Go unit tests (mxchat)
     ./build/bin/braidsd --list-protocols
+    ./build/bin/braidsd -c /tmp/braidsconf           # socket /tmp/braidsconf/braidsd.sock
+    utils/braids-cli -c /tmp/braidsconf status       # one-shot commands
+    utils/braids-console --connect --confdir /tmp/braidsconf   # interactive
     ./build/bin/braidsd --stdio -c /tmp/braidsconf   # JSON-RPC on stdin/stdout
-    utils/braids-console --confdir /tmp/braidsconf   # interactive
 
 Matrix integration testing without real accounts:
 `lib/mxchat/test/homeserver.sh start` (Synapse in Docker on localhost:8008,

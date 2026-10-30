@@ -11,7 +11,7 @@ lib/mxchat/test/homeserver.sh and the scripted peer from lib/mxchat/test/peer.
 braidsd logs in as a fresh user "alice" (event based setup incl. recovery key),
 a peer plays alice's other client (Element: cross-signing, key backup, joins
 rooms) and another peer plays "bob". Exits with 77 (skipped) when the
-homeserver is not running.
+homeserver is not running (fails instead when BRAIDS_REQUIRE_HOMESERVER is set).
 """
 
 import argparse
@@ -132,7 +132,8 @@ def main():
         urllib.request.urlopen(args.hs + "/_matrix/client/versions", timeout=2)
     except Exception:
         print(f"skip: no homeserver at {args.hs} (lib/mxchat/test/homeserver.sh start)")
-        return SKIP
+        # CI sets this, so a homeserver that failed to start is not a silent skip
+        return 1 if os.environ.get("BRAIDS_REQUIRE_HOMESERVER") else SKIP
 
     tmp = tempfile.mkdtemp(prefix="braidsd-mx-")
     procs = []

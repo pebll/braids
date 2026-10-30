@@ -7,11 +7,13 @@
 
 """Interactive console for braidsd (manual testing until the GUI exists).
 
-Starts braidsd --stdio, shows events in a readable form and walks through
+Starts braidsd --stdio (or connects to a running braidsd with --connect),
+shows events in a readable form and walks through
 login flows: QR codes are rendered with `qrencode` when installed (otherwise
 the payload is printed), secret inputs are read without echo.
 
 Usage: utils/braids-console [--braidsd build/bin/braidsd] [--confdir DIR] [--raw]
+       utils/braids-console --connect [SOCKET] [--confdir DIR] [--raw]
 
 Commands:
   add <protocol>              add account (Telegram, WhatsAppMd, Signal, Matrix, Dummy)
@@ -39,7 +41,7 @@ import sys
 import threading
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tests", "braidsd"))
-from braidsclient import ApiError, Braidsd  # noqa: E402
+from braidsclient import ApiError, Braidsd, Client  # noqa: E402
 
 QUIET = {"chat.updated", "contacts.updated", "presence", "members.updated", "account.connected"}
 
@@ -192,11 +194,16 @@ def main():
     root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
     parser = argparse.ArgumentParser(description="interactive braidsd console")
     parser.add_argument("--braidsd", default=os.path.join(root, "build", "bin", "braidsd"))
-    parser.add_argument("--confdir", default=os.path.expanduser("~/.config/braids"))
+    parser.add_argument("--confdir", default=None, help="default ~/.config/braids")
+    parser.add_argument("--connect", nargs="?", const="", metavar="SOCKET",
+                        help="connect to a running braidsd instead of starting one")
     parser.add_argument("--raw", action="store_true", help="print all events as json")
     args = parser.parse_args()
 
-    d = Braidsd(args.braidsd, args.confdir)
+    if args.connect is not None:
+        d = Client.connect(args.connect or Client.default_socket_path(args.confdir))
+    else:
+        d = Braidsd(args.braidsd, args.confdir or os.path.expanduser("~/.config/braids"))
     console = Console(d, args.raw)
     console.newest = None
     print("braids console, type 'help' for commands")

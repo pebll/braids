@@ -17,6 +17,7 @@
 #include "log.h"
 #include "status.h"
 #include "strutil.h"
+#include "timeutil.h"
 
 static const std::string s_GroupId = "The Office_0";
 
@@ -42,7 +43,7 @@ std::string DuChat::GetProfileId() const
 bool DuChat::HasFeature(ProtocolFeature p_ProtocolFeature) const
 {
   static int customFeatures =
-    FeatureAutoGetContactsOnLogin;
+    FeatureAutoGetContactsOnLogin | FeatureEditMessagesAnytime;
   return (p_ProtocolFeature & customFeatures);
 }
 
@@ -413,12 +414,113 @@ void DuChat::PerformRequest(std::shared_ptr<RequestMessage> p_RequestMessage)
       {
         std::shared_ptr<SendMessageRequest> sendMessageRequest =
           std::static_pointer_cast<SendMessageRequest>(p_RequestMessage);
+        const std::string& chatId = sendMessageRequest->chatId;
+        ChatMessage chatMessage = sendMessageRequest->chatMessage;
+        const int64_t now = TimeUtil::GetCurrentTimeMSec();
+        chatMessage.id = GetSelfId() + "_" + std::to_string(now);
+        chatMessage.senderId = GetSelfId();
+        chatMessage.timeSent = now;
+        chatMessage.isOutgoing = true;
+        chatMessage.isRead = false;
+        for (const auto& quoted : s_Messages[chatId])
+        {
+          if (quoted.id != chatMessage.quotedId) continue;
+
+          chatMessage.quotedText = quoted.text;
+          chatMessage.quotedSender = quoted.senderId;
+        }
+
+        s_Messages[chatId].insert(s_Messages[chatId].begin(), chatMessage);
+
         std::shared_ptr<SendMessageNotify> sendMessageNotify =
           std::make_shared<SendMessageNotify>(m_ProfileId);
         sendMessageNotify->success = true;
-        sendMessageNotify->chatId = sendMessageRequest->chatId;
-        sendMessageNotify->chatMessage = sendMessageRequest->chatMessage;
+        sendMessageNotify->chatId = chatId;
+        sendMessageNotify->chatMessage = chatMessage;
         m_MessageHandler(sendMessageNotify);
+
+        // echo, as real protocols do
+        std::shared_ptr<NewMessagesNotify> newMessagesNotify =
+          std::make_shared<NewMessagesNotify>(m_ProfileId);
+        newMessagesNotify->success = true;
+        newMessagesNotify->chatId = chatId;
+        newMessagesNotify->chatMessages = { chatMessage };
+        m_MessageHandler(newMessagesNotify);
+      }
+      break;
+
+    case EditMessageRequestType:
+      {
+        std::shared_ptr<EditMessageRequest> editMessageRequest =
+          std::static_pointer_cast<EditMessageRequest>(p_RequestMessage);
+        for (auto& chatMessage : s_Messages[editMessageRequest->chatId])
+        {
+          if (chatMessage.id != editMessageRequest->msgId) continue;
+
+          chatMessage.text = editMessageRequest->chatMessage.text;
+          chatMessage.isEdited = true;
+          std::shared_ptr<NewMessagesNotify> newMessagesNotify =
+            std::make_shared<NewMessagesNotify>(m_ProfileId);
+          newMessagesNotify->success = true;
+          newMessagesNotify->chatId = editMessageRequest->chatId;
+          newMessagesNotify->chatMessages = { chatMessage };
+          m_MessageHandler(newMessagesNotify);
+        }
+      }
+      break;
+
+    case DeleteMessageRequestType:
+      {
+        std::shared_ptr<DeleteMessageRequest> deleteMessageRequest =
+          std::static_pointer_cast<DeleteMessageRequest>(p_RequestMessage);
+        std::vector<ChatMessage>& messages = s_Messages[deleteMessageRequest->chatId];
+        messages.erase(std::remove_if(messages.begin(), messages.end(), [&](const ChatMessage& p_Message)
+      {
+        return p_Message.id == deleteMessageRequest->msgId;
+      }), messages.end());
+
+        std::shared_ptr<DeleteMessageNotify> deleteMessageNotify =
+          std::make_shared<DeleteMessageNotify>(m_ProfileId);
+        deleteMessageNotify->success = true;
+        deleteMessageNotify->chatId = deleteMessageRequest->chatId;
+        deleteMessageNotify->msgId = deleteMessageRequest->msgId;
+        deleteMessageNotify->isOutgoing = true;
+        m_MessageHandler(deleteMessageNotify);
+      }
+      break;
+
+    case SendReactionRequestType:
+      {
+        std::shared_ptr<SendReactionRequest> sendReactionRequest =
+          std::static_pointer_cast<SendReactionRequest>(p_RequestMessage);
+        for (auto& chatMessage : s_Messages[sendReactionRequest->chatId])
+        {
+          if (chatMessage.id != sendReactionRequest->msgId) continue;
+
+          Reactions& reactions = chatMessage.reactions;
+          const std::string prev = reactions.senderEmojis[s_ReactionsSelfId];
+          if (!prev.empty() && (reactions.emojiCounts[prev] > 0) && (--reactions.emojiCounts[prev] == 0))
+          {
+            reactions.emojiCounts.erase(prev);
+          }
+
+          if (sendReactionRequest->emoji.empty())
+          {
+            reactions.senderEmojis.erase(s_ReactionsSelfId);
+          }
+          else
+          {
+            reactions.senderEmojis[s_ReactionsSelfId] = sendReactionRequest->emoji;
+            ++reactions.emojiCounts[sendReactionRequest->emoji];
+          }
+
+          std::shared_ptr<NewMessageReactionsNotify> newMessageReactionsNotify =
+            std::make_shared<NewMessageReactionsNotify>(m_ProfileId);
+          newMessageReactionsNotify->chatId = sendReactionRequest->chatId;
+          newMessageReactionsNotify->msgId = sendReactionRequest->msgId;
+          newMessageReactionsNotify->reactions = reactions;
+          m_MessageHandler(newMessageReactionsNotify);
+        }
       }
       break;
 

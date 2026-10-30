@@ -1173,6 +1173,23 @@ void ChatModel::DeleteMessage(const std::string& p_AccountId, const std::string&
   SendProtocolRequest(p_AccountId, deleteMessageRequest);
 }
 
+void ChatModel::PinMessage(const std::string& p_AccountId, const std::string& p_ChatId,
+                           const std::string& p_MsgId, bool p_IsPinned)
+{
+  if (!HasFeature(p_AccountId, FeaturePinMessage))
+  {
+    throw ApiException(ApiErrorUnsupported, "pinning messages is not supported by this protocol");
+  }
+
+  const ChatMessage& chatMessage = GetMessageOrThrow(p_AccountId, p_ChatId, p_MsgId);
+  std::shared_ptr<PinMessageRequest> pinMessageRequest = std::make_shared<PinMessageRequest>();
+  pinMessageRequest->chatId = p_ChatId;
+  pinMessageRequest->senderId = chatMessage.senderId;
+  pinMessageRequest->msgId = p_MsgId;
+  pinMessageRequest->isPinned = p_IsPinned;
+  SendProtocolRequest(p_AccountId, pinMessageRequest);
+}
+
 void ChatModel::MarkRead(const std::string& p_AccountId, const std::string& p_ChatId, const std::string& p_MsgId)
 {
   const ChatMessage& target = GetMessageOrThrow(p_AccountId, p_ChatId, p_MsgId);
