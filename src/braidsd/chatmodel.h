@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <deque>
 #include <functional>
+#include <limits>
 #include <map>
 #include <memory>
 #include <set>
@@ -122,10 +123,13 @@ private:
   const ChatMessage* GetLastMessage(const std::string& p_AccountId, const std::string& p_ChatId);
   void RequestPreview(const std::string& p_AccountId, const std::string& p_ChatId);
   void MaybeNotify(const std::string& p_AccountId, const std::string& p_ChatId, const ChatMessage& p_ChatMessage);
+  // p_MinTime: for history pages, the time of the oldest message the protocol
+  // delivered for the request (max: none)
   void ResolvePending(PendingType p_Type, const std::string& p_AccountId, const std::string& p_ChatId,
-                      const std::string& p_Key, bool p_TimedOut);
+                      const std::string& p_Key, bool p_TimedOut,
+                      int64_t p_MinTime = std::numeric_limits<int64_t>::max());
   json MessagesPage(const std::string& p_AccountId, const std::string& p_ChatId, const std::string& p_FromMsgId,
-                    int p_Limit);
+                    int p_Limit, int64_t p_MinTime);
   json MembersJson(const std::string& p_AccountId, const std::string& p_ChatId);
   std::map<std::string, std::string> ParseMentions(const std::string& p_AccountId, const std::string& p_ChatId,
                                                    const std::string& p_Text);
@@ -137,6 +141,9 @@ private:
   std::string GetContactName(const std::string& p_AccountId, const std::string& p_ContactId);
   json ChatToJson(const std::string& p_AccountId, const ChatInfo& p_ChatInfo);
   json MessageToJson(const std::string& p_AccountId, const std::string& p_ChatId, const ChatMessage& p_ChatMessage);
+  const ChatMessage* FindMessage(const std::string& p_AccountId, const std::string& p_ChatId, const std::string& p_MsgId);
+  void RequestQuotedMessage(const std::string& p_AccountId, const std::string& p_ChatId, const std::string& p_MsgId);
+  void UpdateQuotingMessages(const std::string& p_AccountId, const std::string& p_ChatId, const std::string& p_MsgId);
   json ContactToJson(const ContactInfo& p_ContactInfo);
 
 private:
@@ -144,6 +151,11 @@ private:
   ProtocolGetter m_ProtocolGetter;
   std::unordered_map<std::string, AccountState> m_Accounts;
   std::multimap<PendingType, PendingReply> m_Pending;
+
+  // quoted messages fetched to show their text (protocols like Matrix send
+  // only the id): accountId -> "chatId\nmsgId", requested once / still awaited
+  std::map<std::string, std::set<std::string>> m_QuoteRequested;
+  std::map<std::string, std::set<std::string>> m_QuoteAwaited;
   std::set<std::pair<std::string, std::string>> m_DirtyChats;
   std::map<std::pair<std::string, std::string>, std::string> m_EmittedChats; // last chat.updated per chat
   std::pair<std::string, std::string> m_CurrentChat;

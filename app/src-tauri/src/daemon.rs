@@ -123,9 +123,14 @@ impl Daemon {
         let inner = self.inner.clone();
         thread::spawn(move || {
             let mut last_spawn: Option<Instant> = None;
+            let checked = Arc::new(AtomicBool::new(false));
             loop {
                 match UnixStream::connect(&inner.socket) {
                     Ok(stream) => {
+                        if !checked.swap(true, Ordering::SeqCst) {
+                            let daemon = Daemon { inner: inner.clone() };
+                            thread::spawn(move || daemon.restart_if_outdated());
+                        }
                         inner.run(&app, stream);
                         thread::sleep(Duration::from_millis(500));
                     }
@@ -140,6 +145,30 @@ impl Daemon {
                 }
             }
         });
+    }
+
+    /// A braidsd that keeps running across app restarts would hide an update
+    /// (or a rebuild): restart it when its binary is newer than the process.
+    fn restart_if_outdated(&self) {
+        for _ in 0..50 {
+            if self.is_connected() {
+                break;
+            }
+            thread::sleep(Duration::from_millis(100));
+        }
+        let Ok(hello) = self.call("hello", json!({})) else { return };
+        let Some(start_ms) = hello.get("startTime").and_then(Value::as_i64) else { return };
+        let modified_ms = std::fs::metadata(find_braidsd())
+            .and_then(|m| m.modified())
+            .ok()
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| d.as_millis() as i64);
+        if let Some(modified_ms) = modified_ms {
+            if modified_ms > start_ms {
+                eprintln!("braids: braidsd binary is newer than the running daemon, restarting it");
+                let _ = self.call("daemon.shutdown", json!({}));
+            }
+        }
     }
 
     /// One API call; blocks until the reply (use from a blocking task).

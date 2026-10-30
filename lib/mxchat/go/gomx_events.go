@@ -520,6 +520,32 @@ func (conn *MxConn) backfill(roomID id.RoomID, fromMsgId id.EventID, limit int) 
 	CMxSetStatus(conn.connId, FlagFetching)
 	defer CMxClearStatus(conn.connId, FlagFetching)
 
+	var msgs []*OutMsg
+	events := 0
+	addEvents := func(chunk []*event.Event) {
+		events += len(chunk)
+		for _, evt := range chunk {
+			evt.RoomID = roomID
+			if err := evt.Content.ParseRaw(evt.Type); err != nil && !errors.Is(err, event.ErrContentAlreadyParsed) &&
+				!errors.Is(err, event.ErrUnsupportedContentType) {
+				continue
+			}
+
+			if evt.StateKey != nil {
+				continue
+			}
+
+			if evt.ID == fromMsgId {
+				continue
+			}
+
+			msg := conn.handleTimelineEvent(ctx, evt, modeBackfill)
+			if msg != nil {
+				msgs = append(msgs, msg)
+			}
+		}
+	}
+
 	token := ""
 	if fromMsgId != "" {
 		resp, err := client.Context(ctx, roomID, fromMsgId, nil, 0)
@@ -529,36 +555,29 @@ func (conn *MxConn) backfill(roomID id.RoomID, fromMsgId id.EventID, limit int) 
 			return
 		}
 
+		// the server returns some events before fromMsgId (its default context
+		// limit) and a start token before those, so they must be taken from here
+		addEvents(resp.EventsBefore)
 		token = resp.Start
 	}
 
-	resp, err := client.Messages(ctx, roomID, token, "", mautrix.DirectionBackward, nil, limit)
-	if err != nil {
-		LOG_WARNING(fmt.Sprintf("messages failed %s: %v", roomID, err))
-		CMxNewMessagesBatchDone(conn.connId, string(roomID), string(fromMsgId))
-		return
-	}
-
-	var msgs []*OutMsg
-	for _, evt := range resp.Chunk {
-		evt.RoomID = roomID
-		if err := evt.Content.ParseRaw(evt.Type); err != nil && !errors.Is(err, event.ErrContentAlreadyParsed) &&
-			!errors.Is(err, event.ErrUnsupportedContentType) {
-			continue
+	// a page of events may hold no messages at all (state changes, reactions,
+	// edits); an empty result means "start of the room" to the ui, so page on
+	// until there are messages or the server reports the start
+	const maxPages = 20
+	for page := 0; (page < maxPages) && (len(msgs) < limit/2); page++ {
+		resp, err := client.Messages(ctx, roomID, token, "", mautrix.DirectionBackward, nil, limit)
+		if err != nil {
+			LOG_WARNING(fmt.Sprintf("messages failed %s: %v", roomID, err))
+			break
 		}
 
-		if evt.StateKey != nil {
-			continue
+		addEvents(resp.Chunk)
+		if (resp.End == "") || (resp.End == token) || (len(resp.Chunk) == 0) {
+			break
 		}
 
-		if evt.ID == fromMsgId {
-			continue
-		}
-
-		msg := conn.handleTimelineEvent(ctx, evt, modeBackfill)
-		if msg != nil {
-			msgs = append(msgs, msg)
-		}
+		token = resp.End
 	}
 
 	for _, msg := range msgs {
@@ -567,7 +586,7 @@ func (conn *MxConn) backfill(roomID id.RoomID, fromMsgId id.EventID, limit int) 
 		}
 	}
 
-	LOG_DEBUG(fmt.Sprintf("backfill %s got %d events %d msgs", roomID, len(resp.Chunk), len(msgs)))
+	LOG_DEBUG(fmt.Sprintf("backfill %s got %d events %d msgs", roomID, events, len(msgs)))
 	conn.emitBatch(roomID, msgs, string(fromMsgId))
 	conn.flushReactions()
 	conn.saveState(false)

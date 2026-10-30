@@ -12,7 +12,7 @@
   import { File as FileIcon, Paperclip, Pencil, Reply, SendHorizontal, Smile, X } from '@lucide/svelte';
   import { tick } from 'svelte';
   import * as api from '../lib/api';
-  import { plainText, senderColor } from '../lib/format';
+  import { senderColor } from '../lib/format';
   import { settings } from '../lib/settings.svelte';
   import { splitKey, store } from '../lib/store.svelte';
   import { ui } from '../lib/ui.svelte';
@@ -218,7 +218,7 @@
       <span class="ctx-ico">{#if ui.edit}<Pencil size={18} />{:else}<Reply size={18} />{/if}</span>
       <div class="ctx-body" style:--c={ui.edit ? 'var(--accent)' : senderColor(m.senderId)}>
         <div class="ctx-title">{ui.edit ? 'Editing message' : `Replying to ${store.senderName(m)}`}</div>
-        <div class="ctx-text">{plainText(m.text) || m.file?.name || 'Attachment'}</div>
+        <div class="ctx-text">{store.previewText(m)}</div>
       </div>
       <button class="icon-btn sm" aria-label={ui.edit ? 'Cancel edit' : 'Cancel reply'} title="Cancel (Esc)"
         onclick={() => { if (ui.edit) { ui.edit = null; text = ''; } ui.reply = null; textarea?.focus(); }}>

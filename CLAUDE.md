@@ -90,6 +90,9 @@ started by hand. `./make.sh deps` asks for apt confirmation; install
 
 ## Known TODOs
 
+Scheduled-later features are in `doc/BACKLOG.md`.
+
+
 - Telegram uses nchat's API id (`lib/tgchat/src/tgchat.cpp`, overridable via
   `TG_APIID`/`TG_APIHASH`); register a braids API id before public release.
 - Telegram, WhatsApp and Signal login flows through braidsd are implemented

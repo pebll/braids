@@ -234,16 +234,68 @@ def main():
                                         "fromMsgId": page["messages"][0]["id"], "limit": 10})
         check(older["messages"] and older["messages"][-1]["time"] <= page["messages"][0]["time"], "older page")
 
+        # encrypted image from bob: typed as image, downloadable
+        png = os.path.join(tmp, "photo.png")
+        with open(png, "wb") as f:
+            f.write(bytes.fromhex("89504e470d0a1a0a0000000d4948445200000001000000010806000000"
+                                  "1f15c4890000000d49444154789c63f8cfc0f01f0005000201e221bc"
+                                  "330000000049454e44ae426082"))
+        img = bob_peer.cmd(f"sendfile {room} {png}")["event"]
+        imsg = d.wait_event("message.added", lambda p: p["id"] == img, timeout=60)
+        check(imsg["file"] and imsg["file"]["mimeType"] == "image/png", "image typed as image/png")
+        d.call("files.download", {"accountId": account_id, "chatId": room, "msgId": img})
+        dl = d.wait_event("message.updated", lambda p: p["id"] == img and p["file"]["status"] == "downloaded", timeout=60)
+        check(os.path.isfile(dl["file"]["path"]) and dl["file"]["mimeType"] == "image/png", "image downloaded")
+
+        # reply from bob: matrix sends only the quoted id, the text comes from the model
+        quoted_id = page["messages"][-3]["id"]
+        rep = bob_peer.cmd(f"reply {room} {quoted_id} answer to history")["event"]
+        rmsg = d.wait_event("message.added", lambda p: p["id"] == rep, timeout=60)
+        check(rmsg["quoted"]["id"] == quoted_id and rmsg["quoted"]["text"] == "history 22",
+              "reply shows the quoted text")
+
         # members
         members = d.call("members.get", {"accountId": account_id, "chatId": room})
         check({alice_id, bob_id} <= {m["id"] for m in members["members"]}, "members of room")
         check(d.close() == 0, "clean exit")
 
+        # while braidsd is stopped: a message, pages of state events only, then
+        # more than the sync timeline limit (30), so the gap is backfilled from
+        # the server when paging back
+        noise = bob_peer.cmd(f"send {room} before noise")["event"]
+        for i in range(40):
+            bob_peer.cmd(f"topic {room} topic {i}")
+        for i in range(32):
+            bob_peer.cmd(f"send {room} filler {i}")
+
         # restart: loaded without login, history from cache, receives new messages
         d = Braidsd(args.braidsd, confdir)
         wait_until(lambda: [c for c in d.call("chats.list") if c["id"] == room], "room after restart")
-        page = d.call("messages.get", {"accountId": account_id, "chatId": room, "limit": 5})
-        check(page["messages"][-1]["text"] == "history 24", "history after restart")
+        page = wait_until(lambda: (lambda p: p["messages"] and p["messages"][-1]["text"] == "filler 31" and p)(
+            d.call("messages.get", {"accountId": account_id, "chatId": room, "limit": 5})), "history after restart")
+        check(True, "history after restart")
+        # reply quoting a message that is not loaded
+        first = bob_peer.cmd(f"reply {room} {quoted_id} quoting an old one")["event"]
+        d.wait_event(("message.added", "message.updated"),
+                     lambda p: p.get("id") == first and p["quoted"] and p["quoted"]["text"] == "history 22",
+                     timeout=60)
+        check(True, "quoted text of a message not loaded is fetched")
+
+        oldest, found = page["messages"][0]["id"], False
+        for _ in range(15):
+            older = d.call("messages.get", {"accountId": account_id, "chatId": room, "fromMsgId": oldest,
+                                            "limit": 12}, timeout=90)
+            if not older["messages"]:
+                break
+            found = any(m["id"] == noise for m in older["messages"])
+            if found:
+                break
+            oldest = older["messages"][0]["id"]
+        check(found, "paging back across state-only pages")
+        texts = {m["text"] for m in d.call("messages.get", {"accountId": account_id, "chatId": room,
+                                                             "limit": 200})["messages"]}
+        check({f"filler {i}" for i in range(32)} <= texts, "no messages missing in the backfilled gap")
+
         sent = bob_peer.cmd(f"send {room} after restart")["event"]
         d.wait_event("message.added", lambda p: p["id"] == sent, timeout=60)
         check(True, "receives after restart")
@@ -261,7 +313,10 @@ def main():
                 proc.close()
             except Exception:
                 pass
-        shutil.rmtree(tmp, ignore_errors=True)
+        if os.environ.get("BRAIDS_KEEP_TMP"):
+            print(f"kept {tmp}")
+        else:
+            shutil.rmtree(tmp, ignore_errors=True)
 
     print("all tests passed")
     return 0

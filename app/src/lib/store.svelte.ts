@@ -165,6 +165,16 @@ class Store {
     return m.senderName || this.contacts[m.accountId]?.[m.senderId]?.name || m.senderId;
   }
 
+  // Text of the message a reply quotes: from the quote, else from the loaded history.
+  quotedText(m: Message): string {
+    const q = m.quoted;
+    if (!q) return '';
+    if (q.text) return plainText(q.text);
+    const original = this.messages[chatKey(m.accountId, m.chatId)]?.items.find((x) => x.id === q.id);
+    if (original) return this.previewText(original);
+    return 'Original message';
+  }
+
   previewText(m: Message | null): string {
     if (!m) return '';
     if (m.isDeleted) return 'Message deleted';
@@ -404,6 +414,9 @@ class Store {
       items[idx] = m;
       return;
     }
+    // older than the loaded history (e.g. a quoted message fetched for its
+    // text): it belongs to a page not loaded yet
+    if (items.length && !list.atStart && m.time < items[0].time) return;
     // usually newest: append; else insert in time order
     let pos = items.length;
     while (pos > 0 && items[pos - 1].time > m.time) pos--;
@@ -569,13 +582,28 @@ function emptyList(): MessageList {
   return { items: [], loading: false, atStart: false, stalled: false, loaded: false, firstUnreadId: '' };
 }
 
+const EXT_TYPES: Record<string, string> = {
+  jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp', bmp: 'image/bmp',
+  svg: 'image/svg+xml', heic: 'image/heic', mp4: 'video/mp4', mov: 'video/quicktime', m4v: 'video/mp4',
+  ogg: 'audio/ogg', opus: 'audio/opus', mp3: 'audio/mpeg', m4a: 'audio/mp4', pdf: 'application/pdf',
+};
+
+// Mime type of a file; from its name when the protocol (or an older braidsd) gives none.
+export function fileMime(f: FileRef | null): string {
+  if (!f) return '';
+  if (f.mimeType) return f.mimeType;
+  const name = f.name || f.path;
+  const dot = name.lastIndexOf('.');
+  return dot >= 0 ? (EXT_TYPES[name.slice(dot + 1).toLowerCase()] ?? '') : '';
+}
+
 // A local copy exists: downloaded, or a file sent from this computer.
 export function fileReady(f: FileRef | null): boolean {
   return !!f && (f.status === 'downloaded' || (f.status === 'none' && f.path.startsWith('/')));
 }
 
 export function fileLabel(m: Message): string {
-  const mime = m.file?.mimeType ?? '';
+  const mime = fileMime(m.file);
   if (mime.startsWith('image/')) return 'Photo';
   if (mime.startsWith('video/')) return 'Video';
   if (mime.startsWith('audio/')) return 'Audio';

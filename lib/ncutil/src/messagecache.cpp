@@ -700,6 +700,7 @@ bool MessageCache::FetchMessagesFrom(const std::string& p_ProfileId, const std::
       std::make_shared<FetchMessagesFromRequest>();
     fetchFromRequest->profileId = p_ProfileId;
     fetchFromRequest->chatId = p_ChatId;
+    fetchFromRequest->fromMsgId = p_FromMsgId; // lets the requester match the reply
     fetchFromRequest->fromMsgIdTimeSent = fromMsgIdTimeSent;
     fetchFromRequest->limit = std::min(p_Limit, count);
 

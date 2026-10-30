@@ -12,7 +12,7 @@
   import { Check, CheckCheck, Copy, Download, FileText, LoaderCircle, MoreHorizontal, Pencil, Pin, PinOff, Reply, SmilePlus, Trash2, TriangleAlert } from '@lucide/svelte';
   import * as api from '../lib/api';
   import { isOnlyEmoji, renderText, senderColor, timeOfDay } from '../lib/format';
-  import { fileReady, store } from '../lib/store.svelte';
+  import { fileMime, fileReady, store } from '../lib/store.svelte';
   import type { Account, Chat, Message } from '../lib/types';
   import { ui, type MenuItem } from '../lib/ui.svelte';
   import Avatar from './Avatar.svelte';
@@ -39,8 +39,9 @@
   const own = $derived(m.isOutgoing);
   const showName = $derived(chat.isGroup && !own && first);
   const showAvatar = $derived(chat.isGroup && !own);
-  const isImage = $derived(!!m.file && m.file.mimeType.startsWith('image/'));
-  const isVideo = $derived(!!m.file && m.file.mimeType.startsWith('video/') && m.file.mimeType !== 'video/webm');
+  const mime = $derived(fileMime(m.file));
+  const isImage = $derived(mime.startsWith('image/'));
+  const isVideo = $derived(mime.startsWith('video/') && mime !== 'video/webm');
   const ready = $derived(fileReady(m.file));
   const emojiOnly = $derived(!m.file && !m.quoted && !m.isDeleted && isOnlyEmoji(m.text));
   const html = $derived(m.isDeleted ? '' : renderText(m.text, m.mentions, account.selfId));
@@ -188,7 +189,7 @@
       {#if m.quoted}
         <button class="quote" onclick={() => onJump(m.quoted!.id)} style:--q={senderColor(m.quoted.senderId)}>
           <span class="q-name">{m.quoted.senderId === account.selfId ? 'You' : m.quoted.senderName || m.quoted.senderId}</span>
-          <span class="q-text">{m.quoted.text || 'Attachment'}</span>
+          <span class="q-text">{store.quotedText(m)}</span>
         </button>
       {/if}
 

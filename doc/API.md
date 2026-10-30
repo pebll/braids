@@ -1,7 +1,7 @@
 braidsd API
 ===========
 
-Status: draft, API version `0.2.0` (milestone M2). The API is JSON-RPC 2.0
+Status: draft, API version `0.3.0` (milestone M3). The API is JSON-RPC 2.0
 with one JSON object per line, served on a Unix socket and/or stdin/stdout.
 
 Transport
@@ -89,7 +89,7 @@ Methods
 
 | Method | Params | Result |
 |---|---|---|
-| `hello` | | `{apiVersion, version, protocols: [name]}` |
+| `hello` | | `{apiVersion, version, protocols: [name], startTime, pid}` (`startTime`: ms; clients restart a daemon older than its binary) |
 | `daemon.shutdown` | | `{}`, then braidsd exits (also on SIGTERM/SIGINT) |
 | `accounts.list` | | `[Account]` |
 | `accounts.add` | `protocol` | `{setupId}`, then `account.auth` events, see below |

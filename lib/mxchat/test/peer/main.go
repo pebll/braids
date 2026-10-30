@@ -20,6 +20,7 @@
 //   edit <room> <event> <text...>     edit own message
 //   react <room> <event> <key>        send reaction
 //   redact <room> <event>             redact event
+//   topic <room> <text...>            set the room topic (a state event)
 //   typing <room> on|off              typing notification
 //   read <room> <event>               send read receipt
 //   sendfile <room> <path>            send attachment (encrypted in e2ee rooms)
@@ -309,6 +310,10 @@ func (p *peer) command(ctx context.Context, line string) (map[string]any, error)
 			return nil, err
 		}
 		return map[string]any{"event": resp.EventID}, nil
+
+	case "topic":
+		_, err := cli.SendStateEvent(ctx, id.RoomID(arg(1)), event.StateTopic, "", &event.TopicEventContent{Topic: rest(2)})
+		return nil, err
 
 	case "typing":
 		_, err := cli.UserTyping(ctx, id.RoomID(arg(1)), arg(2) == "on", 20*time.Second)

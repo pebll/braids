@@ -627,9 +627,22 @@ void ChatModel::OnNewMessages(const std::string& p_AccountId, std::shared_ptr<Ne
 
   UpdateChatFromMessages(p_AccountId, chatId);
 
+  for (const auto& chatMessage : p_Notify->chatMessages)
+  {
+    UpdateQuotingMessages(p_AccountId, chatId, chatMessage.id);
+  }
+
   if (hasPendingPage)
   {
-    ResolvePending(PendingMessages, p_AccountId, chatId, p_Notify->fromMsgId, false /*p_TimedOut*/);
+    // the page ends at the oldest message delivered for this request: older
+    // messages in the model may be isolated (previews, quotes) with a gap between
+    int64_t minTime = std::numeric_limits<int64_t>::max();
+    for (const auto& chatMessage : p_Notify->chatMessages)
+    {
+      minTime = std::min(minTime, chatMessage.timeSent);
+    }
+
+    ResolvePending(PendingMessages, p_AccountId, chatId, p_Notify->fromMsgId, false /*p_TimedOut*/, minTime);
   }
 }
 
@@ -721,7 +734,7 @@ void ChatModel::MaybeNotify(const std::string& p_AccountId, const std::string& p
 }
 
 void ChatModel::ResolvePending(PendingType p_Type, const std::string& p_AccountId, const std::string& p_ChatId,
-                               const std::string& p_Key, bool p_TimedOut)
+                               const std::string& p_Key, bool p_TimedOut, int64_t p_MinTime)
 {
   for (auto it = m_Pending.lower_bound(p_Type); it != m_Pending.upper_bound(p_Type); /* incremented in loop */)
   {
@@ -736,7 +749,8 @@ void ChatModel::ResolvePending(PendingType p_Type, const std::string& p_AccountI
     {
       case PendingMessages:
         {
-          json result = MessagesPage(p_AccountId, p_ChatId, p_Key, pending.limit);
+          // timed out: nothing is known to be contiguous, the client may retry
+          json result = MessagesPage(p_AccountId, p_ChatId, p_Key, pending.limit, p_MinTime);
           result["timedOut"] = p_TimedOut;
           pending.reply.Ok(result);
         }
@@ -783,7 +797,7 @@ void ChatModel::ProcessTimers(int64_t p_NowMs)
 }
 
 json ChatModel::MessagesPage(const std::string& p_AccountId, const std::string& p_ChatId,
-                             const std::string& p_FromMsgId, int p_Limit)
+                             const std::string& p_FromMsgId, int p_Limit, int64_t p_MinTime)
 {
   const auto& messages = m_Accounts[p_AccountId].chats[p_ChatId].messages;
   int64_t fromTime = std::numeric_limits<int64_t>::max();
@@ -804,6 +818,8 @@ json ChatModel::MessagesPage(const std::string& p_AccountId, const std::string& 
   {
     const ChatMessage& chatMessage = message.second;
     if (chatMessage.id == p_FromMsgId) continue;
+
+    if (chatMessage.timeSent < p_MinTime) continue;
 
     if (chatMessage.timeSent < fromTime)
     {
@@ -1541,17 +1557,92 @@ json ChatModel::ChatToJson(const std::string& p_AccountId, const ChatInfo& p_Cha
   };
 }
 
+const ChatMessage* ChatModel::FindMessage(const std::string& p_AccountId, const std::string& p_ChatId,
+                                          const std::string& p_MsgId)
+{
+  auto ait = m_Accounts.find(p_AccountId);
+  if (ait == m_Accounts.end()) return nullptr;
+
+  auto cit = ait->second.chats.find(p_ChatId);
+  if (cit == ait->second.chats.end()) return nullptr;
+
+  auto mit = cit->second.messages.find(p_MsgId);
+  return (mit != cit->second.messages.end()) ? &mit->second : nullptr;
+}
+
+void ChatModel::RequestQuotedMessage(const std::string& p_AccountId, const std::string& p_ChatId,
+                                     const std::string& p_MsgId)
+{
+  const std::string key = p_ChatId + "\n" + p_MsgId;
+  if (!m_QuoteRequested[p_AccountId].insert(key).second) return;
+
+  m_QuoteAwaited[p_AccountId].insert(key);
+  std::shared_ptr<GetMessageRequest> getMessageRequest = std::make_shared<GetMessageRequest>();
+  getMessageRequest->chatId = p_ChatId;
+  getMessageRequest->msgId = p_MsgId;
+  getMessageRequest->cached = true;
+  LOG_TRACE("request quoted message %s in %s", p_MsgId.c_str(), p_ChatId.c_str());
+  SendProtocolRequest(p_AccountId, getMessageRequest);
+}
+
+// a fetched quoted message arrived: show its text in the replies
+void ChatModel::UpdateQuotingMessages(const std::string& p_AccountId, const std::string& p_ChatId,
+                                      const std::string& p_MsgId)
+{
+  auto ait = m_QuoteAwaited.find(p_AccountId);
+  if ((ait == m_QuoteAwaited.end()) || (ait->second.erase(p_ChatId + "\n" + p_MsgId) == 0)) return;
+
+  for (const auto& message : m_Accounts[p_AccountId].chats[p_ChatId].messages)
+  {
+    if (message.second.quotedId == p_MsgId)
+    {
+      Emit("message.updated", MessageToJson(p_AccountId, p_ChatId, message.second));
+    }
+  }
+}
+
 json ChatModel::MessageToJson(const std::string& p_AccountId, const std::string& p_ChatId,
                               const ChatMessage& p_ChatMessage)
 {
   json quoted;
   if (!p_ChatMessage.quotedId.empty())
   {
+    // protocols like Matrix send only the quoted id: take text and sender
+    // from the quoted message, fetching it when it is not loaded
+    std::string quotedText = p_ChatMessage.quotedText;
+    std::string quotedSender = p_ChatMessage.quotedSender;
+    if (quotedText.empty() || quotedSender.empty())
+    {
+      const ChatMessage* quotedMessage = FindMessage(p_AccountId, p_ChatId, p_ChatMessage.quotedId);
+      if (quotedMessage != nullptr)
+      {
+        if (quotedText.empty())
+        {
+          quotedText = quotedMessage->isDeleted ? "Message deleted" : quotedMessage->text;
+        }
+
+        if (quotedText.empty() && !quotedMessage->fileInfo.empty())
+        {
+          FileInfo fileInfo = ProtocolUtil::FileInfoFromHex(quotedMessage->fileInfo);
+          quotedText = FileUtil::BaseName(fileInfo.filePath);
+        }
+
+        if (quotedSender.empty())
+        {
+          quotedSender = quotedMessage->senderId;
+        }
+      }
+      else
+      {
+        RequestQuotedMessage(p_AccountId, p_ChatId, p_ChatMessage.quotedId);
+      }
+    }
+
     quoted = json{
       { "id", p_ChatMessage.quotedId },
-      { "text", p_ChatMessage.quotedText },
-      { "senderId", p_ChatMessage.quotedSender },
-      { "senderName", GetContactName(p_AccountId, p_ChatMessage.quotedSender) },
+      { "text", quotedText },
+      { "senderId", quotedSender },
+      { "senderName", GetContactName(p_AccountId, quotedSender) },
     };
   }
 

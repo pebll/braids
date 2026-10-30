@@ -10,6 +10,7 @@
 #include <sstream>
 
 #include <dirent.h>
+#include <unistd.h>
 
 #include "appconfig.h"
 #include "apputil.h"
@@ -25,7 +26,8 @@
 #include "timeutil.h"
 
 // semver of the API; clients must match the major version
-static const std::string s_ApiVersion = "0.2.0";
+static const std::string s_ApiVersion = "0.3.0";
+static const int64_t s_StartTime = TimeUtil::GetCurrentTimeMSec();
 
 static const char* AuthStepToString(AuthStep p_Step)
 {
@@ -250,8 +252,9 @@ void Core::Dispatch(const std::string& p_Method, const json& p_Params, const Rep
       protocols.push_back(factory->GetName());
     }
 
+    // startTime lets clients restart a daemon older than its binary (an update)
     p_Reply.Ok(json{ { "apiVersion", s_ApiVersion }, { "version", AppUtil::GetAppVersion() },
-                 { "protocols", protocols } });
+                 { "protocols", protocols }, { "startTime", s_StartTime }, { "pid", (int64_t)getpid() } });
   }
   else if (p_Method == "accounts.list")
   {
