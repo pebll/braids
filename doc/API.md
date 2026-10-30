@@ -164,8 +164,8 @@ account `state` to `error`.
 Known limitations (M1)
 ----------------------
 
-- `accounts.authCancel` only aborts a pending input; a protocol waiting for a
-  QR scan finishes when its own timeout expires (WhatsApp 60 s).
+- `accounts.authCancel` during a setup aborts it (also while waiting for a QR
+  scan); for an account it only skips the current prompt.
 - Removing an account deletes local data but does not log out the device
   remotely yet.
 - No mute/unmute request (protocols do not offer one yet); mute state is
