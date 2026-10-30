@@ -9,13 +9,27 @@ visual design follows [doc/design](../doc/design/README.md).
 Run
 ---
 
-Needs Node 22, Rust, and on Linux the WebKitGTK development packages
-(`libwebkit2gtk-4.1-dev librsvg2-dev libayatana-appindicator3-dev`), plus a
-built braidsd (`./make.sh build` in the repository root).
+Prerequisites:
+
+- Node 22 and Rust (`cargo` in `PATH`; `npm install` does not install it):
+
+      curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+      . "$HOME/.cargo/env"
+
+- Linux (Debian/Ubuntu): `sudo apt install libwebkit2gtk-4.1-dev librsvg2-dev
+  libayatana-appindicator3-dev libxdo-dev build-essential`.
+  macOS: `xcode-select --install`.
+- A built braidsd: `./make.sh --no-telegram build` in the repository root
+  (without `--no-telegram` for Telegram; tdlib takes about an hour).
+
+Then:
 
     cd app
     npm install
     npm run tauri dev          # app window, starts braidsd if needed
+
+The first `tauri dev` compiles the Rust dependencies (a few minutes).
+"failed to run 'cargo metadata'" means `cargo` is not in `PATH`.
 
 The app connects to the socket of a running braidsd, or starts one: `BRAIDSD`
 (path), then `braidsd` next to the app binary, then `../build/bin/braidsd`
