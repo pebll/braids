@@ -2725,6 +2725,7 @@ func SgGetContacts(connId int) int {
 
 	ctx := context.TODO()
 	client.SendContactSyncRequest(ctx)
+	RefreshGroupNames(connId)
 
 	return 0
 }
