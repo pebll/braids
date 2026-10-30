@@ -70,7 +70,10 @@ Layout
 - `src/lib/store.svelte.ts` — client state: mirror of accounts, chats and the
   loaded messages, kept current by API events; login setups; toasts.
 - `src/lib/settings.svelte.ts` — GUI settings (localStorage): theme,
-  notifications, per-account name / color / notifications.
+  notifications, per-account name / color / notifications, chat categories.
+  Categories (favorite / default / archived) are kept by the app; without
+  one, a chat archived in the messenger counts as archived, and archiving in
+  braids is mirrored to messengers that support it (Telegram, WhatsApp).
 - `src/lib/format.ts` — message markup to safe HTML, times, initials, colors.
 - `src/components/` — `Sidebar`, `ChatList`, `Conversation` (+ `MessageItem`,
   `Composer`), `InfoPanel`, `Wizard` / `AuthStep` (login flows), `Settings`,
@@ -78,7 +81,9 @@ Layout
 - `src/styles/tokens.css` — copy of `doc/design/tokens.css`; `app.css` global
   styles. Plain CSS that works in WebKitGTK and WKWebView.
 - `src-tauri/src/daemon.rs` — socket client: start/reconnect braidsd, requests
-  with replies, events to the UI. `lib.rs` — commands, tray, close-to-tray.
+  with replies, events to the UI, restart of a braidsd older than its binary.
+  `lib.rs` — commands, tray (one colored strand per unread chat, all three
+  from 3; icons from `scripts/tray-icons.sh`), close-to-tray.
 
 Known gaps (v1)
 ---------------

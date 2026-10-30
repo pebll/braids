@@ -9,6 +9,10 @@
 
 export type Theme = 'system' | 'light' | 'dark';
 
+// chat category set in braids; without one, a chat archived in the
+// messenger counts as archived, else as default
+export type ChatCategory = 'favorite' | 'default' | 'archived';
+
 export interface AccountMeta {
   name?: string;
   color?: string;
@@ -25,11 +29,12 @@ class Settings {
   sidebarCollapsed = $state(false);
   enterSends = $state(true);
   accounts = $state<Record<string, AccountMeta>>({});
+  categories = $state<Record<string, ChatCategory>>({}); // chat key -> category
 
   constructor() {
     try {
       const saved = JSON.parse(localStorage.getItem(KEY) ?? '{}');
-      for (const k of ['theme', 'notifications', 'notificationPreview', 'closeToTray', 'sidebarCollapsed', 'enterSends', 'accounts'] as const) {
+      for (const k of ['theme', 'notifications', 'notificationPreview', 'closeToTray', 'sidebarCollapsed', 'enterSends', 'accounts', 'categories'] as const) {
         if (saved[k] !== undefined) (this as any)[k] = saved[k];
       }
     } catch {
@@ -47,6 +52,7 @@ class Settings {
         sidebarCollapsed: this.sidebarCollapsed,
         enterSends: this.enterSends,
         accounts: this.accounts,
+        categories: this.categories,
       }));
     } catch {
       // storage unavailable: settings last for this session

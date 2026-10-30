@@ -9,7 +9,7 @@
   A 300 px column at >= 1280 px, an overlay sheet below.
 -->
 <script lang="ts">
-  import { Archive, ArchiveRestore, LogOut, Pin, PinOff, Search, Trash2, X } from '@lucide/svelte';
+  import { Archive, ArchiveRestore, LogOut, Pin, PinOff, Search, Star, StarOff, Trash2, X } from '@lucide/svelte';
   import * as api from '../lib/api';
   import { protocolMeta } from '../lib/protocols';
   import { fileMime, fileReady, splitKey, store } from '../lib/store.svelte';
@@ -50,7 +50,7 @@
     </div>
     <div class="body scroll">
       <div class="identity">
-        <Avatar name={store.chatName(chat)} id={chat.id} size={76} {accountId} ring="var(--bg-1)" />
+        <Avatar name={store.chatName(chat)} id={chat.id} size={76} {accountId} group={chat.isGroup} ring="var(--bg-1)" />
         <div class="name">{store.chatName(chat)}</div>
         <div class="sub">
           <ProtocolBadge protocol={account.protocol} color={store.accountColor(accountId)} size={14} />
@@ -67,11 +67,13 @@
             {#if chat.isPinned}<PinOff size={18} />Unpin{:else}<Pin size={18} />Pin{/if}
           </button>
         {/if}
-        {#if account.capabilities.archiveChat}
-          <button onclick={() => api.call('chats.archive', { accountId, chatId, isArchived: !chat.isArchived }).catch((e) => store.toastError(e))}>
-            {#if chat.isArchived}<ArchiveRestore size={18} />Unarchive{:else}<Archive size={18} />Archive{/if}
-          </button>
-        {/if}
+        <button class:on={store.category(chat) === 'favorite'}
+          onclick={() => store.setCategory(chat, store.category(chat) === 'favorite' ? 'default' : 'favorite')}>
+          {#if store.category(chat) === 'favorite'}<StarOff size={18} />Unfavorite{:else}<Star size={18} />Favorite{/if}
+        </button>
+        <button onclick={() => store.setCategory(chat, store.category(chat) === 'archived' ? 'default' : 'archived')}>
+          {#if store.category(chat) === 'archived'}<ArchiveRestore size={18} />Unarchive{:else}<Archive size={18} />Archive{/if}
+        </button>
         <button class="danger" onclick={leave}>
           {#if chat.isGroup}<LogOut size={18} />Leave{:else}<Trash2 size={18} />Delete{/if}
         </button>
@@ -133,6 +135,7 @@
   }
   .actions button:hover { background: var(--surface-2); }
   .actions button.danger { color: var(--danger); }
+  .actions button.on { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
   .section { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); margin-top: 4px; }
   .muted { font-size: 13px; color: var(--text-muted); }
   .members { display: flex; flex-direction: column; gap: 2px; margin-top: -6px; }

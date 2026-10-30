@@ -6,7 +6,7 @@
 
 // Chat and message actions shared by the chat list, conversation and info panel.
 
-import { Archive, ArchiveRestore, MailCheck, Pin, PinOff, Trash2 } from '@lucide/svelte';
+import { Archive, ArchiveRestore, MailCheck, Pin, PinOff, Star, StarOff, Trash2 } from '@lucide/svelte';
 import * as api from './api';
 import { store } from './store.svelte';
 import type { Chat } from './types';
@@ -32,13 +32,17 @@ export function chatMenu(c: Chat): MenuItem[] {
       run: () => api.call('chats.pin', { accountId: c.accountId, chatId: c.id, isPinned: !c.isPinned }).catch((e) => store.toastError(e)),
     });
   }
-  if (caps?.archiveChat) {
-    items.push({
-      label: c.isArchived ? 'Unarchive' : 'Archive',
-      icon: c.isArchived ? ArchiveRestore : Archive,
-      run: () => api.call('chats.archive', { accountId: c.accountId, chatId: c.id, isArchived: !c.isArchived }).catch((e) => store.toastError(e)),
-    });
-  }
+  const category = store.category(c);
+  items.push({
+    label: category === 'favorite' ? 'Remove from favorites' : 'Add to favorites',
+    icon: category === 'favorite' ? StarOff : Star,
+    run: () => store.setCategory(c, category === 'favorite' ? 'default' : 'favorite'),
+  });
+  items.push({
+    label: category === 'archived' ? 'Unarchive' : 'Archive',
+    icon: category === 'archived' ? ArchiveRestore : Archive,
+    run: () => store.setCategory(c, category === 'archived' ? 'default' : 'archived'),
+  });
   items.push({
     label: c.isGroup ? 'Leave group…' : 'Delete chat…',
     icon: Trash2,

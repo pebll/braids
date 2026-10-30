@@ -213,7 +213,7 @@
         <button class="icon-btn" aria-label="Back to chats" onclick={() => store.closeChat()}><ChevronLeft size={22} /></button>
       {/if}
       <button class="who" onclick={() => (ui.infoOpen = !ui.infoOpen)} title="Chat info">
-        <Avatar name={store.chatName(chat)} id={chat.id} size={38} {accountId} ring="var(--bg-2)" />
+        <Avatar name={store.chatName(chat)} id={chat.id} size={38} {accountId} group={chat.isGroup} ring="var(--bg-2)" />
         <span class="who-text">
           <span class="who-name">{store.chatName(chat)}</span>
           <span class="who-sub">

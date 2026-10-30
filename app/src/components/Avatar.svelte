@@ -17,7 +17,8 @@
     accountId = '',
     online = false,
     ring = 'var(--bg-1)',
-  }: { name: string; id: string; size?: number; accountId?: string; online?: boolean; ring?: string } = $props();
+    group = false,
+  }: { name: string; id: string; size?: number; accountId?: string; online?: boolean; ring?: string; group?: boolean } = $props();
 
   const account = $derived(accountId ? store.accounts[accountId] : undefined);
   const badge = $derived(size >= 40 ? 18 : size >= 30 ? 14 : 12);
@@ -26,6 +27,7 @@
 <span class="avatar" style:width="{size}px" style:height="{size}px">
   <span
     class="circle"
+    class:group
     style:background={avatarColor(id || name)}
     style:font-size="{Math.round(size * (size >= 40 ? 0.39 : 0.37))}px"
     aria-hidden="true">{initials(name)}</span
@@ -43,6 +45,11 @@
   .circle {
     width: 100%; height: 100%; border-radius: 50%; color: #1c1917; font-weight: 600; display: flex;
     align-items: center; justify-content: center; letter-spacing: 0.01em; user-select: none;
+  }
+  /* groups: octagon, people: circle */
+  .circle.group {
+    border-radius: 0;
+    clip-path: polygon(29.3% 0, 70.7% 0, 100% 29.3%, 100% 70.7%, 70.7% 100%, 29.3% 100%, 0 70.7%, 0 29.3%);
   }
   .badge { position: absolute; right: -2px; bottom: -2px; display: flex; }
   .online { position: absolute; right: 0; top: 0; width: 10px; height: 10px; border-radius: 50%; background: var(--success); }

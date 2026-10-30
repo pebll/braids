@@ -10,7 +10,7 @@
 import * as api from './api';
 import { plainText } from './format';
 import { ACCOUNT_COLORS, protocolMeta } from './protocols';
-import { settings } from './settings.svelte';
+import { settings, type ChatCategory } from './settings.svelte';
 import type { Account, ApiEvent, AuthPrompt, Chat, Contact, FileRef, Message } from './types';
 import { ApiError } from './types';
 
@@ -53,7 +53,7 @@ export interface Toast {
   action?: { label: string; run: () => void };
 }
 
-export type Filter = { kind: 'all' } | { kind: 'unread' } | { kind: 'archived' } | { kind: 'account'; accountId: string };
+export type Filter = { kind: 'all' } | { kind: 'favorites' } | { kind: 'unread' } | { kind: 'archived' } | { kind: 'account'; accountId: string };
 
 class Store {
   // daemon
@@ -94,30 +94,52 @@ class Store {
     return Object.values(this.accounts).sort((a, b) => a.accountId.localeCompare(b.accountId));
   }
 
+  category(c: Chat): ChatCategory {
+    return settings.categories[chatKey(c.accountId, c.id)] ?? (c.isArchived ? 'archived' : 'default');
+  }
+
+  // Favorites first (in every view but Archived), then pinned, then activity.
   get chatList(): Chat[] {
     const f = this.filter;
     const q = this.search.trim().toLowerCase();
+    const fav = (c: Chat) => Number(this.category(c) === 'favorite');
     return Object.values(this.chats)
       .filter((c) => this.accounts[c.accountId])
-      .filter((c) => (f.kind === 'archived' ? c.isArchived : !c.isArchived))
+      .filter((c) => (f.kind === 'archived' ? this.category(c) === 'archived' : this.category(c) !== 'archived'))
+      .filter((c) => f.kind !== 'favorites' || this.category(c) === 'favorite')
       .filter((c) => f.kind !== 'unread' || c.isUnread || chatKey(c.accountId, c.id) === this.current)
       .filter((c) => f.kind !== 'account' || c.accountId === f.accountId)
       .filter((c) => !q || this.chatName(c).toLowerCase().includes(q))
-      .sort((a, b) => Number(b.isPinned) - Number(a.isPinned) || b.lastActivity - a.lastActivity);
+      .sort((a, b) => fav(b) - fav(a) || Number(b.isPinned) - Number(a.isPinned) || b.lastActivity - a.lastActivity);
   }
 
   unreadCount(filter: Filter): number {
     return Object.values(this.chats).filter((c) => {
       if (!c.isUnread || !this.accounts[c.accountId]) return false;
-      if (filter.kind === 'archived') return c.isArchived;
-      if (c.isArchived) return false;
+      const category = this.category(c);
+      if (filter.kind === 'archived') return category === 'archived';
+      if (category === 'archived') return false;
+      if (filter.kind === 'favorites') return category === 'favorite';
       if (filter.kind === 'account') return c.accountId === filter.accountId;
       return true;
     }).length;
   }
 
+  // unread chats for tray and dock: not archived, not muted (unless mentioned)
   get badgeCount(): number {
-    return Object.values(this.chats).filter((c) => c.isUnread && !c.isArchived && (!c.isMuted || c.isUnreadMention) && this.accounts[c.accountId]).length;
+    return Object.values(this.chats).filter((c) => c.isUnread && this.category(c) !== 'archived' && (!c.isMuted || c.isUnreadMention) && this.accounts[c.accountId]).length;
+  }
+
+  // Moves a chat to a category; archiving is mirrored to the messenger where it
+  // supports archives, so other devices see it too.
+  async setCategory(c: Chat, category: ChatCategory) {
+    const key = chatKey(c.accountId, c.id);
+    settings.categories[key] = category;
+    settings.save();
+    const archived = category === 'archived';
+    if (this.accounts[c.accountId]?.capabilities.archiveChat && c.isArchived !== archived) {
+      await api.call('chats.archive', { accountId: c.accountId, chatId: c.id, isArchived: archived }).catch((e) => this.toastError(e));
+    }
   }
 
   get currentChat(): Chat | null {
@@ -303,6 +325,10 @@ class Store {
       }
       case 'chat.removed': {
         const key = chatKey(p.accountId, p.chatId);
+        if (settings.categories[key]) {
+          delete settings.categories[key];
+          settings.save();
+        }
         delete this.chats[key];
         delete this.messages[key];
         if (this.current === key) this.current = '';
@@ -398,6 +424,8 @@ class Store {
     const key = chatKey(p.accountId, p.chatId);
     if (!settings.notifications || settings.accounts[p.accountId]?.notify === false) return;
     if (this.focused && this.current === key) return;
+    const chat = this.chats[key];
+    if (chat && this.category(chat) === 'archived' && !p.hasMention) return;
     const title = p.isGroup ? `${p.chatName}` : p.senderName || p.chatName;
     let body = settings.notificationPreview ? plainText(p.text) || (p.hasFile ? 'Attachment' : '') : 'New message';
     if (settings.notificationPreview && p.isGroup && p.senderName) body = `${p.senderName}: ${body}`;
@@ -437,6 +465,10 @@ class Store {
     }
     if (this.current && splitKey(this.current)[0] === accountId) this.current = '';
     if (this.filter.kind === 'account' && this.filter.accountId === accountId) this.filter = { kind: 'all' };
+    for (const key of Object.keys(settings.categories)) {
+      if (splitKey(key)[0] === accountId) delete settings.categories[key];
+    }
+    settings.save();
   }
 
   // ---- chats and messages ----

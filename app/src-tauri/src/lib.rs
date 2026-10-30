@@ -27,6 +27,21 @@ struct AppState {
     daemon: Daemon,
     close_to_tray: AtomicBool,
     temp_counter: AtomicU64,
+    tray_level: AtomicU64, // colored strands shown in the tray icon
+}
+
+/// Tray icon for a number of colored strands: 0 monochrome (a template image
+/// on macOS, white for the usual dark Linux panels), 1 / 2 / 3 for 1, 2 and
+/// 3+ unread chats (app/scripts/tray-icons.sh).
+fn tray_icon(level: u64) -> tauri::Result<Image<'static>> {
+    let bytes: &'static [u8] = match level {
+        0 if cfg!(target_os = "macos") => include_bytes!("../icons/tray-black.png"),
+        0 => include_bytes!("../icons/tray-white.png"),
+        1 => include_bytes!("../icons/tray-unread-1.png"),
+        2 => include_bytes!("../icons/tray-unread-2.png"),
+        _ => include_bytes!("../icons/tray-unread-3.png"),
+    };
+    Image::from_bytes(bytes)
 }
 
 #[tauri::command]
@@ -48,7 +63,7 @@ fn set_close_to_tray(state: State<'_, AppState>, enabled: bool) {
 }
 
 #[tauri::command]
-fn set_badge(app: AppHandle, count: u32) {
+fn set_badge(app: AppHandle, state: State<'_, AppState>, count: u32) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.set_badge_count(if count > 0 { Some(count as i64) } else { None });
         let _ = window.set_title(&if count > 0 { format!("braids ({count})") } else { "braids".into() });
@@ -56,6 +71,13 @@ fn set_badge(app: AppHandle, count: u32) {
     if let Some(tray) = app.tray_by_id("main") {
         let tip = if count > 0 { format!("braids — {count} unread") } else { "braids".into() };
         let _ = tray.set_tooltip(Some(&tip));
+        let level = u64::from(count.min(3));
+        if state.tray_level.swap(level, Ordering::SeqCst) != level {
+            if let Ok(icon) = tray_icon(level) {
+                let _ = tray.set_icon(Some(icon));
+                let _ = tray.set_icon_as_template(level == 0);
+            }
+        }
     }
 }
 
@@ -86,12 +108,7 @@ fn build_tray(app: &AppHandle) -> tauri::Result<TrayIcon> {
     let quit = MenuItem::with_id(app, "quit", "Quit braids", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&open, &quit])?;
 
-    // monochrome: a template image on macOS, white for the usual dark Linux panels
-    let icon = if cfg!(target_os = "macos") {
-        Image::from_bytes(include_bytes!("../icons/tray-black.png"))?
-    } else {
-        Image::from_bytes(include_bytes!("../icons/tray-white.png"))?
-    };
+    let icon = tray_icon(0)?;
 
     TrayIconBuilder::with_id("main")
         .icon(icon)
@@ -121,6 +138,7 @@ pub fn run() {
             daemon: Daemon::new(),
             close_to_tray: AtomicBool::new(true),
             temp_counter: AtomicU64::new(1),
+            tray_level: AtomicU64::new(0),
         })
         .setup(|app| {
             let handle = app.handle().clone();

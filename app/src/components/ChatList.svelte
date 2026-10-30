@@ -23,11 +23,15 @@
   let cursor = $state(-1); // keyboard cursor, distinct from selection
 
   const chats = $derived(store.chatList);
+  // section headers when favorites and other chats are listed together
+  const sectioned = $derived(store.filter.kind !== 'favorites' && store.filter.kind !== 'archived' &&
+    chats.some((c) => store.category(c) === 'favorite') && chats.some((c) => store.category(c) !== 'favorite'));
 
   const title = $derived.by(() => {
     const f = store.filter;
     if (f.kind === 'unread') return 'Unread';
     if (f.kind === 'archived') return 'Archived';
+    if (f.kind === 'favorites') return 'Favorites';
     if (f.kind === 'account') return store.accountName(f.accountId);
     return 'All chats';
   });
@@ -123,6 +127,11 @@
     {#each chats as c, i (chatKey(c.accountId, c.id))}
       {@const key = chatKey(c.accountId, c.id)}
       {@const p = preview(c)}
+      {#if sectioned && i === 0}
+        <div class="section">Favorites</div>
+      {:else if sectioned && store.category(c) !== 'favorite' && store.category(chats[i - 1]) === 'favorite'}
+        <div class="section">Chats</div>
+      {/if}
       {@const selected = key === store.current}
       <div
         class="row"
@@ -136,7 +145,7 @@
         onkeydown={(e) => e.key === 'Enter' && open(c)}
         oncontextmenu={(e) => { e.preventDefault(); ui.openMenu(e, chatMenu(c)); }}
       >
-        <Avatar name={store.chatName(c)} id={c.id} accountId={c.accountId} ring={selected ? 'var(--selected)' : 'var(--bg-1)'}
+        <Avatar name={store.chatName(c)} id={c.id} accountId={c.accountId} group={c.isGroup} ring={selected ? 'var(--selected)' : 'var(--bg-1)'}
           online={!c.isGroup && store.isOnline(c.accountId, c.id)} />
         <div class="body">
           <div class="line1">
@@ -173,6 +182,8 @@
           <p><b>All caught up.</b><br />No unread chats.</p>
         {:else if store.filter.kind === 'archived'}
           <p>No archived chats.</p>
+        {:else if store.filter.kind === 'favorites'}
+          <p><b>No favorites yet.</b><br />Right-click a chat and choose “Add to favorites”.</p>
         {:else if store.accountList.length}
           <Braid width={200} height={28} faint />
           <p><b>No chats yet.</b><br />They appear here as the accounts sync.</p>
@@ -196,6 +207,7 @@
   .search input::placeholder { color: var(--text-muted); }
   kbd { font-family: var(--mono); font-size: 10px; color: var(--text-muted); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; margin-right: 4px; }
   .list { flex: 1; padding: 0 6px 8px; display: flex; flex-direction: column; gap: 1px; outline: none; min-height: 0; }
+  .section { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); padding: 10px 12px 4px; flex-shrink: 0; }
   .row { display: flex; gap: 12px; align-items: center; padding: 9px 12px; border-radius: 10px; cursor: default; flex-shrink: 0; }
   .row:hover { background: var(--hover); }
   .row.selected { background: var(--selected); }

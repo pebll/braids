@@ -9,7 +9,7 @@
   settings. 232 px, collapsible to 60 px; a drawer in the narrow layout.
 -->
 <script lang="ts">
-  import { Archive, CircleAlert, Inbox, LoaderCircle, Mail, PanelLeft, Plus, Settings, WifiOff } from '@lucide/svelte';
+  import { Archive, CircleAlert, Inbox, LoaderCircle, Mail, PanelLeft, Plus, Settings, Star, WifiOff } from '@lucide/svelte';
   import { settings } from '../lib/settings.svelte';
   import { store, type Filter } from '../lib/store.svelte';
   import { ui } from '../lib/ui.svelte';
@@ -20,7 +20,7 @@
   const collapsed = $derived(settings.sidebarCollapsed && !drawer);
 
   const syncing = $derived(store.accountList.filter((a) => a.state === 'connecting').length);
-  const archivedCount = $derived(Object.values(store.chats).filter((c) => c.isArchived && store.accounts[c.accountId]).length);
+  const archivedCount = $derived(Object.values(store.chats).filter((c) => store.accounts[c.accountId] && store.category(c) === 'archived').length);
 
   function select(f: Filter) {
     store.filter = f;
@@ -57,7 +57,7 @@
   </div>
 
   <div class="items">
-    {#each [{ f: { kind: 'all' } as Filter, label: 'All chats', icon: Inbox }, { f: { kind: 'unread' } as Filter, label: 'Unread', icon: Mail }] as item}
+    {#each [{ f: { kind: 'all' } as Filter, label: 'All chats', icon: Inbox }, { f: { kind: 'favorites' } as Filter, label: 'Favorites', icon: Star }, { f: { kind: 'unread' } as Filter, label: 'Unread', icon: Mail }] as item}
       {@const n = store.unreadCount(item.f)}
       <button class="item" class:active={isActive(item.f)} onclick={() => select(item.f)} title={collapsed ? item.label : undefined}>
         <span class="ico"><item.icon size={18} strokeWidth={1.75} /></span>

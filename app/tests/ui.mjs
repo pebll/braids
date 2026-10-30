@@ -149,6 +149,34 @@ try {
   fs.rmSync(png, { force: true });
   await page.getByRole('option', { name: /The Office/ }).click();
 
+  // groups have an octagonal avatar, people a round one
+  check(await page.getByRole('option', { name: /The Office/ }).locator('.circle.group').count() === 1, 'group avatar is octagonal');
+  check(await page.getByRole('option', { name: /Michael/ }).locator('.circle.group').count() === 0, 'person avatar is round');
+
+  // categories: favorite, default, archived
+  await page.getByRole('option', { name: /Dwight/ }).click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Add to favorites' }).click();
+  check((await page.locator('.chatlist .section').first().textContent()) === 'Favorites', 'favorites section shown');
+  check((await page.getByRole('option').first().textContent()).includes('Dwight'), 'favorite listed first');
+  await page.getByRole('button', { name: 'Favorites' }).click();
+  check((await page.getByRole('option').count()) === 1, 'favorites folder');
+  await shot('favorites');
+  await page.getByRole('button', { name: 'All chats' }).click();
+  await page.getByRole('option', { name: /Jim/ }).click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Archive' }).click();
+  check((await page.getByRole('option', { name: /Jim/ }).count()) === 0, 'archived chat leaves the inbox');
+  await page.getByRole('button', { name: /Archived/ }).click();
+  check((await page.getByRole('option', { name: /Jim/ }).count()) === 1, 'archived chat in Archived');
+  await page.getByRole('option', { name: /Jim/ }).click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Unarchive' }).click();
+  await page.getByRole('button', { name: 'All chats' }).click();
+  check((await page.getByRole('option', { name: /Jim/ }).count()) === 1, 'unarchived chat back in the inbox');
+  await page.getByRole('option', { name: /The Office/ }).click();
+  await page.keyboard.press('Control+i');
+  await page.getByText('Group info').waitFor();
+  await shot('inbox');
+  await page.keyboard.press('Control+i');
+
   // info panel and theme
   await page.keyboard.press('Control+i');
   await page.getByText('Group info').waitFor();
