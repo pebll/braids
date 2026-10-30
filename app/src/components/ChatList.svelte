@@ -6,7 +6,7 @@
   braids is distributed under the GNU AGPL v3 license, see LICENSE for details.
 
   The unified inbox: chats of all accounts (or the selected folder/account),
-  newest activity first, favorites outlined. Search by name, context menu per chat.
+  newest activity first, favorites with a gold avatar ring. Search by name, context menu per chat.
 -->
 <script lang="ts">
   import { AtSign, Menu as MenuIcon, Search, SquarePen, VolumeX, X } from '@lucide/svelte';
@@ -129,8 +129,6 @@
         class:selected
         class:cursor={i === cursor}
         class:unread={c.isUnread}
-        class:favorite={store.category(c) === 'favorite'}
-        title={store.category(c) === 'favorite' ? 'Favorite' : undefined}
         role="option"
         aria-selected={selected}
         tabindex="-1"
@@ -139,6 +137,7 @@
         oncontextmenu={(e) => { e.preventDefault(); ui.openMenu(e, chatMenu(c)); }}
       >
         <Avatar name={store.chatName(c)} id={c.id} accountId={c.accountId} group={c.isGroup} ring={selected ? 'var(--selected)' : 'var(--bg-1)'}
+          favorite={store.category(c) === 'favorite'}
           online={!c.isGroup && store.isOnline(c.accountId, c.id)} />
         <div class="body">
           <div class="line1">
@@ -199,7 +198,6 @@
   .row { display: flex; gap: 12px; align-items: center; padding: 9px 12px; border-radius: 10px; cursor: default; flex-shrink: 0; }
   .row:hover { background: var(--hover); }
   .row.selected { background: var(--selected); }
-  .row.favorite { box-shadow: inset 0 0 0 1.5px var(--favorite); }
   .row.cursor { box-shadow: inset 0 0 0 2px var(--focus); }
   .body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
   .line1, .line2 { display: flex; align-items: center; gap: 5px; }

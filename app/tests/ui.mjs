@@ -161,7 +161,7 @@ try {
   // categories: favorite, default, archived
   await page.getByRole('option', { name: /Dwight/ }).click({ button: 'right' });
   await page.getByRole('menuitem', { name: 'Add to favorites' }).click();
-  check(await page.locator('.chatlist .row.favorite', { hasText: 'Dwight' }).count() === 1, 'favorite marked in the list');
+  check(await (await page.locator('.chatlist .row', { has: page.locator('.name', { hasText: /^Dwight$/ }) }).locator('.circle').getAttribute('style')).includes('--favorite'), 'favorite marked in the list');
   check(await page.locator('.chatlist .section').count() === 0, 'no favorites section, sorted by date');
   await page.getByRole('button', { name: 'Favorites' }).click();
   check((await page.getByRole('option').count()) === 1, 'favorites folder');

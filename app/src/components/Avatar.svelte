@@ -20,6 +20,7 @@
     ring = 'var(--bg-1)',
     group = false,
     owner = '',
+    favorite = false,
   }: {
     name: string;
     id: string;
@@ -29,6 +30,7 @@
     ring?: string;
     group?: boolean;
     owner?: string; // account whose picture of id is shown (default: accountId)
+    favorite?: boolean; // gold ring
   } = $props();
 
   const pictureAccount = $derived(owner || accountId);
@@ -43,6 +45,7 @@
   <span
     class="circle"
     class:group
+    style:box-shadow={favorite ? `0 0 0 2px ${ring}, 0 0 0 4px var(--favorite)` : undefined}
     style:background={avatarColor(id || name)}
     style:font-size="{Math.round(size * (size >= 40 ? 0.39 : 0.37))}px"
     aria-hidden="true"
