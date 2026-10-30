@@ -12,7 +12,7 @@
   import { Check, CheckCheck, Copy, Download, FileText, LoaderCircle, MoreHorizontal, Pencil, Pin, PinOff, Reply, SmilePlus, Trash2, TriangleAlert } from '@lucide/svelte';
   import * as api from '../lib/api';
   import { isOnlyEmoji, renderText, senderColor, timeOfDay } from '../lib/format';
-  import { store } from '../lib/store.svelte';
+  import { fileReady, store } from '../lib/store.svelte';
   import type { Account, Chat, Message } from '../lib/types';
   import { ui, type MenuItem } from '../lib/ui.svelte';
   import Avatar from './Avatar.svelte';
@@ -40,6 +40,8 @@
   const showName = $derived(chat.isGroup && !own && first);
   const showAvatar = $derived(chat.isGroup && !own);
   const isImage = $derived(!!m.file && m.file.mimeType.startsWith('image/'));
+  const isVideo = $derived(!!m.file && m.file.mimeType.startsWith('video/') && m.file.mimeType !== 'video/webm');
+  const ready = $derived(fileReady(m.file));
   const emojiOnly = $derived(!m.file && !m.quoted && !m.isDeleted && isOnlyEmoji(m.text));
   const html = $derived(m.isDeleted ? '' : renderText(m.text, m.mentions, account.selfId));
   const reactions = $derived(Object.entries(m.reactions.counts).filter(([, n]) => n > 0));
@@ -61,7 +63,7 @@
 
   // images are fetched right away, other files on request
   $effect(() => {
-    if (isImage && m.file?.status === 'notDownloaded' && !requestedDownload) {
+    if ((isImage || isVideo) && m.file?.status === 'notDownloaded' && !requestedDownload) {
       requestedDownload = true;
       download();
     }
@@ -73,7 +75,7 @@
 
   function openFile() {
     if (!m.file) return;
-    if (m.file.status === 'downloaded') {
+    if (ready) {
       if (isImage) ui.lightbox = { src: api.fileUrl(m.file.path), name: m.file.name, path: m.file.path };
       else api.openPath(m.file.path).catch((e) => store.toastError(e));
     } else if (m.file.status !== 'downloading') {
@@ -114,7 +116,7 @@
     if (m.text) items.push({ label: 'Copy text', icon: Copy, run: () => navigator.clipboard.writeText(m.text).catch(() => {}) });
     if (m.file) {
       items.push({
-        label: m.file.status === 'downloaded' ? 'Open file' : 'Download',
+        label: ready ? 'Open file' : 'Download',
         icon: Download,
         run: openFile,
       });
@@ -177,7 +179,7 @@
       class:emoji={emojiOnly}
       class:mention={mentionsMe}
       class:deleted={m.isDeleted}
-      class:has-image={isImage && m.file?.status === 'downloaded'}
+      class:has-image={(isImage || isVideo) && ready}
     >
       {#if showName}
         <div class="sender" style:color={senderColor(m.senderId)}>{store.senderName(m)}</div>
@@ -191,22 +193,25 @@
       {/if}
 
       {#if m.file && !m.isDeleted}
-        {#if isImage && m.file.status === 'downloaded'}
+        {#if isImage && ready}
           <button class="image" onclick={openFile} aria-label="Open image {m.file.name}">
             <img src={api.fileUrl(m.file.path)} alt={m.file.name} loading="lazy" />
           </button>
+        {:else if isVideo && ready}
+          <!-- svelte-ignore a11y_media_has_caption -->
+          <video class="video" src={api.fileUrl(m.file.path)} controls preload="metadata"></video>
         {:else}
-          <button class="file" onclick={openFile} title={m.file.status === 'downloaded' ? 'Open' : 'Download'}>
+          <button class="file" onclick={openFile} title={ready ? 'Open' : 'Download'}>
             <span class="file-ico">
               {#if m.file.status === 'downloading'}<LoaderCircle size={20} class="spin" />
               {:else if m.file.status === 'failed'}<TriangleAlert size={20} />
-              {:else if m.file.status === 'downloaded'}<FileText size={20} />
+              {:else if ready}<FileText size={20} />
               {:else}<Download size={20} />{/if}
             </span>
             <span class="file-meta">
               <span class="file-name">{m.file.name || 'File'}</span>
               <span class="file-status">
-                {m.file.status === 'downloaded' ? 'Open' : m.file.status === 'downloading' ? 'Downloading…' : m.file.status === 'failed' ? 'Download failed — retry' : 'Download'}
+                {ready ? 'Open' : m.file.status === 'downloading' ? 'Downloading…' : m.file.status === 'failed' ? 'Download failed — retry' : 'Download'}
               </span>
             </span>
           </button>
@@ -297,6 +302,7 @@
   .q-text { font-size: 13px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 360px; }
 
   .image { border: 0; padding: 0; background: none; display: block; margin-bottom: 4px; }
+  .video { display: block; max-width: 100%; max-height: 360px; border-radius: 12px; margin-bottom: 4px; background: #000; }
   .image img { display: block; max-width: 100%; max-height: 320px; border-radius: 12px; min-width: 120px; object-fit: cover; }
 
   .file {

@@ -136,6 +136,19 @@ try {
   check((await composer.inputValue()) === 'unsent words', 'draft restored');
   await composer.fill('');
 
+  // images: a sent photo is shown inline (the type is guessed from the extension)
+  const png = path.join(confdir, '..', `braids-ui-${process.pid}.png`);
+  fs.writeFileSync(png, Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64'));
+  await page.evaluate(async (filePath) => {
+    const accounts = await (await fetch('/__braids/call', { method: 'POST', body: JSON.stringify({ method: 'accounts.list' }) })).json();
+    await fetch('/__braids/call', { method: 'POST', body: JSON.stringify({ method: 'messages.send', params: { accountId: accounts.result[0].accountId, chatId: 'Michael_0', filePath } }) });
+  }, png);
+  await page.getByRole('option', { name: /Michael/ }).click();
+  await page.waitForFunction(() => [...document.querySelectorAll('.msg .image img')].some((img) => img.naturalWidth > 0));
+  check(true, 'sent image shown inline');
+  fs.rmSync(png, { force: true });
+  await page.getByRole('option', { name: /The Office/ }).click();
+
   // info panel and theme
   await page.keyboard.press('Control+i');
   await page.getByText('Group info').waitFor();

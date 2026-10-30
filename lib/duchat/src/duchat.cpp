@@ -405,7 +405,23 @@ void DuChat::PerformRequest(std::shared_ptr<RequestMessage> p_RequestMessage)
         newMessagesNotify->cached = false;
         newMessagesNotify->sequence = true;
 
-        newMessagesNotify->chatMessages = s_Messages[getMessagesRequest->chatId];
+        newMessagesNotify->fromMsgId = getMessagesRequest->fromMsgId;
+
+        // newest first: the messages older than fromMsgId (all without it)
+        const std::vector<ChatMessage>& messages = s_Messages[getMessagesRequest->chatId];
+        bool isOlder = getMessagesRequest->fromMsgId.empty();
+        for (const auto& chatMessage : messages)
+        {
+          if (isOlder)
+          {
+            newMessagesNotify->chatMessages.push_back(chatMessage);
+          }
+          else if (chatMessage.id == getMessagesRequest->fromMsgId)
+          {
+            isOlder = true;
+          }
+        }
+
         m_MessageHandler(newMessagesNotify);
       }
       break;

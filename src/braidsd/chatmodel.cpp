@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <limits>
+#include <map>
 
 #include "fileutil.h"
 #include "log.h"
@@ -28,6 +29,35 @@ static bool IsSameMessage(const ChatMessage& p_Lhs, const ChatMessage& p_Rhs)
          (p_Lhs.isOutgoing == p_Rhs.isOutgoing) && (p_Lhs.isRead == p_Rhs.isRead) &&
          (p_Lhs.isEdited == p_Rhs.isEdited) && (p_Lhs.isDeleted == p_Rhs.isDeleted) &&
          (p_Lhs.isPinned == p_Rhs.isPinned) && (p_Lhs.hasMention == p_Rhs.hasMention);
+}
+
+// Mime type of a file the protocol did not type (e.g. WhatsApp sets only the
+// extension, Telegram download updates carry no type).
+static std::string GuessMimeType(const FileInfo& p_FileInfo)
+{
+  static const std::map<std::string, std::string> s_Types = {
+    { "jpg", "image/jpeg" }, { "jpeg", "image/jpeg" }, { "png", "image/png" }, { "gif", "image/gif" },
+    { "webp", "image/webp" }, { "bmp", "image/bmp" }, { "heic", "image/heic" }, { "svg", "image/svg+xml" },
+    { "mp4", "video/mp4" }, { "mov", "video/quicktime" }, { "webm", "video/webm" }, { "mkv", "video/x-matroska" },
+    { "3gp", "video/3gpp" }, { "ogg", "audio/ogg" }, { "oga", "audio/ogg" }, { "opus", "audio/opus" },
+    { "mp3", "audio/mpeg" }, { "m4a", "audio/mp4" }, { "wav", "audio/wav" }, { "pdf", "application/pdf" },
+  };
+
+  const std::string& path = p_FileInfo.filePath;
+  const size_t dot = path.find_last_of('.');
+  const size_t slash = path.find_last_of('/');
+  if ((dot != std::string::npos) && ((slash == std::string::npos) || (dot > slash)))
+  {
+    auto it = s_Types.find(StrUtil::ToLower(path.substr(dot + 1)));
+    if (it != s_Types.end()) return it->second;
+  }
+
+  if ((p_FileInfo.fileStatus == FileStatusDownloaded) && FileUtil::Exists(path) && !FileUtil::IsDir(path))
+  {
+    return FileUtil::GetMimeType(path);
+  }
+
+  return "";
 }
 
 static const char* FileStatusToString(FileStatus p_FileStatus)
@@ -252,7 +282,14 @@ void ChatModel::OnServiceMessage(std::shared_ptr<ServiceMessage> p_ServiceMessag
         auto mit = messages.find(newMessageFileNotify->msgId);
         if (mit != messages.end())
         {
-          mit->second.fileInfo = newMessageFileNotify->fileInfo;
+          // download updates may not repeat the type
+          FileInfo newInfo = ProtocolUtil::FileInfoFromHex(newMessageFileNotify->fileInfo);
+          if (newInfo.fileType.empty() && !mit->second.fileInfo.empty())
+          {
+            newInfo.fileType = ProtocolUtil::FileInfoFromHex(mit->second.fileInfo).fileType;
+          }
+
+          mit->second.fileInfo = ProtocolUtil::FileInfoToHex(newInfo);
           Emit("message.updated", MessageToJson(accountId, chatId, mit->second));
         }
       }
@@ -1526,7 +1563,7 @@ json ChatModel::MessageToJson(const std::string& p_AccountId, const std::string&
       { "id", fileInfo.fileId },
       { "path", fileInfo.filePath },
       { "name", FileUtil::BaseName(fileInfo.filePath) },
-      { "mimeType", fileInfo.fileType },
+      { "mimeType", fileInfo.fileType.empty() ? GuessMimeType(fileInfo) : fileInfo.fileType },
       { "status", FileStatusToString(fileInfo.fileStatus) },
     };
   }

@@ -12,7 +12,7 @@
   import { Archive, ArchiveRestore, LogOut, Pin, PinOff, Search, Trash2, X } from '@lucide/svelte';
   import * as api from '../lib/api';
   import { protocolMeta } from '../lib/protocols';
-  import { splitKey, store } from '../lib/store.svelte';
+  import { fileReady, splitKey, store } from '../lib/store.svelte';
   import { ui } from '../lib/ui.svelte';
   import Avatar from './Avatar.svelte';
   import ProtocolBadge from './ProtocolBadge.svelte';
@@ -25,7 +25,7 @@
   const membersLoaded = $derived(store.members[chatKey] !== undefined);
   const members = $derived(store.members[chatKey] ?? []);
   const images = $derived(
-    (store.messages[chatKey]?.items ?? []).filter((m) => m.file?.status === 'downloaded' && m.file.mimeType.startsWith('image/')).slice(-9).reverse(),
+    (store.messages[chatKey]?.items ?? []).filter((m) => fileReady(m.file) && m.file!.mimeType.startsWith('image/')).slice(-9).reverse(),
   );
   const contact = $derived(chat && !chat.isGroup ? store.contacts[accountId]?.[chatId] : undefined);
 

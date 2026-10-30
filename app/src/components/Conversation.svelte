@@ -268,6 +268,8 @@
         </div>
       {:else if list?.loading}
         <div class="start"><span class="loading-dots"><span></span><span></span><span></span></span></div>
+      {:else if list?.stalled}
+        <div class="start"><button class="btn ghost" onclick={() => store.loadOlder(chatKey, true)}>Load older messages</button></div>
       {/if}
 
       {#each items as m, i (m.id)}

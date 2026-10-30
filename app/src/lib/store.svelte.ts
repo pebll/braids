@@ -11,7 +11,7 @@ import * as api from './api';
 import { plainText } from './format';
 import { ACCOUNT_COLORS, protocolMeta } from './protocols';
 import { settings } from './settings.svelte';
-import type { Account, ApiEvent, AuthPrompt, Chat, Contact, Message } from './types';
+import type { Account, ApiEvent, AuthPrompt, Chat, Contact, FileRef, Message } from './types';
 import { ApiError } from './types';
 
 export const API_MAJOR = '0';
@@ -30,6 +30,7 @@ export interface MessageList {
   items: Message[];
   loading: boolean;
   atStart: boolean;
+  stalled: boolean; // the protocol did not answer: load more only on request
   loaded: boolean;
   firstUnreadId: string; // "new messages" separator, set when the chat is opened
 }
@@ -444,9 +445,9 @@ class Store {
     this.markCurrentRead();
   }
 
-  async loadOlder(key: string): Promise<number> {
+  async loadOlder(key: string, force = false): Promise<number> {
     const list = this.messages[key];
-    if (!list || list.loading || list.atStart) return 0;
+    if (!list || list.loading || list.atStart || (list.stalled && !force)) return 0;
     const [accountId, chatId] = splitKey(key);
     list.loading = true;
     try {
@@ -460,6 +461,7 @@ class Store {
       current.loaded = true;
       // no older messages (protocols may repeat the last page) means the start
       if (older.length === 0 && !page.timedOut) current.atStart = true;
+      current.stalled = older.length === 0 && !!page.timedOut;
       return older.length;
     } catch (e) {
       this.toastError(e);
@@ -564,7 +566,12 @@ class Store {
 }
 
 function emptyList(): MessageList {
-  return { items: [], loading: false, atStart: false, loaded: false, firstUnreadId: '' };
+  return { items: [], loading: false, atStart: false, stalled: false, loaded: false, firstUnreadId: '' };
+}
+
+// A local copy exists: downloaded, or a file sent from this computer.
+export function fileReady(f: FileRef | null): boolean {
+  return !!f && (f.status === 'downloaded' || (f.status === 'none' && f.path.startsWith('/')));
 }
 
 export function fileLabel(m: Message): string {

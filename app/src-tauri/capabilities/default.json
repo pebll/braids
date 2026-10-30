@@ -16,6 +16,12 @@
           "path": "$HOME/**"
         },
         {
+          "path": "$HOME/.config/**"
+        },
+        {
+          "path": "$HOME/.local/**"
+        },
+        {
           "path": "$TEMP/**"
         },
         {
