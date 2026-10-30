@@ -1,5 +1,10 @@
 Matrix
 ======
+> **braids note:** this page was written for nchat. The protocol behaviour,
+> security notes and licensing apply to braids; the setup instructions refer to
+> nchat's terminal setup (`nchat --setup`), which braids replaces with a GUI
+> login flow (see ARCHITECTURE.md).
+
 nchat can be built with support for the [Matrix](https://matrix.org)
 protocol, including end-to-end encryption. The implementation uses
 [mautrix-go](https://github.com/mautrix/go) with its pure Go olm

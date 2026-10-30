@@ -5,7 +5,7 @@
 # Copyright (C) 2020-2026 Kristofer Berggren
 # All rights reserved.
 #
-# See LICENSE for redistribution information.
+# See LICENSE.nchat for redistribution information.
 
 # helper functions
 exiterr()
@@ -30,6 +30,8 @@ show_usage()
   echo "Options:"
   echo "  --no-telegram   - build without telegram support"
   echo "  --no-whatsapp   - build without whatsapp support"
+  echo "  --no-signal     - build without signal support"
+  echo "  --no-matrix     - build without matrix support"
   echo "  --yes,-y        - non-interactive mode, assume yes"
   echo ""
   echo "Action:"
@@ -37,11 +39,9 @@ show_usage()
   echo "  build           - perform build"
   echo "  debug           - perform debug build"
   echo "  tests           - perform build and run tests"
-  echo "  doc             - perform build and generate documentation"
   echo "  install         - perform build and install"
-  echo "  all             - perform deps, build, tests, doc and install"
+  echo "  all             - perform deps, build, tests and install"
   echo "  src             - perform source code reformatting"
-  echo "  bump            - perform version bump"
   echo ""
   echo "Env:"
   echo "  NCHAT_PREFIX    - install prefix (default: /usr/local). A user-writable"
@@ -58,10 +58,8 @@ DEPS="0"
 BUILD="0"
 DEBUG="0"
 TESTS="0"
-DOC="0"
 INSTALL="0"
 SRC="0"
-BUMP="0"
 YES=""
 CMAKEARGS="${DEV_CMAKEARGS:-} ${NCHAT_CMAKEARGS:-}"
 
@@ -89,11 +87,6 @@ while [[ ${#} -gt 0 ]]; do
       TESTS="1"
       ;;
 
-    doc)
-      BUILD="1"
-      DOC="1"
-      ;;
-
     install)
       BUILD="1"
       INSTALL="1"
@@ -103,15 +96,10 @@ while [[ ${#} -gt 0 ]]; do
       SRC="1"
       ;;
 
-    bump)
-      BUMP="1"
-      ;;
-
     all)
       DEPS="1"
       BUILD="1"
       TESTS="1"
-      DOC="1"
       INSTALL="1"
       ;;
 
@@ -121,6 +109,14 @@ while [[ ${#} -gt 0 ]]; do
 
     --no-whatsapp)
       CMAKEARGS="-DHAS_WHATSAPP=OFF ${CMAKEARGS}"
+      ;;
+
+    --no-signal)
+      CMAKEARGS="-DHAS_SIGNAL=OFF ${CMAKEARGS}"
+      ;;
+
+    --no-matrix)
+      CMAKEARGS="-DHAS_MATRIX=OFF ${CMAKEARGS}"
       ;;
 
     -y)
@@ -234,47 +230,18 @@ fi
 if [[ "${SRC}" == "1" ]]; then
   go fmt lib/wmchat/go/*.go || exiterr "go fmt failed, exiting."
   go fmt lib/sgchat/go/*.go || exiterr "go fmt failed, exiting."
+  go fmt lib/mxchat/go/*.go || exiterr "go fmt failed, exiting."
   uncrustify --update-config-with-doc -c etc/uncrustify.cfg -o etc/uncrustify.cfg && \
-  uncrustify -c etc/uncrustify.cfg --replace --no-backup src/*.{cpp,h} \
+  uncrustify -c etc/uncrustify.cfg --replace --no-backup src/braidsd/*.cpp \
              lib/common/src/*.h \
              lib/duchat/src/*.{cpp,h} \
+             lib/mxchat/src/*.{cpp,h} \
              lib/ncutil/src/*.{cpp,h} \
              lib/sgchat/src/*.{cpp,h} \
              lib/tgchat/src/*.{cpp,h} \
              lib/wmchat/src/*.{cpp,h} \
              tests/*.{cpp,h} \
     || exiterr "unrustify failed, exiting."
-fi
-
-# bump
-if [[ "${BUMP}" == "1" ]]; then
-  CURRENT_VERSION=$(grep NCHAT_VERSION lib/common/src/version.h | head -1 | awk -F'"' '{print $2}') # ex: 5.1.1
-  CURRENT_MAJMIN="$(echo ${CURRENT_VERSION} | cut -d'.' -f1,2)" # ex: 5.1
-  URL="https://github.com/d99kris/nchat.git"
-  LATEST_TAG=$(git -c 'versionsort.suffix=-' ls-remote --tags --sort='v:refname' ${URL} | tail -n1 | cut -d'/' -f3)
-  LATEST_VERSION=$(echo "${LATEST_TAG}" | cut -c2-) # ex: 5.1.3
-  LATEST_MAJMIN="$(echo ${LATEST_VERSION} | cut -d'.' -f1,2)" # ex: 5.1
-  SED="sed"
-  if [[ "$(uname)" == "Darwin" ]]; then
-    SED="gsed"
-  fi
-  if [[ "${CURRENT_MAJMIN}" == "${LATEST_MAJMIN}" ]]; then
-    NEW_MAJ="$(echo ${CURRENT_VERSION} | cut -d'.' -f1)" # ex: 5
-    let NEW_MIN=$(echo ${CURRENT_VERSION} | cut -d'.' -f2)+1
-    NEW_PATCH="1" # use 1-based build/snapshot number
-    NEW_VERSION="${NEW_MAJ}.${NEW_MIN}.${NEW_PATCH}"
-    echo "Current:      ${CURRENT_MAJMIN} == ${LATEST_MAJMIN} Latest"
-    echo "Bump release: ${NEW_VERSION}"
-    ${SED} -i "s/^#define NCHAT_VERSION .*/#define NCHAT_VERSION \"${NEW_VERSION}\"/g" lib/common/src/version.h
-  else
-    NEW_MAJ="$(echo ${CURRENT_VERSION} | cut -d'.' -f1)" # ex: 5
-    NEW_MIN="$(echo ${CURRENT_VERSION} | cut -d'.' -f2)" # ex: 1
-    let NEW_PATCH=$(echo ${CURRENT_VERSION} | cut -d'.' -f3)+1
-    NEW_VERSION="${NEW_MAJ}.${NEW_MIN}.${NEW_PATCH}"
-    echo "Current:      ${CURRENT_MAJMIN} != ${LATEST_MAJMIN} Latest"
-    echo "Bump build:   ${NEW_VERSION}"
-    ${SED} -i "s/^#define NCHAT_VERSION .*/#define NCHAT_VERSION \"${NEW_VERSION}\"/g" lib/common/src/version.h
-  fi
 fi
 
 # cmake args
@@ -372,18 +339,6 @@ fi
 # tests
 if [[ "${TESTS}" == "1" ]]; then
   cd build && ctest --output-on-failure && cd .. || exiterr "tests failed, exiting."
-fi
-
-# doc
-if [[ "${DOC}" == "1" ]]; then
-  if [[ -x "$(command -v help2man)" ]]; then
-    if [[ "$(uname)" == "Darwin" ]]; then
-      SED="gsed -i"
-    else
-      SED="sed -i"
-    fi
-    help2man -n "ncurses chat" -N -o src/nchat.1 ./build/bin/nchat && ${SED} "s/\.\\\\\" DO NOT MODIFY THIS FILE\!  It was generated by help2man.*/\.\\\\\" DO NOT MODIFY THIS FILE\!  It was generated by help2man./g" src/nchat.1 && ${SED} "s/^Combined distribution subject to.*/License varies by build configuration.\n.br\nSee \`nchat \-\-version\` for details./g" src/nchat.1 || exiterr "doc failed, exiting."
-  fi
 fi
 
 # install

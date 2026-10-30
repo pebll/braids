@@ -1,5 +1,8 @@
 Config Flags
 ============
+> **braids note:** inherited from nchat. braids enables all protocols by
+> default (`HAS_DUMMY`, `HAS_TELEGRAM`, `HAS_WHATSAPP`, `HAS_SIGNAL`,
+> `HAS_MATRIX`); flags only affecting the removed terminal UI no longer apply.
 
 Component Loading
 -----------------
@@ -31,8 +34,8 @@ The protocols supported by nchat is controlled by the following cmake flags:
     HAS_DUMMY=ON
     HAS_TELEGRAM=ON
     HAS_WHATSAPP=ON
-    HAS_SIGNAL=OFF
-    HAS_MATRIX=OFF
+    HAS_SIGNAL=ON
+    HAS_MATRIX=ON
 
 It is possible to enable / disable protocols by passing one or multiple flags
 to cmake:

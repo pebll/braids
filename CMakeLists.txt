@@ -1,6 +1,6 @@
 # Project
 cmake_minimum_required(VERSION 3.16 FATAL_ERROR)
-project(nchat LANGUAGES CXX)
+project(braids LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 14)
 include(CheckCXXSourceCompiles)
 include(TestBigEndian)
@@ -230,11 +230,11 @@ option(HAS_WHATSAPP "WhatsApp" ON)
 message(STATUS "WhatsApp: ${HAS_WHATSAPP}")
 
 # Optional component - Signal
-option(HAS_SIGNAL "Signal" OFF)
+option(HAS_SIGNAL "Signal" ON)
 message(STATUS "Signal: ${HAS_SIGNAL}")
 
 # Optional component - Matrix
-option(HAS_MATRIX "Matrix" OFF)
+option(HAS_MATRIX "Matrix" ON)
 message(STATUS "Matrix: ${HAS_MATRIX}")
 
 # musl restrictions - Go c-archives built with a stock Go toolchain segfault
@@ -408,89 +408,18 @@ else()
   set(LIBRARY_LINKING_TYPE STATIC)
 endif()
 
-# Embedded compose script - bundled in the executable and extracted to the
-# temp dir at runtime, so no separate libexec install is needed.
-set(COMPOSE_SCRIPT_HEADER "${CMAKE_CURRENT_BINARY_DIR}/generated/composescript.h")
-add_custom_command(
-  OUTPUT "${COMPOSE_SCRIPT_HEADER}"
-  COMMAND "${CMAKE_COMMAND}"
-          -DIN_FILE=${CMAKE_CURRENT_SOURCE_DIR}/src/compose
-          -DOUT_FILE=${COMPOSE_SCRIPT_HEADER}
-          -DVAR_NAME=ComposeScript
-          -P ${CMAKE_CURRENT_SOURCE_DIR}/utils/embedfile.cmake
-  DEPENDS src/compose utils/embedfile.cmake
-  COMMENT "Embedding compose script"
-  VERBATIM
+# Application: core daemon
+add_executable(braidsd
+  src/braidsd/main.cpp
 )
-
-# Application
-add_executable(nchat
-  ${COMPOSE_SCRIPT_HEADER}
-  src/main.cpp
-  src/ui.cpp
-  src/ui.h
-  src/uichatlistdialog.cpp
-  src/uichatlistdialog.h
-  src/uicolorconfig.cpp
-  src/uicolorconfig.h
-  src/uiconfig.cpp
-  src/uiconfig.h
-  src/uicontactlistdialog.cpp
-  src/uicontactlistdialog.h
-  src/uicontroller.cpp
-  src/uigroupmemberlistdialog.cpp
-  src/uigroupmemberlistdialog.h
-  src/uicontroller.h
-  src/uidialog.cpp
-  src/uidialog.h
-  src/uiemojilistdialog.cpp
-  src/uiemojilistdialog.h
-  src/uientryview.cpp
-  src/uientryview.h
-  src/uifilelistdialog.cpp
-  src/uifilelistdialog.h
-  src/uihelpview.cpp
-  src/uihelpview.h
-  src/uihistoryview.cpp
-  src/uihistoryview.h
-  src/uikeyconfig.cpp
-  src/uikeyconfig.h
-  src/uikeydump.cpp
-  src/uikeydump.h
-  src/uikeyinput.cpp
-  src/uikeyinput.h
-  src/uilistborderview.cpp
-  src/uilistborderview.h
-  src/uilistdialog.cpp
-  src/uilistdialog.h
-  src/uilistview.cpp
-  src/uilistview.h
-  src/uimessagedialog.cpp
-  src/uimessagedialog.h
-  src/uimodel.cpp
-  src/uimodel.h
-  src/uiscreen.cpp
-  src/uiscreen.h
-  src/uistatusview.cpp
-  src/uistatusview.h
-  src/uitextinputdialog.cpp
-  src/uitextinputdialog.h
-  src/uitopview.cpp
-  src/uitopview.h
-  src/uiview.cpp
-  src/uiview.h
-  src/uiviewbase.cpp
-  src/uiviewbase.h
-)
-install(TARGETS nchat DESTINATION bin)
+install(TARGETS braidsd DESTINATION bin)
 
 # Headers
-target_include_directories(nchat PRIVATE "lib/common/src")
-target_include_directories(nchat PRIVATE "lib/ncutil/src")
-target_include_directories(nchat PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
+target_include_directories(braidsd PRIVATE "lib/common/src")
+target_include_directories(braidsd PRIVATE "lib/ncutil/src")
 
 # Compiler flags
-set_target_properties(nchat PROPERTIES COMPILE_FLAGS
+set_target_properties(braidsd PROPERTIES COMPILE_FLAGS
                       "-Wall -Wextra -Wpedantic -Wshadow -Wpointer-arith \
                        -Wcast-qual -Wno-missing-braces -Wswitch-default \
                        -Wunreachable-code -Wundef -Wuninitialized \
@@ -520,118 +449,68 @@ if(HAS_MATRIX)
   add_subdirectory(lib/mxchat)
 endif()
 
-# Dependency ncurses
-if (${CMAKE_SYSTEM_NAME} MATCHES "OpenBSD")
-  target_link_libraries(nchat PUBLIC ncurses)
-else()
-  set(CURSES_NEED_NCURSES TRUE)
-  set(CURSES_NEED_WIDE TRUE)
-  if (${CMAKE_SYSTEM_NAME} MATCHES "FreeBSD")
-    # FreeBSD base ncurses is wide-char but has no ncursesw/ header dir, which
-    # FindCurses requires with CURSES_NEED_WIDE, so point it at the base headers.
-    find_path(CURSES_INCLUDE_PATH NAMES ncurses.h PATHS /usr/include NO_DEFAULT_PATH)
-  endif()
-  find_package(Curses REQUIRED)
-  if(HAS_STATIC_EXTLIBS)
-    # static ncursesw does not bundle terminfo routines on some distros
-    find_library(TINFO_LIBRARY NAMES tinfow tinfo)
-    if(TINFO_LIBRARY)
-      list(APPEND CURSES_LIBRARIES ${TINFO_LIBRARY})
-    endif()
-  endif()
-  include_directories(${CURSES_INCLUDE_DIR})
-  target_compile_options(nchat PUBLIC ${NCURSES_CFLAGS})
-endif()
-
 # Linking
-target_link_libraries(nchat PUBLIC ncutil pthread ${CURSES_LIBRARIES} ${CMAKE_DL_LIBS})
+target_link_libraries(braidsd PUBLIC ncutil pthread ${CMAKE_DL_LIBS})
 
 # Optionals
 if(HAS_DUMMY)
-  target_include_directories(nchat PRIVATE "lib/duchat/src")
-  target_compile_definitions(nchat PRIVATE HAS_DUMMY="${HAS_DUMMY}")
+  target_include_directories(braidsd PRIVATE "lib/duchat/src")
+  target_compile_definitions(braidsd PRIVATE HAS_DUMMY="${HAS_DUMMY}")
   if(NOT HAS_DYNAMICLOAD)
-    target_link_libraries(nchat PUBLIC duchat)
+    target_link_libraries(braidsd PUBLIC duchat)
   endif()
 endif()
 
 if(HAS_TELEGRAM)
-  target_include_directories(nchat PRIVATE "lib/tgchat/src")
-  target_compile_definitions(nchat PRIVATE HAS_TELEGRAM="${HAS_TELEGRAM}")
+  target_include_directories(braidsd PRIVATE "lib/tgchat/src")
+  target_compile_definitions(braidsd PRIVATE HAS_TELEGRAM="${HAS_TELEGRAM}")
   if(NOT HAS_DYNAMICLOAD)
-    target_link_libraries(nchat PUBLIC tgchat)
+    target_link_libraries(braidsd PUBLIC tgchat)
   endif()
 endif()
 
 if(HAS_WHATSAPP)
-  target_include_directories(nchat PRIVATE "lib/wmchat/src")
-  target_compile_definitions(nchat PRIVATE HAS_WHATSAPP="${HAS_WHATSAPP}")
+  target_include_directories(braidsd PRIVATE "lib/wmchat/src")
+  target_compile_definitions(braidsd PRIVATE HAS_WHATSAPP="${HAS_WHATSAPP}")
   if(NOT HAS_DYNAMICLOAD)
-    target_link_libraries(nchat PUBLIC wmchat)
+    target_link_libraries(braidsd PUBLIC wmchat)
   endif()
 endif()
 
 if(HAS_SIGNAL)
-  target_include_directories(nchat PRIVATE "lib/sgchat/src")
-  target_compile_definitions(nchat PRIVATE HAS_SIGNAL="${HAS_SIGNAL}")
+  target_include_directories(braidsd PRIVATE "lib/sgchat/src")
+  target_compile_definitions(braidsd PRIVATE HAS_SIGNAL="${HAS_SIGNAL}")
   if(NOT HAS_DYNAMICLOAD)
-    target_link_libraries(nchat PUBLIC sgchat)
+    target_link_libraries(braidsd PUBLIC sgchat)
   endif()
 endif()
 
 if(HAS_MATRIX)
-  target_include_directories(nchat PRIVATE "lib/mxchat/src")
-  target_compile_definitions(nchat PRIVATE HAS_MATRIX="${HAS_MATRIX}")
+  target_include_directories(braidsd PRIVATE "lib/mxchat/src")
+  target_compile_definitions(braidsd PRIVATE HAS_MATRIX="${HAS_MATRIX}")
   if(NOT HAS_DYNAMICLOAD)
-    target_link_libraries(nchat PUBLIC mxchat)
+    target_link_libraries(braidsd PUBLIC mxchat)
   endif()
 endif()
 
 # Features
-if(HAS_MULTIPROTOCOL)
-  target_compile_definitions(nchat PRIVATE HAS_MULTIPROTOCOL="${HAS_MULTIPROTOCOL}")
-endif()
-
 if(HAS_DYNAMICLOAD)
-  target_compile_definitions(nchat PRIVATE HAS_DYNAMICLOAD="${HAS_DYNAMICLOAD}")
-endif()
-
-if(HAS_COREDUMP)
-  target_compile_definitions(nchat PRIVATE HAS_COREDUMP="${HAS_COREDUMP}")
-  if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-    # Core dump entitlements
-    set(SIGNSCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/utils/sign")
-    set(ENTITLEMENTS "${CMAKE_CURRENT_SOURCE_DIR}/src/nchat.entitlements")
-    install(CODE "execute_process(COMMAND
-      \"${SIGNSCRIPT}\" \"${ENTITLEMENTS}\" \"\$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/bin/nchat\"
-      )" COMPONENT Runtime)
-  endif()
+  target_compile_definitions(braidsd PRIVATE HAS_DYNAMICLOAD="${HAS_DYNAMICLOAD}")
 endif()
 
 # Common
-target_common_config(nchat)
-target_compile_definitions(nchat PRIVATE
-                           CMAKE_INSTALL_LIBDIR="${CMAKE_INSTALL_LIBDIR}"
-                           GO_VERSION="${GO_VERSION}"
-                           GO_VERSION_MIN="${GO_VERSION_MIN}")
+target_common_config(braidsd)
+target_compile_definitions(braidsd PRIVATE CMAKE_INSTALL_LIBDIR="${CMAKE_INSTALL_LIBDIR}")
 
 # Third-party license attribution
 #
 # Combine the committed per-component license fragments into a single notices
 # file matching this build's enabled protocols and link mode, for binary
 # distributions. The Go fragments (lib/wmchat, lib/sgchat) are regenerated by
-# utils/dist/gen-third-party-licenses; the others are hand-maintained. The
-# combined-work preamble mirrors the license rule in ShowVersion()
-# (src/main.cpp): AGPL v3 when Signal is compiled in (mautrix-signal), else
-# GPL v3 when WhatsApp is compiled in (whatsmeow links GPL-3.0 libsignal),
-# else MIT.
-if(HAS_SIGNAL)
-  set(TPL_PREAMBLE "${CMAKE_CURRENT_SOURCE_DIR}/utils/licenses/preamble-agpl.txt")
-elseif(HAS_WHATSAPP)
-  set(TPL_PREAMBLE "${CMAKE_CURRENT_SOURCE_DIR}/utils/licenses/preamble-gpl.txt")
-else()
-  set(TPL_PREAMBLE "${CMAKE_CURRENT_SOURCE_DIR}/utils/licenses/preamble-mit.txt")
-endif()
+# utils/dist/gen-third-party-licenses; the others are hand-maintained. braids
+# is AGPL v3 licensed regardless of the enabled protocols, so the preamble is
+# always the AGPL one.
+set(TPL_PREAMBLE "${CMAKE_CURRENT_SOURCE_DIR}/utils/licenses/preamble-agpl.txt")
 
 set(TPL_FRAGMENTS
   "${TPL_PREAMBLE}"
@@ -665,113 +544,25 @@ foreach(TPL_FRAGMENT ${TPL_FRAGMENTS})
   set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${TPL_FRAGMENT}")
 endforeach()
 
-# Install the combined notices file and nchat's own license to the FHS doc dir
-# (share/doc/nchat), so binary distributions carry attribution.
+# Install the combined notices file, the braids license and the original nchat
+# license to the FHS doc dir (share/doc/braids), so binary distributions carry
+# attribution.
 install(FILES "${TPL_COMBINED}" "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE"
-        DESTINATION "${CMAKE_INSTALL_DATADIR}/doc/nchat")
-
-# Manual install dir
-if(NOT CMAKE_INSTALL_MANDIR)
-  if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-    set(CMAKE_INSTALL_MANDIR "${CMAKE_INSTALL_PREFIX}/share/man")
-  else()
-    set(CMAKE_INSTALL_MANDIR "${CMAKE_INSTALL_PREFIX}/man")
-  endif()
-  message(STATUS "Using fallback man dir: ${CMAKE_INSTALL_MANDIR}")
-else()
-  message(STATUS "Using default man dir: ${CMAKE_INSTALL_MANDIR}")
-endif()
-
-# Manual
-install(FILES src/nchat.1 DESTINATION "${CMAKE_INSTALL_MANDIR}/man1")
+        "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.nchat"
+        DESTINATION "${CMAKE_INSTALL_DATADIR}/doc/braids")
 
 # Uninstall
-if(HAS_SHARED_LIBS)
-  add_custom_target(uninstall
-    COMMAND "${CMAKE_COMMAND}" -E remove "${CMAKE_INSTALL_PREFIX}/bin/nchat"
-    COMMAND "${CMAKE_COMMAND}" -E remove "${CMAKE_INSTALL_MANDIR}/man1/nchat.1"
-    COMMAND "${CMAKE_COMMAND}" -E remove "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/libncutil${CMAKE_SHARED_LIBRARY_SUFFIX}"
-    COMMAND "${CMAKE_COMMAND}" -E remove "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/libtdclientshared${CMAKE_SHARED_LIBRARY_SUFFIX}"
-    COMMAND "${CMAKE_COMMAND}" -E remove "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/libtgchat${CMAKE_SHARED_LIBRARY_SUFFIX}"
-    COMMAND "${CMAKE_COMMAND}" -E remove "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/libduchat${CMAKE_SHARED_LIBRARY_SUFFIX}"
-    COMMAND "${CMAKE_COMMAND}" -E remove "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/libwmchat${CMAKE_SHARED_LIBRARY_SUFFIX}"
-    COMMAND "${CMAKE_COMMAND}" -E remove "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/libsgchat${CMAKE_SHARED_LIBRARY_SUFFIX}"
-    COMMAND "${CMAKE_COMMAND}" -E remove "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_DATADIR}/doc/nchat/THIRD_PARTY_LICENSES"
-    COMMAND "${CMAKE_COMMAND}" -E remove "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_DATADIR}/doc/nchat/LICENSE"
-    COMMAND "${CMAKE_COMMAND}" -E remove_directory "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_DATADIR}/doc/nchat"
-  )
-else()
-  add_custom_target(uninstall
-    COMMAND "${CMAKE_COMMAND}" -E remove "${CMAKE_INSTALL_PREFIX}/bin/nchat"
-    COMMAND "${CMAKE_COMMAND}" -E remove "${CMAKE_INSTALL_MANDIR}/man1/nchat.1"
-    COMMAND "${CMAKE_COMMAND}" -E remove "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_DATADIR}/doc/nchat/THIRD_PARTY_LICENSES"
-    COMMAND "${CMAKE_COMMAND}" -E remove "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_DATADIR}/doc/nchat/LICENSE"
-    COMMAND "${CMAKE_COMMAND}" -E remove_directory "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_DATADIR}/doc/nchat"
-  )
-endif()
-
-# Dev Application
-if(CMAKE_BUILD_TYPE MATCHES "Debug")
-  message(STATUS "Building dev application")
-  add_executable(devnchat
-    src/main.cpp
-    dev/ui.cpp
-    dev/ui.h
-  )
-
-  # Headers
-  target_include_directories(devnchat PRIVATE "lib/common/src")
-  target_include_directories(devnchat PRIVATE "lib/ncutil/src")
-
-  # Compiler flags
-  set_target_properties(devnchat PROPERTIES COMPILE_FLAGS
-                        "-Wall -Wextra -Wpedantic -Wshadow -Wpointer-arith \
-                         -Wcast-qual -Wno-missing-braces -Wswitch-default \
-                         -Wunreachable-code -Wundef -Wuninitialized \
-                         -Wcast-align")
-
-  # Linking
-  target_link_libraries(devnchat PUBLIC ncutil pthread ${CURSES_NCURSES_LIBRARY} dl)
-
-  # Optionals
-  if(HAS_DUMMY)
-    target_include_directories(devnchat PRIVATE "lib/duchat/src")
-    target_compile_definitions(devnchat PRIVATE HAS_DUMMY="${HAS_DUMMY}")
-    if(NOT HAS_DYNAMICLOAD)
-      target_link_libraries(devnchat PUBLIC duchat)
-    endif()
-  endif()
-
-  if(HAS_TELEGRAM)
-    target_include_directories(devnchat PRIVATE "lib/tgchat/src")
-    target_compile_definitions(devnchat PRIVATE HAS_TELEGRAM="${HAS_TELEGRAM}")
-    if(NOT HAS_DYNAMICLOAD)
-      target_link_libraries(devnchat PUBLIC tgchat)
-    endif()
-  endif()
-
-  if(HAS_WHATSAPP)
-    target_include_directories(devnchat PRIVATE "lib/wmchat/src")
-    target_compile_definitions(devnchat PRIVATE HAS_WHATSAPP="${HAS_WHATSAPP}")
-    if(NOT HAS_DYNAMICLOAD)
-      target_link_libraries(devnchat PUBLIC wmchat)
-    endif()
-  endif()
-
-  # Features
-  if(HAS_MULTIPROTOCOL)
-    target_compile_definitions(devnchat PRIVATE HAS_MULTIPROTOCOL="${HAS_MULTIPROTOCOL}")
-  endif()
-
-  if(HAS_DYNAMICLOAD)
-    target_compile_definitions(devnchat PRIVATE HAS_DYNAMICLOAD="${HAS_DYNAMICLOAD}")
-  endif()
-
-  # Common
-  target_compile_definitions(devnchat PRIVATE CMAKE_INSTALL_LIBDIR="${CMAKE_INSTALL_LIBDIR}"
-                             GO_VERSION="${GO_VERSION}" GO_VERSION_MIN="${GO_VERSION_MIN}")
-
-endif()
+add_custom_target(uninstall
+  COMMAND "${CMAKE_COMMAND}" -E remove "${CMAKE_INSTALL_PREFIX}/bin/braidsd"
+  COMMAND "${CMAKE_COMMAND}" -E remove "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/libncutil${CMAKE_SHARED_LIBRARY_SUFFIX}"
+  COMMAND "${CMAKE_COMMAND}" -E remove "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/libtdclientshared${CMAKE_SHARED_LIBRARY_SUFFIX}"
+  COMMAND "${CMAKE_COMMAND}" -E remove "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/libtgchat${CMAKE_SHARED_LIBRARY_SUFFIX}"
+  COMMAND "${CMAKE_COMMAND}" -E remove "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/libduchat${CMAKE_SHARED_LIBRARY_SUFFIX}"
+  COMMAND "${CMAKE_COMMAND}" -E remove "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/libwmchat${CMAKE_SHARED_LIBRARY_SUFFIX}"
+  COMMAND "${CMAKE_COMMAND}" -E remove "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/libsgchat${CMAKE_SHARED_LIBRARY_SUFFIX}"
+  COMMAND "${CMAKE_COMMAND}" -E remove "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/libmxchat${CMAKE_SHARED_LIBRARY_SUFFIX}"
+  COMMAND "${CMAKE_COMMAND}" -E remove_directory "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_DATADIR}/doc/braids"
+)
 
 # Tests
 option(HAS_TESTS "Build tests" ON)
@@ -797,7 +588,7 @@ if(HAS_WHATSAPP AND HAS_SIGNAL)
   # Order the check after every end product. Depending on nchat alone is not
   # enough - in a dynamic-load build it does not depend on the protocol libraries,
   # so the check would then run in the middle of the build output.
-  foreach(NCHAT_TARGET nchat devnchat duchat tgchat wmchat sgchat)
+  foreach(NCHAT_TARGET braidsd duchat tgchat wmchat sgchat mxchat)
     if(TARGET ${NCHAT_TARGET})
       add_dependencies(checkgodeps ${NCHAT_TARGET})
     endif()

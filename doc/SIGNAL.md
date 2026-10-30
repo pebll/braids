@@ -1,5 +1,8 @@
 Signal
 ======
+> **braids note:** inherited from nchat. In braids Signal is enabled by
+> default; disable it with `./make.sh --no-signal build`.
+
 In order to build nchat with Signal support one needs to enable the signal
 protocol feature explicitly by setting:
 

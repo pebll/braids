@@ -1,20 +1,20 @@
 ================================================================================
-nchat — Third-party license notices
+braids — Third-party license notices
 ================================================================================
 
-This distribution of nchat includes Signal protocol support (mautrix-signal and
-libsignal). Those components are licensed under the GNU Affero General Public
-License v3, so this binary, as a combined work, is distributed under and subject
-to the GNU AGPL v3. nchat's own source code is authored under the MIT license
-(see the nchat repository), but the terms below govern this combined
-distribution.
+braids is licensed under the GNU Affero General Public License v3. It is based
+on nchat by Kristofer Berggren, whose source code is licensed under the MIT
+license (see LICENSE.nchat), and it includes components under their own
+licenses, listed below. Signal protocol support (mautrix-signal, libsignal) is
+itself licensed under the GNU AGPL v3, and WhatsApp support links the GPL v3
+licensed libsignal; the terms below govern this combined distribution.
 
-Complete corresponding source code for this binary — nchat itself, the bundled
-mautrix-signal, whatsmeow and libsignal trees, and the build scripts — is
-available from the nchat repository at https://github.com/d99kris/nchat (the
-exact revision is reported by "nchat --version"). This notice accompanies the
-binary as the offer of source required by the GNU AGPL v3, including its
-Section 13 network-use provision.
+Complete corresponding source code for this binary — braids itself, the
+bundled mautrix-signal, whatsmeow and libsignal trees, and the build scripts —
+is available from the braids repository at https://github.com/pebll/braids
+(the exact revision is reported by "braidsd --version"). This notice
+accompanies the binary as the offer of source required by the GNU AGPL v3,
+including its Section 13 network-use provision.
 
 --------------------------------------------------------------------------------
 Combined-work license: GNU Affero General Public License v3

@@ -534,8 +534,8 @@ void MessageCache::AddProfile(const std::string& p_ProfileId, bool p_CheckSequen
     static const int64_t s_SchemaVersion = 12;
     if (schemaVersion > s_SchemaVersion)
     {
-      LOG_WARNING("cache db schema %d from newer nchat version detected, if cache issues are encountered "
-                  "please delete %s or perform a fresh nchat setup", schemaVersion, dbDir.c_str());
+      LOG_WARNING("cache db schema %d from newer braids version detected, if cache issues are encountered "
+                  "please delete %s or perform a fresh setup", schemaVersion, dbDir.c_str());
     }
     else
     {

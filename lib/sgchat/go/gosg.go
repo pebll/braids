@@ -430,7 +430,7 @@ func GetOSName() string {
 }
 
 func GetDeviceName() string {
-	return "nchat (" + GetOSName() + ")"
+	return "braids (" + GetOSName() + ")"
 }
 
 func HasGUI() bool {

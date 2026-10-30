@@ -380,9 +380,9 @@ func MxSetupLogin(connId int, homeserver string, userId string, password string)
 	defer cancel()
 
 	hostname, _ := os.Hostname()
-	deviceName := "nchat"
+	deviceName := "braids"
 	if hostname != "" {
-		deviceName = "nchat (" + hostname + ")"
+		deviceName = "braids (" + hostname + ")"
 	}
 
 	resp, err := client.Login(ctx, &mautrix.ReqLogin{
