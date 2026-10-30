@@ -6,10 +6,10 @@
   braids is distributed under the GNU AGPL v3 license, see LICENSE for details.
 
   The unified inbox: chats of all accounts (or the selected folder/account),
-  pinned first, then by activity. Search by name, context menu per chat.
+  newest activity first, favorites outlined. Search by name, context menu per chat.
 -->
 <script lang="ts">
-  import { AtSign, Menu as MenuIcon, Pin, Search, SquarePen, VolumeX, X } from '@lucide/svelte';
+  import { AtSign, Menu as MenuIcon, Search, SquarePen, VolumeX, X } from '@lucide/svelte';
   import { chatMenu } from '../lib/actions';
   import { listTime } from '../lib/format';
   import { chatKey, store } from '../lib/store.svelte';
@@ -156,7 +156,6 @@
                 {p.text}
               {/if}
             </span>
-            {#if c.isPinned}<span class="flag" title="Pinned"><Pin size={14} /></span>{/if}
             {#if c.isUnreadMention}<span class="mention-dot" title="Mentioned"><AtSign size={12} strokeWidth={2.5} /></span>{/if}
             {#if c.isUnread}<span class="dot" class:muted={c.isMuted} title="Unread"></span>{/if}
           </div>

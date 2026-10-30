@@ -5,11 +5,11 @@
 
   braids is distributed under the GNU AGPL v3 license, see LICENSE for details.
 
-  Chat info: identity, actions (pin, archive, leave), members, shared media.
+  Chat info: identity, actions (favorite, archive, leave), members, shared media.
   A 300 px column at >= 1280 px, an overlay sheet below.
 -->
 <script lang="ts">
-  import { Archive, ArchiveRestore, LogOut, Pin, PinOff, Search, Star, StarOff, Trash2, X } from '@lucide/svelte';
+  import { Archive, ArchiveRestore, LogOut, Search, Star, StarOff, Trash2, X } from '@lucide/svelte';
   import * as api from '../lib/api';
   import { protocolMeta } from '../lib/protocols';
   import { fileMime, fileReady, splitKey, store } from '../lib/store.svelte';
@@ -62,11 +62,6 @@
 
       <div class="actions">
         <button onclick={() => (ui.chatSearchOpen = true)}><Search size={18} />Search</button>
-        {#if account.capabilities.pinChat}
-          <button onclick={() => api.call('chats.pin', { accountId, chatId, isPinned: !chat.isPinned }).catch((e) => store.toastError(e))}>
-            {#if chat.isPinned}<PinOff size={18} />Unpin{:else}<Pin size={18} />Pin{/if}
-          </button>
-        {/if}
         <button class:on={store.category(chat) === 'favorite'}
           onclick={() => store.setCategory(chat, store.category(chat) === 'favorite' ? 'default' : 'favorite')}>
           {#if store.category(chat) === 'favorite'}<StarOff size={18} />Unfavorite{:else}<Star size={18} />Favorite{/if}

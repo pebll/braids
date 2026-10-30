@@ -6,14 +6,13 @@
 
 // Chat and message actions shared by the chat list, conversation and info panel.
 
-import { Archive, ArchiveRestore, MailCheck, Pin, PinOff, Star, StarOff, Trash2 } from '@lucide/svelte';
+import { Archive, ArchiveRestore, MailCheck, Star, StarOff, Trash2 } from '@lucide/svelte';
 import * as api from './api';
 import { store } from './store.svelte';
 import type { Chat } from './types';
 import { ui, type MenuItem } from './ui.svelte';
 
 export function chatMenu(c: Chat): MenuItem[] {
-  const caps = store.accounts[c.accountId]?.capabilities;
   const items: MenuItem[] = [];
   if (c.isUnread) {
     items.push({
@@ -23,13 +22,6 @@ export function chatMenu(c: Chat): MenuItem[] {
         const msg = c.lastMessage;
         if (msg) await api.call('messages.markRead', { accountId: c.accountId, chatId: c.id, msgId: msg.id }).catch((e) => store.toastError(e));
       },
-    });
-  }
-  if (caps?.pinChat) {
-    items.push({
-      label: c.isPinned ? 'Unpin' : 'Pin',
-      icon: c.isPinned ? PinOff : Pin,
-      run: () => api.call('chats.pin', { accountId: c.accountId, chatId: c.id, isPinned: !c.isPinned }).catch((e) => store.toastError(e)),
     });
   }
   const category = store.category(c);
