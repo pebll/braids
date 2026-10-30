@@ -29,11 +29,13 @@ import (
 
 func TestNormalizeUserId(t *testing.T) {
 	cases := map[string]string{
-		"@alice:example.org":    "@alice:example.org",
-		"alice:example.org":     "@alice:example.org",
-		"  @bob:localhost:8448": "@bob:localhost:8448",
-		"alice":                 "",
-		"":                      "",
+		"@alice:example.org":     "@alice:example.org",
+		"alice:example.org":      "@alice:example.org",
+		"pebll@matrix.fenker.eu": "@pebll:matrix.fenker.eu",
+		"@a@b":                   "",
+		"  @bob:localhost:8448":  "@bob:localhost:8448",
+		"alice":                  "",
+		"":                       "",
 	}
 
 	for in, want := range cases {

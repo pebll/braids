@@ -313,12 +313,19 @@ func (conn *MxConn) getRoom(roomID id.RoomID) *RoomInfo {
 	return ri
 }
 
-// MxNormalizeUserId turns "alice:example.org", "@alice:example.org" into a
+// MxNormalizeUserId turns "alice:example.org", "alice@example.org" or
+// "@alice:example.org" into a
 // canonical mxid. Returns empty string if invalid.
 func MxNormalizeUserId(userId string) string {
 	userId = strings.TrimSpace(userId)
 	if userId == "" {
 		return ""
+	}
+
+	// accept email-style "alice@example.org" as "@alice:example.org"
+	if !strings.Contains(userId, ":") && strings.Count(userId, "@") == 1 && !strings.HasPrefix(userId, "@") {
+		parts := strings.SplitN(userId, "@", 2)
+		userId = parts[0] + ":" + parts[1]
 	}
 
 	if !strings.HasPrefix(userId, "@") {

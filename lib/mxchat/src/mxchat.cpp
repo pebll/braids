@@ -129,7 +129,7 @@ bool MxChat::SetupProfile(const std::string& p_ProfilesDir, std::string& p_Profi
   const std::string userId = TakeCString(CMxNormalizeUserId(const_cast<char*>(userIdInput.c_str())));
   if (userId.empty())
   {
-    std::cout << "Invalid user ID.\n";
+    std::cout << "Invalid user ID, expected format @user:server (ex. @alice:matrix.org).\n";
     m_IsSetup = false;
     return false;
   }
