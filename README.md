@@ -31,6 +31,11 @@ default; Telegram's tdlib takes long to compile, skip it with
     ./make.sh build
     ./build/bin/braidsd --list-protocols
 
+Telegram uses braids' API credentials when they are given at build time:
+copy `.env.example` to `.env` (git-ignored) and fill in `TG_API_ID` and
+`TG_API_HASH`, or set them as environment variables. Without them a build
+falls back to nchat's credentials, fine for development only.
+
 Run the tests:
 
     ./make.sh tests

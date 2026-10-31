@@ -12,3 +12,6 @@ app/dist/
 app/src-tauri/target/
 app/src-tauri/gen/
 app/test-results/
+
+# local secrets (Telegram API credentials, see .env.example)
+/.env

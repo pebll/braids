@@ -100,7 +100,8 @@ Scheduled-later features are in `doc/BACKLOG.md`.
 
 
 - Telegram API credentials: braids' own are given at build time
-  (`TG_API_ID`/`TG_API_HASH`, CMake variables or environment; the release
+  (`TG_API_ID`/`TG_API_HASH`: CMake variables, environment, or a git-ignored
+  `.env` in the repository root, see `.env.example`; the release
   workflow takes them from repository secrets). Builds without them fall back
   to nchat's credentials (development only).
 - Telegram, WhatsApp and Signal login flows through braidsd are implemented
