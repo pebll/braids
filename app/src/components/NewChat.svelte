@@ -138,7 +138,7 @@
           <p class="hint">Telegram: https://t.me/+… or @name · WhatsApp: https://chat.whatsapp.com/… · Matrix: #room:server or a matrix.to link. Signal invite links are not supported yet.</p>
           {#if joinError}<p class="error" role="alert">{joinError}</p>{/if}
           {#if fromLink}
-            <button type="button" class="linkish" onclick={() => { api.openUrl(fromLink).catch(() => {}); ui.newChatOpen = false; }}>Open in the browser instead</button>
+            <button type="button" class="linkish" onclick={() => { api.openUrl(fromLink).catch((e) => store.toastError(e)); ui.newChatOpen = false; }}>Open in the browser instead</button>
           {/if}
           <button class="btn primary" type="submit" disabled={!link.trim() || !accountId || !joinAccounts.some((a) => a.accountId === accountId) || busy === 'join'}>
             {#if busy === 'join'}<LoaderCircle size={16} class="spin" />Joining…{:else}Join{/if}

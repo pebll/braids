@@ -35,6 +35,7 @@
         }
       ]
     },
-    "opener:allow-open-url"
+    "opener:allow-open-url",
+    "opener:allow-default-urls"
   ]
 }

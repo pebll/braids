@@ -60,7 +60,7 @@
     </div>
     <p class="foot">
       Open source · AGPL v3 ·
-      <a href="https://github.com/pebll/braids" onclick={(e) => { e.preventDefault(); api.openUrl('https://github.com/pebll/braids'); }}>Source code</a>
+      <a href="https://github.com/pebll/braids" onclick={(e) => { e.preventDefault(); api.openUrl('https://github.com/pebll/braids').catch((e) => store.toastError(e)); }}>Source code</a>
       · <button class="link-btn" onclick={() => { ui.settingsSection = 'general'; ui.settingsOpen = true; }}>Settings</button>
     </p>
   </div>

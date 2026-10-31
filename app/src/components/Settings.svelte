@@ -266,7 +266,7 @@
           <span class="hint">Core {store.daemonVersion || '–'} · API {store.apiVersion || '–'} · built on nchat</span>
           <p>Free software under the GNU Affero General Public License v3.</p>
           <div class="buttons center">
-            <button class="btn" onclick={() => api.openUrl('https://github.com/pebll/braids')}>Source code</button>
+            <button class="btn" onclick={() => api.openUrl('https://github.com/pebll/braids').catch((e) => store.toastError(e))}>Source code</button>
             <button class="btn" onclick={() => api.openLicenses().catch((e) => store.toastError(e))}>Third-party licenses</button>
           </div>
         </div>
