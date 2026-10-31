@@ -99,14 +99,18 @@
     atBottom = true;
   }
 
+  // older messages go on top; the view keeps its distance from the bottom
+  // (stays at the bottom when it was there at the end: images may have
+  // grown the content and moved the view while the page was loading)
   async function loadOlder() {
     if (!scroller || !list || list.loading || list.atStart) return;
-    const prevHeight = scroller.scrollHeight;
-    const prevTop = scroller.scrollTop;
-    const n = await store.loadOlder(chatKey);
-    if (!n || !scroller) return;
+    const key = chatKey;
+    const fromBottom = scroller.scrollHeight - scroller.scrollTop;
+    const n = await store.loadOlder(key);
+    if (!n || !scroller || key !== chatKey) return;
     await tick();
-    scroller.scrollTop = prevTop + (scroller.scrollHeight - prevHeight);
+    if (atBottom) scrollToBottom();
+    else scroller.scrollTop = scroller.scrollHeight - fromBottom;
   }
 
   // load more when the history does not fill the view yet
@@ -125,13 +129,15 @@
     if (atBottom) store.markCurrentRead();
   }
 
-  // stay at the bottom while content grows (images, reactions, edits)
+  // stay at the bottom while content grows (images, reactions, edits) or
+  // the view changes size (window shown again, composer grows)
   $effect(() => {
-    if (!inner) return;
+    if (!inner || !scroller) return;
     const observer = new ResizeObserver(() => {
       if (atBottom) scrollToBottom();
     });
     observer.observe(inner);
+    observer.observe(scroller);
     return () => observer.disconnect();
   });
 

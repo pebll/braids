@@ -204,6 +204,13 @@ try {
   await page.waitForTimeout(300);
   check(await page.locator('.messages').evaluate((el) => el.scrollHeight > el.clientHeight && el.scrollHeight - el.scrollTop - el.clientHeight < 60),
     'reopened chat scrolled to the latest message');
+  // a chat opened for the first time (history loaded on opening)
+  await page.getByRole('option', { name: /Kelly/ }).click();
+  await page.locator('[data-msg-id]').first().waitFor();
+  await page.waitForTimeout(500);
+  check(await page.locator('.messages').evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight < 60), 'first opening shows the latest message');
+  await page.getByRole('option', { name: /The Office/ }).click();
+  await page.locator('[data-msg-id]').first().waitFor();
 
   // categories: favorite, default, archived
   await page.getByRole('option', { name: /Dwight/ }).click({ button: 'right' });
