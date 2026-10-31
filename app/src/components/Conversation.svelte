@@ -67,8 +67,8 @@
     return p ? lastSeen(p.timeSeen) : '';
   });
 
-  // scroll: to the bottom (or the first unread) when a chat opens, stick to
-  // the bottom for new messages while at the bottom
+  // scroll: to the latest message when a chat opens, stick to the bottom for
+  // new messages while at the bottom
   $effect.pre(() => {
     const key = chatKey;
     const count = items.length;
@@ -88,11 +88,7 @@
     }
     tick().then(() => {
       if (!scroller) return;
-      if (opened || (appended && (wasAtBottom || items[count - 1]?.isOutgoing))) {
-        const unread = opened && list?.firstUnreadId ? scroller.querySelector('[data-unread-marker]') : null;
-        if (unread) (unread as HTMLElement).scrollIntoView({ block: 'center' });
-        else scrollToBottom();
-      }
+      if (opened || (appended && (wasAtBottom || items[count - 1]?.isOutgoing))) scrollToBottom();
       fillViewport();
     });
   });

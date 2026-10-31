@@ -517,11 +517,13 @@ class Store {
     if (!this.messages[key]?.loaded) {
       this.messages[key] = emptyList();
       await this.loadOlder(key);
-      const list = this.messages[key];
-      if (list) {
-        const firstUnread = list.items.find((m) => !m.isOutgoing && !m.isRead);
-        list.firstUnreadId = this.chats[key]?.isUnread && firstUnread ? firstUnread.id : '';
-      }
+    }
+    // the "new messages" separator marks what is unread now, not at an
+    // earlier opening
+    const list = this.messages[key];
+    if (list) {
+      const firstUnread = list.items.find((m) => !m.isOutgoing && !m.isRead);
+      list.firstUnreadId = this.chats[key]?.isUnread && firstUnread ? firstUnread.id : '';
     }
     this.markCurrentRead();
   }

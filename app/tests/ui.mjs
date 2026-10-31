@@ -158,6 +158,15 @@ try {
   check(await page.getByRole('option', { name: /The Office/ }).locator('.circle.group').count() === 1, 'group avatar is a rounded square');
   check(await page.getByRole('option', { name: /Michael/ }).locator('.circle.group').count() === 0, 'person avatar is round');
 
+  // reopening a chat shows the latest messages, not the old position
+  await page.getByRole('option', { name: /The Office/ }).click();
+  await page.locator('.messages').evaluate((el) => { el.scrollTop = 0; });
+  await page.getByRole('option', { name: /Michael/ }).click();
+  await page.getByRole('option', { name: /The Office/ }).click();
+  await page.waitForTimeout(300);
+  check(await page.locator('.messages').evaluate((el) => el.scrollHeight > el.clientHeight && el.scrollHeight - el.scrollTop - el.clientHeight < 60),
+    'reopened chat scrolled to the latest message');
+
   // categories: favorite, default, archived
   await page.getByRole('option', { name: /Dwight/ }).click({ button: 'right' });
   await page.getByRole('menuitem', { name: 'Add to favorites' }).click();
