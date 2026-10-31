@@ -267,7 +267,7 @@
           <p>Free software under the GNU Affero General Public License v3.</p>
           <div class="buttons center">
             <button class="btn" onclick={() => api.openUrl('https://github.com/pebll/braids')}>Source code</button>
-            <button class="btn" onclick={() => api.openUrl('https://github.com/pebll/braids/blob/main/src/braidsd/THIRD_PARTY_LICENSES')}>Third-party licenses</button>
+            <button class="btn" onclick={() => api.openLicenses().catch((e) => store.toastError(e))}>Third-party licenses</button>
           </div>
         </div>
       {/if}

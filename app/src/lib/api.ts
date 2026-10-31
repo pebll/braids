@@ -112,6 +112,16 @@ export async function saveFileAs(path: string, name: string): Promise<string> {
   return '';
 }
 
+// The third-party notices shipped with the app, else the repository's.
+export async function openLicenses(): Promise<void> {
+  if (isTauri) {
+    const { invoke } = await import('@tauri-apps/api/core');
+    const path = await invoke<string>('licenses_path');
+    if (path) return openPath(path);
+  }
+  await openUrl('https://github.com/pebll/braids/blob/main/app/THIRD_PARTY_LICENSES');
+}
+
 export async function openPath(path: string): Promise<void> {
   if (isTauri) {
     const { openPath } = await import('@tauri-apps/plugin-opener');

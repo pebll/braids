@@ -116,6 +116,17 @@ async fn save_file_as(app: AppHandle, path: String, name: String) -> Result<Stri
     Ok(target.to_string_lossy().into_owned())
 }
 
+/// The bundled third-party notices file, "" when not installed (development).
+#[tauri::command]
+fn licenses_path(app: AppHandle) -> String {
+    app.path()
+        .resolve("THIRD_PARTY_LICENSES", tauri::path::BaseDirectory::Resource)
+        .ok()
+        .filter(|p| p.exists())
+        .map(|p| p.to_string_lossy().into_owned())
+        .unwrap_or_default()
+}
+
 fn show_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.unminimize();
@@ -180,7 +191,7 @@ pub fn run() {
                 }
             }
         })
-        .invoke_handler(tauri::generate_handler![api_call, daemon_connected, set_close_to_tray, set_badge, save_temp_file, save_file_as])
+        .invoke_handler(tauri::generate_handler![api_call, daemon_connected, set_close_to_tray, set_badge, save_temp_file, save_file_as, licenses_path])
         .run(tauri::generate_context!())
         .expect("error while running braids");
 }
