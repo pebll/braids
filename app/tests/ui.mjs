@@ -201,6 +201,17 @@ try {
   await page.getByRole('option', { name: /Michael/ }).click();
   await page.waitForFunction(() => [...document.querySelectorAll('.msg .image img')].some((img) => img.naturalWidth > 0));
   check(true, 'sent image shown inline');
+
+  // forwarding an image keeps the image and adds the origin line
+  const images = () => page.locator('.msg.own .image').count();
+  const imagesBefore = await images();
+  await page.locator('.msg.own', { has: page.locator('.image') }).last().click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Forward…' }).click();
+  await page.fill('input[aria-label="Search chats to forward to"]', 'Michael');
+  await page.locator('.target', { hasText: 'Michael' }).first().click();
+  await page.waitForFunction((n) => document.querySelectorAll('.msg.own .image').length > n, imagesBefore);
+  check((await page.locator('.msg.own', { has: page.locator('.image') }).last().textContent()).includes('Forwarded from me'),
+    'forwarded image with origin line');
   fs.rmSync(png, { force: true });
   await page.getByRole('option', { name: /The Office/ }).click();
 

@@ -247,6 +247,20 @@ def main():
         dl = d.wait_event("message.updated", lambda p: p["id"] == img and p["file"]["status"] == "downloaded", timeout=60)
         check(os.path.isfile(dl["file"]["path"]) and dl["file"]["mimeType"] == "image/png", "image downloaded")
 
+        # forward the received image (as the app does): alone and with a caption
+        d.call("messages.send", {"accountId": account_id, "chatId": room, "filePath": dl["file"]["path"]})
+        fwd = bob_peer.wait("message", lambda m: m["sender"] == alice_id and m.get("file"), timeout=60)
+        print("forwarded image:", {k: fwd.get(k) for k in ("msgtype", "body", "file_size", "file_error")}, flush=True)
+        check(fwd["msgtype"] == "m.image" and fwd.get("file_size", 0) > 0, "forwarded image arrives as image")
+        d.call("messages.send", {"accountId": account_id, "chatId": room, "filePath": dl["file"]["path"],
+                                 "text": "_Forwarded from bob_\nlook at this"})
+        fwd2 = bob_peer.wait("message", lambda m: m["sender"] == alice_id and m.get("file") and m["id"] != fwd["id"],
+                             timeout=60)
+        print("forwarded image with caption:", {k: fwd2.get(k) for k in ("msgtype", "body", "html", "file_size")},
+              flush=True)
+        check(fwd2["msgtype"] == "m.image" and fwd2.get("file_size", 0) > 0, "forwarded image with caption arrives")
+        check("look at this" in (fwd2.get("body") or "") + (fwd2.get("html") or ""), "caption sent with the image")
+
         # reply from bob: matrix sends only the quoted id, the text comes from the model
         quoted_id = page["messages"][-3]["id"]
         rep = bob_peer.cmd(f"reply {room} {quoted_id} answer to history")["event"]

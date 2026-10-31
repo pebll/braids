@@ -207,6 +207,17 @@ func MxSendMessage(connId int, chatId string, text string, quotedId string, file
 			LOG_WARNING(fmt.Sprintf("send file failed: %v", err))
 			return -1
 		}
+
+		// a caption: body (and formatted body) hold the text, filename the
+		// file's name (media captions, Matrix spec v1.10)
+		if text != "" {
+			mdText, userIDs := mentionsToMarkdown(text, mentionsJson)
+			rendered := format.RenderMarkdown(mdText, true, false)
+			content.Body = rendered.Body
+			content.Format = rendered.Format
+			content.FormattedBody = rendered.FormattedBody
+			content.Mentions = &event.Mentions{UserIDs: userIDs}
+		}
 	} else {
 		mdText, userIDs := mentionsToMarkdown(text, mentionsJson)
 		rendered := format.RenderMarkdown(mdText, true, false)

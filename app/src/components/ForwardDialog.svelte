@@ -53,6 +53,8 @@
     if (!m.file) return '';
     const current = () => store.messages[chatKey(m.accountId, m.chatId)]?.items.find((x) => x.id === m.id) ?? m;
     if (fileReady(current().file)) return current().file!.path;
+    // a sent file that is no longer on this computer cannot be fetched again
+    if (current().file!.status === 'none' && !current().file!.path) throw new Error('The file of this message is no longer on this computer.');
     await api.call('files.download', { accountId: m.accountId, chatId: m.chatId, msgId: m.id });
     for (let i = 0; i < 600; i++) {
       await new Promise((r) => setTimeout(r, 100));

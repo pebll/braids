@@ -1754,12 +1754,24 @@ json ChatModel::MessageToJson(const std::string& p_AccountId, const std::string&
   if (!p_ChatMessage.fileInfo.empty())
   {
     FileInfo fileInfo = ProtocolUtil::FileInfoFromHex(p_ChatMessage.fileInfo);
+    const std::string mimeType = fileInfo.fileType.empty() ? GuessMimeType(fileInfo) : fileInfo.fileType;
+    std::string path = fileInfo.filePath;
+    FileStatus status = fileInfo.fileStatus;
+    // a local file that is gone (cache cleaned, sent from a temp file): to be
+    // downloaded again if the messenger has it, else not available
+    if (((status == FileStatusDownloaded) || (status == FileStatusNone)) && !path.empty() && (path.at(0) == '/') &&
+        !FileUtil::Exists(path))
+    {
+      status = fileInfo.fileId.empty() ? FileStatusNone : FileStatusNotDownloaded;
+      path.clear();
+    }
+
     file = json{
       { "id", fileInfo.fileId },
-      { "path", fileInfo.filePath },
+      { "path", path },
       { "name", FileUtil::BaseName(fileInfo.filePath) },
-      { "mimeType", fileInfo.fileType.empty() ? GuessMimeType(fileInfo) : fileInfo.fileType },
-      { "status", FileStatusToString(fileInfo.fileStatus) },
+      { "mimeType", mimeType },
+      { "status", FileStatusToString(status) },
     };
   }
 
