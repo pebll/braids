@@ -102,6 +102,18 @@ try {
   check((await own.locator('code').textContent()) === 'code', 'sent message rendered with markup');
   check((await page.getByRole('option', { name: /The Office/ }).textContent()).includes('You:'), 'chat preview shows own message');
 
+  // @-mention suggestions from the group members
+  await composer.fill('');
+  await composer.pressSequentially('thanks @an');
+  await page.locator('.mentions [role=option]', { hasText: 'Andy' }).waitFor();
+  check(await page.locator('.mentions [role=option]').count() === 1, 'mention suggestions filtered by name');
+  await shot('mention');
+  await composer.press('Enter');
+  check((await composer.inputValue()) === 'thanks @Andy ', 'Enter inserts the mention');
+  await composer.press('Enter');
+  await page.locator('.msg.own', { hasText: 'thanks @Andy' }).last().waitFor();
+  check(true, 'message with mention sent');
+
   // one-line message: react and reply side by side
   const oneLiner = page.locator('.msg.own', { hasText: 'Hello team' }).last();
   await oneLiner.hover();

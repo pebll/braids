@@ -17,6 +17,7 @@
   import { settings } from '../lib/settings.svelte';
   import { splitKey, store } from '../lib/store.svelte';
   import { ui } from '../lib/ui.svelte';
+  import Avatar from './Avatar.svelte';
 
   let { chatKey }: { chatKey: string } = $props();
 
@@ -33,6 +34,42 @@
 
   const [accountId, chatId] = $derived(splitKey(chatKey));
   const account = $derived(store.accounts[accountId]);
+
+  // @-mentions: while typing "@na" after a space or at the start, the group's
+  // members matching it are suggested; the pick is inserted as @Name or
+  // @[Name With Spaces], which braidsd sends as a mention
+  let mention = $state<{ start: number; query: string } | null>(null);
+  let mentionIndex = $state(0);
+  const suggestions = $derived.by(() => {
+    if (!mention) return [];
+    const q = mention.query.toLowerCase();
+    return (store.members[chatKey] ?? [])
+      .filter((c) => !c.isSelf && c.id !== account?.selfId && c.name && c.name.toLowerCase().includes(q))
+      .sort((a, b) => Number(b.name.toLowerCase().startsWith(q)) - Number(a.name.toLowerCase().startsWith(q)) || a.name.localeCompare(b.name))
+      .slice(0, 8);
+  });
+
+  function updateMention() {
+    if (!textarea) return;
+    const caret = textarea.selectionStart ?? text.length;
+    const m = /(^|\s)@([^\s@[\]]*)$/.exec(text.slice(0, caret));
+    mention = m ? { start: caret - m[2].length - 1, query: m[2] } : null;
+    mentionIndex = 0;
+  }
+
+  function insertMention(name: string) {
+    if (!mention || !textarea) return;
+    const caret = textarea.selectionStart ?? text.length;
+    const token = /\s|[\]]/.test(name) ? `@[${name}] ` : `@${name} `;
+    text = text.slice(0, mention.start) + token + text.slice(caret);
+    const pos = mention.start + token.length;
+    mention = null;
+    tick().then(() => {
+      textarea?.focus();
+      textarea?.setSelectionRange(pos, pos);
+      resize();
+    });
+  }
 
   // load / save the draft when the chat changes
   $effect(() => {
@@ -83,6 +120,7 @@
 
   function onInput() {
     resize();
+    updateMention();
     if (ui.edit) return;
     const now = Date.now();
     if (text && now - lastTypingSent > 4000) {
@@ -139,6 +177,23 @@
   }
 
   function onKeydown(e: KeyboardEvent) {
+    if (suggestions.length) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        mentionIndex = (mentionIndex + (e.key === 'ArrowDown' ? 1 : suggestions.length - 1)) % suggestions.length;
+        return;
+      }
+      if ((e.key === 'Enter' && !e.shiftKey) || e.key === 'Tab') {
+        e.preventDefault();
+        insertMention(suggestions[mentionIndex].name);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        mention = null;
+        return;
+      }
+    }
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && (settings.enterSends || e.ctrlKey || e.metaKey)) {
       e.preventDefault();
       submit();
@@ -241,8 +296,20 @@
         aria-label="Message"
         oninput={onInput}
         onkeydown={onKeydown}
+        onclick={updateMention}
+        onblur={() => setTimeout(() => (mention = null), 150)}
         onpaste={onPaste}
       ></textarea>
+      {#if suggestions.length}
+        <div class="mentions" role="listbox" aria-label="Mention">
+          {#each suggestions as c, i (c.id)}
+            <button role="option" aria-selected={i === mentionIndex} onmousedown={(e) => { e.preventDefault(); insertMention(c.name); }}>
+              <Avatar name={c.name} id={c.id} size={24} owner={accountId} />
+              <span>{c.name}</span>
+            </button>
+          {/each}
+        </div>
+      {/if}
       <button class="icon-btn sm" aria-label="Emoji" title="Emoji" onclick={() => (emojiOpen = !emojiOpen)}><Smile size={19} strokeWidth={1.75} /></button>
       {#if emojiOpen}
         <div class="emoji-pop" role="dialog" aria-label="Emoji">
@@ -291,6 +358,12 @@
     position: absolute; bottom: 46px; right: 0; width: 296px; padding: 8px; display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px;
     background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-2); z-index: 10;
   }
+  .mentions {
+    position: absolute; bottom: 46px; left: 0; width: 260px; max-height: 280px; overflow-y: auto; padding: 4px; display: flex; flex-direction: column;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-2); z-index: 10;
+  }
+  .mentions button { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 8px; border: 0; border-radius: 8px; background: none; text-align: left; font-size: 14px; color: var(--text); }
+  .mentions button[aria-selected='true'], .mentions button:hover { background: var(--hover); }
   .emoji-pop button { border: 0; background: none; height: 32px; border-radius: 6px; font-size: 18px; padding: 0; }
   .emoji-pop button:hover { background: var(--hover); }
 </style>

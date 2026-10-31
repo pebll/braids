@@ -576,6 +576,30 @@ void DuChat::PerformRequest(std::shared_ptr<RequestMessage> p_RequestMessage)
       }
       break;
 
+    case GetGroupMembersRequestType:
+      {
+        // The Office: the people writing in it and self (Stanley)
+        std::shared_ptr<GetGroupMembersRequest> getGroupMembersRequest =
+          std::static_pointer_cast<GetGroupMembersRequest>(p_RequestMessage);
+        std::shared_ptr<NewGroupMembersNotify> newGroupMembersNotify =
+          std::make_shared<NewGroupMembersNotify>(m_ProfileId);
+        newGroupMembersNotify->chatId = getGroupMembersRequest->chatId;
+        if (getGroupMembersRequest->chatId == s_GroupId)
+        {
+          for (const std::string& name : { "Andy", "Dwight", "Jim", "Michael", "Pam", "Stanley" })
+          {
+            ContactInfo contactInfo;
+            contactInfo.id = std::string(name) + "_0";
+            contactInfo.name = name;
+            contactInfo.isSelf = (contactInfo.id == "Stanley_0");
+            newGroupMembersNotify->contactInfos.push_back(contactInfo);
+          }
+        }
+
+        m_MessageHandler(newGroupMembersNotify);
+      }
+      break;
+
     case JoinChatRequestType:
       {
         // test groups: https://dummy.example/join/<Name> joins "<Name>"
