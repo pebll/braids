@@ -241,6 +241,18 @@ try {
   await page.keyboard.press('Control+a');
   await page.locator('.chatlist h2', { hasText: 'All chats' }).waitFor();
   check(true, 'Ctrl+A shows all chats');
+  // AZERTY: the key labelled A sits where QWERTY has Q (code KeyQ)
+  const azerty = (key, code) => page.evaluate(([key, code]) => {
+    (document.activeElement ?? document.body).dispatchEvent(new KeyboardEvent('keydown', { key, code, ctrlKey: true, bubbles: true, cancelable: true }));
+  }, [key, code]);
+  await page.keyboard.press('Control+b');
+  await page.locator('.chatlist h2', { hasText: 'Favorites' }).waitFor();
+  await azerty('q', 'KeyA');
+  await page.waitForTimeout(200);
+  check(await page.locator('.chatlist h2', { hasText: 'Favorites' }).count() === 1, 'AZERTY Ctrl+Q (physical A) is not All chats');
+  await azerty('a', 'KeyQ');
+  await page.locator('.chatlist h2', { hasText: 'All chats' }).waitFor();
+  check(true, 'shortcuts follow the keyboard layout (AZERTY Ctrl+A)');
 
   // changing a shortcut
   await page.keyboard.press('Control+,');
