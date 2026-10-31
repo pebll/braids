@@ -30,11 +30,12 @@ class Settings {
   enterSends = $state(true);
   accounts = $state<Record<string, AccountMeta>>({});
   categories = $state<Record<string, ChatCategory>>({}); // chat key -> category
+  keybinds = $state<Partial<Record<string, string[]>>>({}); // action -> combos, only changed ones (keybinds.svelte.ts)
 
   constructor() {
     try {
       const saved = JSON.parse(localStorage.getItem(KEY) ?? '{}');
-      for (const k of ['theme', 'notifications', 'notificationPreview', 'closeToTray', 'sidebarCollapsed', 'enterSends', 'accounts', 'categories'] as const) {
+      for (const k of ['theme', 'notifications', 'notificationPreview', 'closeToTray', 'sidebarCollapsed', 'enterSends', 'accounts', 'categories', 'keybinds'] as const) {
         if (saved[k] !== undefined) (this as any)[k] = saved[k];
       }
     } catch {
@@ -53,6 +54,7 @@ class Settings {
         enterSends: this.enterSends,
         accounts: this.accounts,
         categories: this.categories,
+        keybinds: this.keybinds,
       }));
     } catch {
       // storage unavailable: settings last for this session

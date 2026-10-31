@@ -12,6 +12,7 @@
   import { File as FileIcon, Paperclip, Pencil, Reply, SendHorizontal, Smile, X } from '@lucide/svelte';
   import { tick } from 'svelte';
   import * as api from '../lib/api';
+  import { editLastOwnMessage } from '../lib/actions';
   import { senderColor } from '../lib/format';
   import { settings } from '../lib/settings.svelte';
   import { splitKey, store } from '../lib/store.svelte';
@@ -137,16 +138,6 @@
     }
   }
 
-  function editLastOwn() {
-    const list = store.messages[chatKey]?.items ?? [];
-    const win = account?.capabilities.editWindowSec ?? 0;
-    const m = [...list].reverse().find((x) => x.isOutgoing && !x.isDeleted && x.text);
-    if (!m || win === 0 || (win > 0 && Date.now() - m.time > win * 1000)) return false;
-    ui.reply = null;
-    ui.edit = m;
-    return true;
-  }
-
   function onKeydown(e: KeyboardEvent) {
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && (settings.enterSends || e.ctrlKey || e.metaKey)) {
       e.preventDefault();
@@ -160,7 +151,7 @@
       } else if (ui.reply) ui.reply = null;
       else textarea?.blur();
     } else if (e.key === 'ArrowUp' && !text && !attachments.length) {
-      if (editLastOwn()) e.preventDefault();
+      if (editLastOwnMessage()) e.preventDefault();
     }
   }
 

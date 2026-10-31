@@ -197,7 +197,41 @@ try {
   check(true, 'info panel opens');
   await page.locator('.info .description', { hasText: 'Dunder Mifflin Scranton' }).waitFor();
   check(await page.locator('.info .description a[data-link]').count() === 1, 'group description shown with link');
+  // default shortcuts
+  await page.keyboard.press('Control+Space');
+  check(await page.evaluate(() => document.activeElement?.getAttribute('aria-label') === 'Search chats'), 'Ctrl+Space focuses chat search');
+  await page.keyboard.press('Escape');
+  const selectedName = () => page.locator('[role=option][aria-selected=true] .name').textContent();
+  const before = await selectedName();
+  await page.keyboard.press('Alt+j');
+  await page.waitForFunction((b) => document.querySelector('[role=option][aria-selected=true] .name')?.textContent !== b, before);
+  check(true, 'Alt+J opens the next chat');
+  await page.keyboard.press('Alt+k');
+  await page.waitForFunction((b) => document.querySelector('[role=option][aria-selected=true] .name')?.textContent === b, before);
+  check(true, 'Alt+K back to the previous chat');
+
+  // changing a shortcut
   await page.keyboard.press('Control+,');
+  await page.getByRole('button', { name: 'Keyboard' }).click();
+  await page.getByRole('button', { name: 'Add shortcut for Search chats' }).click();
+  await page.keyboard.press('l');
+  await page.locator('.record-error').waitFor();
+  check(true, 'plain key rejected as shortcut');
+  await page.keyboard.press('Control+e');
+  await page.locator('.toast', { hasText: 'removed from' }).first().waitFor();
+  check(await page.locator('[data-action=searchChats] .combo').count() === 2 &&
+    await page.locator('[data-action=editLast] .combo').count() === 0, 'recorded shortcut moves from the other action');
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Control+e');
+  check(await page.evaluate(() => document.activeElement?.getAttribute('aria-label') === 'Search chats'), 'changed shortcut works');
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Control+,');
+  await page.getByRole('button', { name: 'Keyboard' }).click();
+  await page.getByRole('button', { name: 'Reset all' }).click();
+  check(await page.locator('[data-action=editLast] .combo').count() === 1 &&
+    await page.locator('[data-action=searchChats] .combo').count() === 1, 'reset all restores the defaults');
+  await shot('settings-keyboard');
+  await page.getByRole('button', { name: 'General' }).click();
   await page.getByRole('button', { name: 'Dark' }).click();
   check(await page.evaluate(() => document.documentElement.classList.contains('t-dark')), 'dark theme applied');
   await shot('settings-dark');

@@ -76,6 +76,8 @@ Layout
   braids is mirrored to messengers that support it (Telegram, WhatsApp).
   Profile pictures are requested in batches (`avatars.get`) when an
   `Avatar` is shown and arrive by `avatar.updated`; initials are the fallback.
+- `src/lib/keybinds.svelte.ts` — global shortcuts: actions, default combos,
+  user changes (Settings → Keyboard, stored in settings).
 - `src/lib/format.ts` — message markup to safe HTML, times, initials, colors.
 - `src/components/` — `Sidebar`, `ChatList`, `Conversation` (+ `MessageItem`,
   `Composer`), `InfoPanel`, `Wizard` / `AuthStep` (login flows), `Settings`,

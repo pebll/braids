@@ -12,6 +12,7 @@
   import { AtSign, Menu as MenuIcon, Search, SquarePen, VolumeX, X } from '@lucide/svelte';
   import { chatMenu } from '../lib/actions';
   import { listTime } from '../lib/format';
+  import { bindings, comboKeys } from '../lib/keybinds.svelte';
   import { chatKey, store } from '../lib/store.svelte';
   import type { Chat } from '../lib/types';
   import { ui } from '../lib/ui.svelte';
@@ -106,7 +107,7 @@
       {#if store.search}
         <button class="icon-btn sm" aria-label="Clear search" onclick={() => (store.search = '')}><X size={15} /></button>
       {:else}
-        <kbd>Ctrl K</kbd>
+        {#if bindings('searchChats')[0]}<kbd>{comboKeys(bindings('searchChats')[0]).join(' ')}</kbd>{/if}
       {/if}
     </label>
   </div>

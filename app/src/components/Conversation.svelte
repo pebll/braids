@@ -14,6 +14,7 @@
   import { chatMenu } from '../lib/actions';
   import * as api from '../lib/api';
   import { dayLabel, isSameDay, lastSeen, startOfDay } from '../lib/format';
+  import { hint } from '../lib/keybinds.svelte';
   import { splitKey, store } from '../lib/store.svelte';
   import type { Message } from '../lib/types';
   import { ui } from '../lib/ui.svelte';
@@ -227,10 +228,10 @@
           </span>
         </span>
       </button>
-      <button class="icon-btn" class:active={ui.chatSearchOpen} aria-label="Search in chat" title="Search in chat (Ctrl+F)" onclick={() => (ui.chatSearchOpen = !ui.chatSearchOpen)}>
+      <button class="icon-btn" class:active={ui.chatSearchOpen} aria-label="Search in chat" title={`Search in chat${hint('searchInChat')}`} onclick={() => (ui.chatSearchOpen = !ui.chatSearchOpen)}>
         <Search size={19} strokeWidth={1.75} />
       </button>
-      <button class="icon-btn" class:active={ui.infoOpen} aria-label="Toggle info panel" title="Chat info (Ctrl+I)" onclick={() => (ui.infoOpen = !ui.infoOpen)}>
+      <button class="icon-btn" class:active={ui.infoOpen} aria-label="Toggle info panel" title={`Chat info${hint('toggleInfo')}`} onclick={() => (ui.infoOpen = !ui.infoOpen)}>
         <PanelRight size={19} strokeWidth={1.75} />
       </button>
       <button class="icon-btn" aria-label="More" title="More" onclick={(e) => { const r = (e.currentTarget as HTMLElement).getBoundingClientRect(); ui.openMenu({ x: r.right - 210, y: r.bottom + 4 }, chatMenu(chat)); }}>

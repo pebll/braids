@@ -8,7 +8,7 @@
 
 import { Archive, ArchiveRestore, MailCheck, Star, StarOff, Trash2 } from '@lucide/svelte';
 import * as api from './api';
-import { store } from './store.svelte';
+import { splitKey, store } from './store.svelte';
 import type { Chat } from './types';
 import { ui, type MenuItem } from './ui.svelte';
 
@@ -51,4 +51,17 @@ export function chatMenu(c: Chat): MenuItem[] {
     },
   });
   return items;
+}
+
+// Starts editing the newest own text message of the current chat, if the
+// protocol still allows editing it.
+export function editLastOwnMessage(): boolean {
+  if (!store.current) return false;
+  const list = store.messages[store.current]?.items ?? [];
+  const win = store.accounts[splitKey(store.current)[0]]?.capabilities.editWindowSec ?? 0;
+  const m = [...list].reverse().find((x) => x.isOutgoing && !x.isDeleted && x.text);
+  if (!m || win === 0 || (win > 0 && Date.now() - m.time > win * 1000)) return false;
+  ui.reply = null;
+  ui.edit = m;
+  return true;
 }

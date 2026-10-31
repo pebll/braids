@@ -10,6 +10,7 @@
 -->
 <script lang="ts">
   import { Archive, CircleAlert, Inbox, LoaderCircle, Plus, Settings, Star, WifiOff } from '@lucide/svelte';
+  import { hint } from '../lib/keybinds.svelte';
   import { settings } from '../lib/settings.svelte';
   import { store, type Filter } from '../lib/store.svelte';
   import { ui } from '../lib/ui.svelte';
@@ -50,7 +51,7 @@
   {#if drawer}
     <div class="brand"><Logo size={22} /><span class="name">braids</span></div>
   {:else}
-    <button class="brand logo-toggle" title={collapsed ? 'Expand sidebar (Ctrl+B)' : 'Collapse sidebar (Ctrl+B)'} aria-label="Toggle sidebar" onclick={toggle}>
+    <button class="brand logo-toggle" title={`${collapsed ? 'Expand' : 'Collapse'} sidebar${hint('toggleSidebar')}`} aria-label="Toggle sidebar" onclick={toggle}>
       <Logo size={22} />
       {#if !collapsed}<span class="name">braids</span>{/if}
     </button>
@@ -121,7 +122,7 @@
       {#if !collapsed}Add account{/if}
     </button>
     {#if !collapsed}
-      <button class="icon-btn" aria-label="Settings" title="Settings (Ctrl+,)" onclick={() => { ui.drawerOpen = false; ui.settingsSection = 'general'; ui.settingsOpen = true; }}>
+      <button class="icon-btn" aria-label="Settings" title={`Settings${hint('settings')}`} onclick={() => { ui.drawerOpen = false; ui.settingsSection = 'general'; ui.settingsOpen = true; }}>
         <Settings size={18} strokeWidth={1.75} />
       </button>
     {/if}

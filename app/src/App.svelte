@@ -23,7 +23,9 @@
   import Sidebar from './components/Sidebar.svelte';
   import Welcome from './components/Welcome.svelte';
   import Wizard from './components/Wizard.svelte';
+  import { editLastOwnMessage } from './lib/actions';
   import * as api from './lib/api';
+  import { actionFor, type Action } from './lib/keybinds.svelte';
   import { settings } from './lib/settings.svelte';
   import { store } from './lib/store.svelte';
   import { ui } from './lib/ui.svelte';
@@ -65,43 +67,77 @@
     store.openChat(next);
   }
 
+  // next unread chat after the current one in list order (wrapping)
+  function nextUnread() {
+    const list = store.chatList;
+    const keys = list.map((c) => `${c.accountId}\u0001${c.id}`);
+    const i = keys.indexOf(store.current);
+    for (let n = 1; n <= list.length; n++) {
+      const j = (i + n) % list.length;
+      if (list[j].isUnread && keys[j] !== store.current) {
+        store.openChat(keys[j]);
+        return;
+      }
+    }
+  }
+
+  function run(action: Action): boolean {
+    switch (action) {
+      case 'nextChat':
+      case 'prevChat':
+        moveChat(action === 'nextChat' ? 1 : -1);
+        return true;
+      case 'searchChats':
+        if (ui.narrow) store.closeChat();
+        ui.focusSearch++;
+        return true;
+      case 'searchInChat':
+        if (!store.current) return false;
+        ui.chatSearchOpen = true;
+        return true;
+      case 'nextUnread':
+        nextUnread();
+        return true;
+      case 'replyLast': {
+        if (!store.current) return false;
+        const items = store.messages[store.current]?.items ?? [];
+        const last = [...items].reverse().find((m) => !m.isOutgoing && !m.isDeleted);
+        if (last) {
+          ui.edit = null;
+          ui.reply = last;
+          ui.focusComposer++;
+        }
+        return true;
+      }
+      case 'editLast':
+        if (!store.current) return false;
+        if (editLastOwnMessage()) ui.focusComposer++;
+        return true;
+      case 'toggleInfo':
+        if (!store.current) return false;
+        ui.infoOpen = !ui.infoOpen;
+        return true;
+      case 'toggleSidebar':
+        settings.sidebarCollapsed = !settings.sidebarCollapsed;
+        settings.save();
+        return true;
+      case 'settings':
+        ui.settingsSection = 'general';
+        ui.settingsOpen = true;
+        return true;
+    }
+  }
+
   function onKey(e: KeyboardEvent) {
-    const mod = e.ctrlKey || e.metaKey;
-    const modal = ui.settingsOpen || ui.newChatOpen || !!store.wizardSetupId || !!ui.confirmRequest || !!ui.lightbox;
+    const modal = ui.settingsOpen || ui.newChatOpen || !!store.wizardSetupId || !!ui.confirmRequest || !!ui.lightbox || ui.recordingKeys;
     if (modal) {
-      if (mod && e.key === ',') e.preventDefault();
+      // no browser actions (print, new window, ...) behind a dialog either
+      if (!ui.recordingKeys && actionFor(e)) e.preventDefault();
       return;
     }
-    if (mod && e.key.toLowerCase() === 'k') {
+    const action = actionFor(e);
+    if (action && run(action)) {
       e.preventDefault();
-      if (ui.narrow) store.closeChat();
-      ui.focusSearch++;
-    } else if (mod && e.key.toLowerCase() === 'f' && store.current) {
-      e.preventDefault();
-      ui.chatSearchOpen = true;
-    } else if (mod && e.key.toLowerCase() === 'i' && store.current) {
-      e.preventDefault();
-      ui.infoOpen = !ui.infoOpen;
-    } else if (mod && e.key.toLowerCase() === 'b') {
-      e.preventDefault();
-      settings.sidebarCollapsed = !settings.sidebarCollapsed;
-      settings.save();
-    } else if (mod && e.key === ',') {
-      e.preventDefault();
-      ui.settingsSection = 'general';
-      ui.settingsOpen = true;
-    } else if (mod && e.key.toLowerCase() === 'r' && store.current) {
-      e.preventDefault();
-      const items = store.messages[store.current]?.items ?? [];
-      const last = [...items].reverse().find((m) => !m.isOutgoing && !m.isDeleted);
-      if (last) {
-        ui.edit = null;
-        ui.reply = last;
-        ui.focusComposer++;
-      }
-    } else if (e.altKey && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
-      e.preventDefault();
-      moveChat(e.key === 'ArrowDown' ? 1 : -1);
     } else if (e.key === 'Escape' && ui.infoOpen && !ui.wide) {
       ui.infoOpen = false;
     }

@@ -6,9 +6,12 @@
   braids is distributed under the GNU AGPL v3 license, see LICENSE for details.
 -->
 <script lang="ts">
-  import { Bell, ChevronLeft, Info, Keyboard, Monitor, Moon, Pencil, Plus, Settings as SettingsIcon, Sun, Trash2, Users, X } from '@lucide/svelte';
+  import { Bell, ChevronLeft, Info, Keyboard, Monitor, Moon, Pencil, Plus, RotateCcw, Settings as SettingsIcon, Sun, Trash2, Users, X } from '@lucide/svelte';
   import * as api from '../lib/api';
   import { ACCOUNT_COLORS, protocolMeta } from '../lib/protocols';
+  import {
+    ACTIONS, addBinding, bindings, comboKeys, comboLabel, comboOf, isDefault, isMac, isUsableCombo, removeBinding, resetBindings, type Action,
+  } from '../lib/keybinds.svelte';
   import { settings, type Theme } from '../lib/settings.svelte';
   import { store } from '../lib/store.svelte';
   import { ui } from '../lib/ui.svelte';
@@ -23,17 +26,52 @@
     { id: 'about', label: 'About', icon: Info },
   ];
 
-  const mod = navigator.platform.toLowerCase().includes('mac') ? '⌘' : 'Ctrl';
-  const SHORTCUTS: [string, string[]][] = [
-    ['Next / previous chat', ['Alt', '↓', '/', 'Alt', '↑']],
-    ['Search chats', [mod, 'K']],
-    ['Search in chat', [mod, 'F']],
-    ['Reply to last message', [mod, 'R']],
-    ['Edit last own message', ['↑']],
-    ['Toggle info panel', [mod, 'I']],
-    ['Toggle sidebar', [mod, 'B']],
-    ['Settings', [mod, ',']],
-  ];
+  const mod = isMac ? '⌘' : 'Ctrl';
+
+  // shortcut recording: the next key combo is added to this action
+  let recording = $state<Action | ''>('');
+  let recordError = $state('');
+
+  function startRecording(action: Action) {
+    recording = action;
+    recordError = '';
+    ui.recordingKeys = true;
+  }
+
+  function stopRecording() {
+    recording = '';
+    ui.recordingKeys = false;
+  }
+
+  function onRecordKey(e: KeyboardEvent) {
+    if (!recording) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (e.key === 'Escape') {
+      stopRecording();
+      return;
+    }
+    const combo = comboOf(e);
+    if (!combo) return; // modifier alone: wait for the key
+    if (!isUsableCombo(combo)) {
+      recordError = `${comboLabel(combo)} would type text: use ${mod} or Alt with a key.`;
+      return;
+    }
+    const takenFrom = addBinding(recording, combo);
+    if (takenFrom) store.toast(`${comboLabel(combo)} removed from “${ACTIONS.find((a) => a.id === takenFrom)!.label}”.`);
+    stopRecording();
+  }
+
+  $effect(() => {
+    if (!recording) return;
+    window.addEventListener('keydown', onRecordKey, true);
+    return () => window.removeEventListener('keydown', onRecordKey, true);
+  });
+
+  // closing settings or leaving the section ends a recording
+  $effect(() => {
+    if ((!ui.settingsOpen || ui.settingsSection !== 'keyboard') && recording) stopRecording();
+  });
 
   const account = $derived(ui.settingsAccount ? store.accounts[ui.settingsAccount] : undefined);
   let removing = $state(false);
@@ -141,13 +179,31 @@
           <div class="row-text"><b>Vim mode</b><span>j/k to move, i to type, Esc to leave. Coming in a later version.</span></div>
           <button class="toggle" role="switch" aria-checked="false" aria-label="Vim mode" disabled></button>
         </div>
-        <div class="section">Shortcuts</div>
-        {#each SHORTCUTS as [label, keys]}
-          <div class="row compact">
-            <span>{label}</span>
-            <span class="keys">{#each keys as k}{#if k === '/'}<span class="slash">/</span>{:else}<kbd>{k}</kbd>{/if}{/each}</span>
+        <div class="section shortcuts-head">
+          <span>Shortcuts</span>
+          <button class="btn ghost" onclick={() => resetBindings()} disabled={!Object.keys(settings.keybinds).length}><RotateCcw size={14} />Reset all</button>
+        </div>
+        {#each ACTIONS as a (a.id)}
+          <div class="row compact shortcut" data-action={a.id}>
+            <span>{a.label}</span>
+            <span class="keys">
+              {#each bindings(a.id) as combo (combo)}
+                <span class="combo">
+                  {#each comboKeys(combo) as k}<kbd>{k}</kbd>{/each}
+                  <button class="remove" aria-label={`Remove ${comboLabel(combo)} from ${a.label}`} title="Remove" onclick={() => removeBinding(a.id, combo)}><X size={12} /></button>
+                </span>
+              {/each}
+              {#if recording === a.id}
+                <span class="recording" role="status">Press keys… <span class="hint">Esc cancels</span></span>
+              {:else}
+                <button class="icon-btn sm" aria-label={`Add shortcut for ${a.label}`} title="Add shortcut" onclick={() => startRecording(a.id)}><Plus size={14} /></button>
+              {/if}
+              <button class="icon-btn sm" class:invisible={isDefault(a.id)} aria-label={`Reset ${a.label}`} title="Reset to default" onclick={() => resetBindings(a.id)}><RotateCcw size={14} /></button>
+            </span>
           </div>
+          {#if recording === a.id && recordError}<div class="record-error">{recordError}</div>{/if}
         {/each}
+        <p class="hint">In the message field, ↑ also edits your last message and Esc cancels a reply or edit.</p>
       {:else if ui.settingsSection === 'accounts' && account}
         <h2 class="with-back">
           <button class="icon-btn sm" aria-label="Back to accounts" onclick={() => (ui.settingsAccount = '')}><ChevronLeft size={18} /></button>
@@ -233,9 +289,17 @@
   .row-text b { font-weight: 500; }
   .row-text span { font-size: 12px; color: var(--text-muted); line-height: 16px; overflow-wrap: anywhere; }
   .section { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); margin-top: 16px; }
-  .keys { display: flex; gap: 4px; align-items: center; }
+  .keys { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+  .shortcuts-head { display: flex; align-items: center; justify-content: space-between; }
+  .shortcuts-head .btn { height: 26px; padding: 0 8px; gap: 4px; font-size: 12px; text-transform: none; letter-spacing: 0; }
+  .shortcut { gap: 12px; }
+  .combo { display: inline-flex; align-items: center; gap: 3px; padding: 2px 2px 2px 4px; border-radius: 6px; background: var(--surface-2); }
+  .combo .remove { border: 0; background: none; padding: 2px; display: flex; color: var(--text-muted); border-radius: 4px; }
+  .combo .remove:hover { color: var(--danger); background: var(--hover); }
+  .recording { font-size: 12px; color: var(--accent); font-weight: 600; }
+  .record-error { font-size: 12px; color: var(--danger); text-align: right; margin-top: -4px; }
+  .invisible { visibility: hidden; }
   kbd { font-family: var(--mono); font-size: 11px; border: 1px solid var(--border-strong); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; min-width: 20px; text-align: center; }
-  .slash { color: var(--text-muted); }
   .card { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: var(--radius-lg); background: var(--surface-2); border: 1px solid var(--border); margin-bottom: 12px; }
   .field { margin: 8px 0; }
   .label { font-size: 13px; font-weight: 600; }

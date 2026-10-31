@@ -40,6 +40,7 @@ class Ui {
   highlightId = $state('');
   dropHover = $state(false);
   focusComposer = $state(0); // bump to focus
+  recordingKeys = $state(false); // a shortcut is being recorded in Settings
   focusSearch = $state(0);
 
   get narrow(): boolean {
