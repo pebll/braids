@@ -42,6 +42,23 @@ install(TARGETS tgchat DESTINATION ${CMAKE_INSTALL_LIBDIR})
 # Common
 target_common_config(tgchat)
 
+# Telegram API credentials of braids (https://my.telegram.org), given at
+# build time so they are not in the repository: -DTG_API_ID=... -DTG_API_HASH=...
+# or the environment variables of the same name. Without them nchat's
+# credentials are used (development builds only).
+if(NOT TG_API_ID AND DEFINED ENV{TG_API_ID})
+  set(TG_API_ID "$ENV{TG_API_ID}")
+endif()
+if(NOT TG_API_HASH AND DEFINED ENV{TG_API_HASH})
+  set(TG_API_HASH "$ENV{TG_API_HASH}")
+endif()
+if(TG_API_ID AND TG_API_HASH)
+  message(STATUS "Telegram API credentials: braids (from build configuration)")
+  target_compile_definitions(tgchat PRIVATE TG_API_ID="${TG_API_ID}" TG_API_HASH="${TG_API_HASH}")
+else()
+  message(STATUS "Telegram API credentials: nchat fallback (set TG_API_ID / TG_API_HASH for releases)")
+endif()
+
 # Headers
 target_include_directories(tgchat PRIVATE "../common/src")
 target_include_directories(tgchat PRIVATE "../ncutil/src")

@@ -40,6 +40,7 @@ public:
 
   bool Login();
   bool Logout();
+  bool Unlink();
 
   void Process();
 

@@ -741,7 +741,13 @@ void Core::RemoveAccount(const std::string& p_AccountId)
   const std::string profileDir = m_ProfilesDir + "/" + p_AccountId;
   RunBackground([this, protocol, dirLock, profileDir, p_AccountId]() mutable
   {
-    // @todo: also log out the device remotely where the protocol supports it
+    // end the session at the messenger too (best effort, e.g. when offline the
+    // device stays listed there until removed on the phone)
+    if (!protocol->Unlink())
+    {
+      LOG_WARNING("remote unlink of %s failed or not supported", p_AccountId.c_str());
+    }
+
     protocol->Logout();
     protocol->CloseProfile();
     MessageCache::RemoveProfile(p_AccountId);

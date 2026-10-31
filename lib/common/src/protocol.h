@@ -114,6 +114,14 @@ public:
   virtual bool Login() = 0;
   virtual bool Logout() = 0;
 
+  // braids extension: ends this device's session at the messenger (the linked
+  // device disappears from the phone / session list), for account removal.
+  // Blocking with a timeout, best effort; called before Logout().
+  virtual bool Unlink()
+  {
+    return false;
+  }
+
   virtual void SendRequest(std::shared_ptr<RequestMessage> p_Request) = 0;
   virtual void SetMessageHandler(const std::function<void(std::shared_ptr<ServiceMessage>)>& p_MessageHandler) = 0;
 

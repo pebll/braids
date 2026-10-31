@@ -2896,6 +2896,25 @@ func WmLogin(connId int) int {
 	return 0
 }
 
+// WmUnlink removes this linked device at WhatsApp (as "Log out" on the
+// phone does) and deletes the local session.
+func WmUnlink(connId int) int {
+	client := GetClient(connId)
+	if client == nil {
+		return -1
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	if err := client.Logout(ctx); err != nil {
+		LOG_WARNING(fmt.Sprintf("unlink failed: %v", err))
+		return -1
+	}
+
+	LOG_DEBUG("unlink ok")
+	return 0
+}
+
 func WmLogout(connId int) int {
 
 	LOG_DEBUG("logout " + strconv.Itoa(connId))

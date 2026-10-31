@@ -58,6 +58,11 @@ func CSgLogin(connId int) int {
 	return SgLogin(connId)
 }
 
+//export CSgUnlink
+func CSgUnlink(connId int) int {
+	return SgUnlink(connId)
+}
+
 //export CSgLogout
 func CSgLogout(connId int) int {
 	return SgLogout(connId)

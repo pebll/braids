@@ -8,7 +8,9 @@
 #include "tgchat.h"
 
 #include <cstdint>
+#include <chrono>
 #include <functional>
+#include <future>
 #include <iostream>
 #include <limits>
 #include <map>
@@ -112,6 +114,7 @@ public:
 
   bool Login();
   bool Logout();
+  bool Unlink();
 
   void Process();
 
@@ -331,6 +334,11 @@ bool TgChat::Logout()
   return m_Impl->Logout();
 }
 
+bool TgChat::Unlink()
+{
+  return m_Impl->Unlink();
+}
+
 void TgChat::Process()
 {
   m_Impl->Process();
@@ -474,6 +482,30 @@ bool TgChat::Impl::Login()
   }
 
   return true;
+}
+
+// Terminates this session at Telegram (it leaves Settings -> Devices); waits
+// up to 15 s for the answer.
+bool TgChat::Impl::Unlink()
+{
+  if (!m_Running) return false;
+
+  auto done = std::make_shared<std::promise<bool>>();
+  std::future<bool> result = done->get_future();
+  SendQuery(td::td_api::make_object<td::td_api::logOut>(), [done](Object object)
+  {
+    done->set_value(object && (object->get_id() == td::td_api::ok::ID));
+  });
+
+  if (result.wait_for(std::chrono::seconds(15)) != std::future_status::ready)
+  {
+    LOG_WARNING("unlink timeout");
+    return false;
+  }
+
+  const bool ok = result.get();
+  LOG_DEBUG("unlink %s", ok ? "ok" : "failed");
+  return ok;
 }
 
 bool TgChat::Impl::Logout()
@@ -2681,12 +2713,20 @@ void TgChat::Impl::OnAuthStateUpdate()
     set_parameters->use_message_database_ = true;
     set_parameters->use_secret_chats_ = true;
 
-    std::string apiId = getenv("TG_APIID") ? getenv("TG_APIID")
-      : StrUtil::StrFromHex("3130343132303237");
+    // braids' credentials come from the build (TG_API_ID / TG_API_HASH, see
+    // CMakeLists.txt); nchat's are the fallback for development builds; the
+    // environment variables TG_APIID / TG_APIHASH override both
+#if defined(TG_API_ID) && defined(TG_API_HASH)
+    const std::string buildApiId = TG_API_ID;
+    const std::string buildApiHash = TG_API_HASH;
+#else
+    const std::string buildApiId = StrUtil::StrFromHex("3130343132303237");
+    const std::string buildApiHash = StrUtil::StrFromHex("3536373261353832633265666532643939363232326636343237386563616163");
+#endif
+    std::string apiId = getenv("TG_APIID") ? getenv("TG_APIID") : buildApiId;
     set_parameters->api_id_ = StrUtil::ToInteger(apiId);
 
-    std::string apiHash = getenv("TG_APIHASH") ? getenv("TG_APIHASH")
-      : StrUtil::StrFromHex("3536373261353832633265666532643939363232326636343237386563616163");
+    std::string apiHash = getenv("TG_APIHASH") ? getenv("TG_APIHASH") : buildApiHash;
     set_parameters->api_hash_ = apiHash;
 
     set_parameters->system_language_code_ = "en";

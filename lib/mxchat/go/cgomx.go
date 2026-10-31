@@ -81,6 +81,11 @@ func CMxLogin(connId int) int {
 	return MxLogin(connId)
 }
 
+//export CMxUnlink
+func CMxUnlink(connId int) int {
+	return MxUnlink(connId)
+}
+
 //export CMxLogout
 func CMxLogout(connId int) int {
 	return MxLogout(connId)

@@ -270,6 +270,13 @@ bool SgChat::Login()
   return (rv == 0);
 }
 
+bool SgChat::Unlink()
+{
+  if (!m_Running) return false;
+
+  return (CSgUnlink(m_ConnId) == 0);
+}
+
 bool SgChat::Logout()
 {
   int rv = 0;

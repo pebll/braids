@@ -248,6 +248,13 @@ bool WmChat::Login()
   return (rv == 0);
 }
 
+bool WmChat::Unlink()
+{
+  if (!m_Running) return false;
+
+  return (CWmUnlink(m_ConnId) == 0);
+}
+
 bool WmChat::Logout()
 {
   int rv = 0;

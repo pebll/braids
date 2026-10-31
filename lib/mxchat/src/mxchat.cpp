@@ -296,6 +296,13 @@ bool MxChat::Login()
   return (rv == 0);
 }
 
+bool MxChat::Unlink()
+{
+  if (!m_Running) return false;
+
+  return (CMxUnlink(m_ConnId) == 0);
+}
+
 bool MxChat::Logout()
 {
   int rv = 0;

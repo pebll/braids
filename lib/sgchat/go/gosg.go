@@ -2219,6 +2219,24 @@ func monitorConnectionStatus(connId int, statusChan chan signalmeow.SignalConnec
 	}
 }
 
+// SgUnlink removes this linked device from the Signal account.
+func SgUnlink(connId int) int {
+	client := GetClient(connId)
+	if client == nil {
+		return -1
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	if err := client.Unlink(ctx); err != nil {
+		LOG_WARNING(fmt.Sprintf("unlink failed: %v", err))
+		return -1
+	}
+
+	LOG_DEBUG("unlink ok")
+	return 0
+}
+
 func SgLogout(connId int) int {
 	LOG_DEBUG("logout " + strconv.Itoa(connId))
 
