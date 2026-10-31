@@ -27,7 +27,7 @@
       if (!menuEl) return;
       const r = menuEl.getBoundingClientRect();
       menuPos = {
-        x: Math.max(8, Math.min(m.x, window.innerWidth - r.width - 8)),
+        x: Math.max(8, Math.min(m.leftOf ? m.x - r.width : m.x, window.innerWidth - r.width - 8)),
         y: Math.max(8, m.y + r.height > window.innerHeight - 8 ? m.y - r.height : m.y),
       };
       menuEl.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus();

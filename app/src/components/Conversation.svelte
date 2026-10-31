@@ -50,7 +50,7 @@
   let searchFrom = $state('');
   let searchStatus = $state('');
   let searchInput: HTMLInputElement | undefined = $state();
-  let reactFor = $state<{ m: Message; x: number; y: number; emojis: string[] } | null>(null);
+  let reactFor = $state<{ m: Message; x: number; y: number; above: boolean; emojis: string[] } | null>(null);
   let lastKey = '';
   let lastCount = 0;
   let lastNewestId = '';
@@ -180,7 +180,9 @@
   async function openReactions(m: Message, anchor: HTMLElement) {
     const r = anchor.getBoundingClientRect();
     const fallback = ['👍', '👎', '❤️', '🔥', '🎉', '😂', '😮', '😢', '😡', '🙏', '👏', '🤔', '💯', '👀', '✅', '🙌'];
-    reactFor = { m, x: r.left, y: r.bottom + 6, emojis: fallback };
+    // below the button, or above it near the bottom of the window
+    const above = r.bottom + 220 > window.innerHeight;
+    reactFor = { m, x: r.left, y: above ? r.top - 6 : r.bottom + 6, above, emojis: fallback };
     try {
       const res = await api.call('reactions.available', { accountId, chatId, msgId: m.id });
       if (reactFor?.m.id === m.id && res.emojis?.length) reactFor.emojis = res.emojis;
@@ -317,7 +319,7 @@
 
     {#if reactFor}
       <div class="react-scrim" role="presentation" onclick={() => (reactFor = null)}></div>
-      <div class="react-pop" role="dialog" aria-label="Reactions" style:left="{Math.min(reactFor.x, ui.width - 300)}px" style:top="{reactFor.y}px">
+      <div class="react-pop" role="dialog" aria-label="Reactions" style:left="{Math.min(reactFor.x, ui.width - 300)}px" style:top="{reactFor.y}px" class:above={reactFor.above}>
         {#each reactFor.emojis as e}
           <button class:mine={reactFor.m.reactions.own === e} onclick={() => sendReaction(e)}>{e}</button>
         {/each}
@@ -378,6 +380,7 @@
     position: fixed; z-index: 31; width: 288px; max-height: 240px; overflow-y: auto; padding: 8px; display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px;
     background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-2);
   }
+  .react-pop.above { transform: translateY(-100%); }
   .react-pop button { border: 0; background: none; height: 32px; border-radius: 6px; font-size: 18px; padding: 0; }
   .react-pop button:hover { background: var(--hover); }
   .react-pop button.mine { background: var(--accent-soft); }

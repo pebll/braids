@@ -9,7 +9,7 @@
   groups, quote, attachment, reactions, hover actions.
 -->
 <script lang="ts">
-  import { Check, CheckCheck, Copy, Download, FileText, LoaderCircle, MoreHorizontal, Pencil, Pin, PinOff, Reply, SmilePlus, Trash2, TriangleAlert } from '@lucide/svelte';
+  import { Check, CheckCheck, Copy, Download, FileText, Forward, LoaderCircle, MoreHorizontal, Pencil, Pin, PinOff, Reply, SmilePlus, Trash2, TriangleAlert } from '@lucide/svelte';
   import * as api from '../lib/api';
   import { isOnlyEmoji, renderText, senderColor, timeOfDay } from '../lib/format';
   import { fileMime, fileReady, store } from '../lib/store.svelte';
@@ -35,7 +35,6 @@
     onReact: (m: Message, anchor: HTMLElement) => void;
   } = $props();
 
-  const QUICK = ['👍', '❤️', '😂', '😮'];
   const own = $derived(m.isOutgoing);
   const showName = $derived(chat.isGroup && !own && first);
   const showAvatar = $derived(chat.isGroup && !own);
@@ -50,6 +49,7 @@
   let moreBtn: HTMLButtonElement | undefined = $state();
   let reactBtn: HTMLButtonElement | undefined = $state();
   let requestedDownload = false;
+  let saveWhenReady = $state(false);
 
   const editState = $derived.by(() => {
     const win = account.capabilities.editWindowSec;
@@ -73,6 +73,32 @@
   function download() {
     api.call('files.download', { accountId: m.accountId, chatId: m.chatId, msgId: m.id }).catch((e) => store.toastError(e));
   }
+
+  // "Download file": a copy in the Downloads folder (fetched first if needed)
+  async function saveFile() {
+    if (!m.file) return;
+    if (!ready) {
+      saveWhenReady = true;
+      if (m.file.status !== 'downloading') download();
+      return;
+    }
+    try {
+      const saved = await api.saveToDownloads(m.file.path, m.file.name);
+      if (saved) store.toast(`Saved to ${saved}`, 'info', { label: 'Open', run: () => api.openPath(saved).catch((e) => store.toastError(e)) });
+    } catch (e) {
+      store.toastError(e);
+    }
+  }
+
+  $effect(() => {
+    if (saveWhenReady && ready) {
+      saveWhenReady = false;
+      saveFile();
+    } else if (saveWhenReady && m.file?.status === 'failed') {
+      saveWhenReady = false;
+      store.toast('The file could not be downloaded.', 'error');
+    }
+  });
 
   function openFile() {
     if (!m.file) return;
@@ -111,17 +137,12 @@
     if (ok) await api.call('messages.delete', { accountId: m.accountId, chatId: m.chatId, msgId: m.id }).catch((e) => store.toastError(e));
   }
 
-  export function menuItems(): MenuItem[] {
-    const items: MenuItem[] = [{ label: 'Reply', icon: Reply, run: reply }];
-    if (editState.show) items.push({ label: 'Edit', icon: Pencil, run: edit, disabled: !editState.ok, hint: editState.reason });
+  // the "…" menu of the hover bar
+  function moreItems(): MenuItem[] {
+    const items: MenuItem[] = [];
     if (m.text) items.push({ label: 'Copy text', icon: Copy, run: () => navigator.clipboard.writeText(m.text).catch(() => {}) });
-    if (m.file) {
-      items.push({
-        label: ready ? 'Open file' : 'Download',
-        icon: Download,
-        run: openFile,
-      });
-    }
+    if (m.file) items.push({ label: 'Download file', icon: Download, run: saveFile });
+    items.push({ label: 'Forward…', icon: Forward, run: () => (ui.forward = m) });
     if (account.capabilities.pinMessage) {
       items.push({
         label: m.isPinned ? 'Unpin message' : 'Pin message',
@@ -129,7 +150,16 @@
         run: () => api.call('messages.pin', { accountId: m.accountId, chatId: m.chatId, msgId: m.id, isPinned: !m.isPinned }).catch((e) => store.toastError(e)),
       });
     }
-    if (own || m.isDeleted) items.push({ label: m.isDeleted ? 'Remove' : 'Delete for everyone', icon: Trash2, danger: true, run: remove });
+    return items;
+  }
+
+  // right-click menu: everything
+  export function menuItems(): MenuItem[] {
+    if (m.isDeleted) return [{ label: 'Remove', icon: Trash2, danger: true, run: remove }];
+    const items: MenuItem[] = [{ label: 'Reply', icon: Reply, run: reply }];
+    if (editState.show) items.push({ label: 'Edit', icon: Pencil, run: edit, disabled: !editState.ok, hint: editState.reason });
+    items.push(...moreItems());
+    if (own) items.push({ label: 'Delete for everyone', icon: Trash2, danger: true, run: remove });
     return items;
   }
 
@@ -249,19 +279,19 @@
     {/if}
 
     {#if !m.isDeleted}
-      <div class="actions" role="toolbar" aria-label="Message actions">
-        {#each QUICK as emoji}
-          <button class="quick" class:mine={m.reactions.own === emoji} onclick={() => react(emoji)} title="React {emoji}">{emoji}</button>
-        {/each}
-        <button class="icon-btn sm" bind:this={reactBtn} onclick={() => onReact(m, reactBtn!)} title="More reactions" aria-label="More reactions"><SmilePlus size={17} /></button>
+      <div class="actions" role="toolbar" aria-label="Message actions" aria-orientation="vertical">
+        <button class="icon-btn sm" bind:this={reactBtn} onclick={() => onReact(m, reactBtn!)} title="React" aria-label="React"><SmilePlus size={17} /></button>
         <button class="icon-btn sm" onclick={reply} title="Reply" aria-label="Reply"><Reply size={17} /></button>
-        {#if editState.show}
-          <button class="icon-btn sm" onclick={edit} disabled={!editState.ok} title={editState.ok ? 'Edit' : editState.reason} aria-label="Edit"><Pencil size={16} /></button>
-        {/if}
         <button class="icon-btn sm" bind:this={moreBtn} title="More" aria-label="More"
-          onclick={() => { const r = moreBtn!.getBoundingClientRect(); ui.openMenu({ x: r.left, y: r.bottom + 4 }, menuItems()); }}>
+          onclick={() => { const r = moreBtn!.getBoundingClientRect(); ui.openMenu({ x: own ? r.left - 4 : r.right + 4, y: r.top }, moreItems(), own); }}>
           <MoreHorizontal size={17} />
         </button>
+        {#if editState.ok}
+          <button class="icon-btn sm" onclick={edit} title="Edit" aria-label="Edit"><Pencil size={16} /></button>
+        {/if}
+        {#if own}
+          <button class="icon-btn sm danger" onclick={remove} title="Delete for everyone" aria-label="Delete for everyone"><Trash2 size={16} /></button>
+        {/if}
       </div>
     {/if}
   </div>
@@ -334,13 +364,12 @@
   .chip.mine { background: var(--accent-soft); border-color: var(--accent); }
   .chip .n { font-size: 12px; font-weight: 600; color: var(--text-2); }
 
+  /* hover bar: vertical, beside the bubble (right of others' messages, left of own) */
   .actions {
-    position: absolute; top: -34px; left: 0; display: none; align-items: center; gap: 2px; padding: 3px 4px; background: var(--surface);
-    border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow-2); z-index: 5; white-space: nowrap;
+    position: absolute; bottom: 0; left: calc(100% + 6px); display: none; flex-direction: column; align-items: center; gap: 2px; padding: 3px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow-2); z-index: 5;
   }
-  .own .actions { left: auto; right: 0; }
+  .own .actions { left: auto; right: calc(100% + 6px); }
   .msg:hover .actions, .actions:focus-within { display: flex; }
-  .quick { width: 28px; height: 28px; border: 0; background: none; border-radius: 8px; font-size: 16px; padding: 0; }
-  .quick:hover { background: var(--hover); }
-  .quick.mine { background: var(--accent-soft); }
+  .actions .danger:hover { color: var(--danger); }
 </style>

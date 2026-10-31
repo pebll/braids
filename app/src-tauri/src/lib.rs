@@ -95,6 +95,34 @@ fn save_temp_file(state: State<'_, AppState>, name: String, data: Vec<u8>) -> Re
     Ok(path.to_string_lossy().into_owned())
 }
 
+/// Copies a received file into the user's Downloads folder under its name
+/// (never overwriting: "name (1).ext" etc.), returns the new path.
+#[tauri::command]
+fn save_to_downloads(app: AppHandle, path: String, name: String) -> Result<String, String> {
+    let dir = app.path().download_dir().map_err(|e| e.to_string())?;
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    // the attachment's name, else the cached file's
+    let file_name = [&name, &path]
+        .iter()
+        .find_map(|p| PathBuf::from(p).file_name().map(|n| n.to_owned()))
+        .unwrap_or_else(|| "file".into());
+    let stem = PathBuf::from(&file_name).file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+    let ext = PathBuf::from(&file_name).extension().map(|s| format!(".{}", s.to_string_lossy())).unwrap_or_default();
+    for n in 0..1000 {
+        let target = if n == 0 { dir.join(&file_name) } else { dir.join(format!("{stem} ({n}){ext}")) };
+        match fs::OpenOptions::new().write(true).create_new(true).open(&target) {
+            Ok(mut out) => {
+                let mut input = fs::File::open(&path).map_err(|e| e.to_string())?;
+                std::io::copy(&mut input, &mut out).map_err(|e| e.to_string())?;
+                return Ok(target.to_string_lossy().into_owned());
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(e) => return Err(e.to_string()),
+        }
+    }
+    Err("too many files with this name".into())
+}
+
 fn show_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.unminimize();
@@ -159,7 +187,7 @@ pub fn run() {
                 }
             }
         })
-        .invoke_handler(tauri::generate_handler![api_call, daemon_connected, set_close_to_tray, set_badge, save_temp_file])
+        .invoke_handler(tauri::generate_handler![api_call, daemon_connected, set_close_to_tray, set_badge, save_temp_file, save_to_downloads])
         .run(tauri::generate_context!())
         .expect("error while running braids");
 }

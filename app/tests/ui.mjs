@@ -111,7 +111,9 @@ try {
 
   const last = page.locator('.msg.own').last();
   await last.hover();
-  await last.locator('.quick').first().click();
+  check(await last.locator('.actions').evaluate((el) => getComputedStyle(el).flexDirection === 'column'), 'hover bar is vertical');
+  await last.getByRole('button', { name: 'React', exact: true }).click();
+  await page.locator('.react-pop button').first().click();
   await last.locator('.chip.mine').waitFor();
   check(true, 'reaction added');
   await last.locator('.chip.mine').click();
@@ -132,6 +134,28 @@ try {
   await page.getByRole('button', { name: 'Delete for everyone' }).click();
   await page.waitForFunction(() => !document.body.textContent.includes('a reply, edited'));
   check(true, 'delete with confirmation');
+
+  // more menu: copy, forward with origin line (to the same chat, so no other
+  // chat's preview mentions it)
+  await page.getByRole('option', { name: /Michael/ }).click();
+  const theirs = page.locator('.msg:not(.own)').last();
+  await theirs.waitFor();
+  await theirs.hover();
+  await shot('hover-bar');
+  await theirs.getByRole('button', { name: 'More' }).click();
+  await shot('more-menu');
+  check(await page.getByRole('menuitem', { name: 'Copy text' }).count() === 1 && await page.getByRole('menuitem', { name: 'Open file' }).count() === 0,
+    'more menu has copy, no open');
+  await page.getByRole('menuitem', { name: 'Forward…' }).click();
+  await page.getByText('Forward message').waitFor();
+  await page.getByLabel('Add “Forwarded from” line').check();
+  await page.fill('input[aria-label="Search chats to forward to"]', 'Michael');
+  await page.locator('.target', { hasText: 'Michael' }).first().click();
+  await page.locator('.toast', { hasText: 'Forwarded to Michael' }).waitFor();
+  await page.locator('.msg.own', { hasText: 'Forwarded from Michael' }).last().waitFor();
+  check(true, 'message forwarded with origin line');
+  await page.getByRole('option', { name: /The Office/ }).click();
+  await page.locator('[data-msg-id]').first().waitFor();
 
   // draft survives switching chats
   await composer.fill('unsent words');

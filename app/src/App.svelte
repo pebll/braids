@@ -16,6 +16,7 @@
   import Braid from './components/Braid.svelte';
   import ChatList from './components/ChatList.svelte';
   import Conversation from './components/Conversation.svelte';
+  import ForwardDialog from './components/ForwardDialog.svelte';
   import InfoPanel from './components/InfoPanel.svelte';
   import NewChat from './components/NewChat.svelte';
   import Overlays from './components/Overlays.svelte';
@@ -129,7 +130,7 @@
   }
 
   function onKey(e: KeyboardEvent) {
-    const modal = ui.settingsOpen || ui.newChatOpen || !!store.wizardSetupId || !!ui.confirmRequest || !!ui.lightbox || ui.recordingKeys;
+    const modal = ui.settingsOpen || ui.newChatOpen || !!ui.forward || !!store.wizardSetupId || !!ui.confirmRequest || !!ui.lightbox || ui.recordingKeys;
     if (modal) {
       // no browser actions (print, new window, ...) behind a dialog either
       if (!ui.recordingKeys && actionFor(e)) e.preventDefault();
@@ -196,6 +197,7 @@
 {#if store.wizardSetupId}<Wizard />{/if}
 {#if ui.settingsOpen}<Settings />{/if}
 {#if ui.newChatOpen}<NewChat />{/if}
+{#if ui.forward}<ForwardDialog m={ui.forward} />{/if}
 {#if prompt && !store.wizardSetupId}<AccountPrompt {prompt} />{/if}
 <Overlays />
 

@@ -34,9 +34,10 @@ class Ui {
   chatSearchOpen = $state(false);
   lightbox = $state<{ src: string; name: string; path: string } | null>(null);
   confirmRequest = $state<ConfirmRequest | null>(null);
-  menu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null);
+  menu = $state<{ x: number; y: number; items: MenuItem[]; leftOf?: boolean } | null>(null); // leftOf: x is the right edge
   reply = $state<Message | null>(null);
   edit = $state<Message | null>(null);
+  forward = $state<Message | null>(null); // message being forwarded (dialog open)
   highlightId = $state('');
   dropHover = $state(false);
   focusComposer = $state(0); // bump to focus
@@ -57,10 +58,10 @@ class Ui {
     });
   }
 
-  openMenu(e: MouseEvent | { x: number; y: number }, items: MenuItem[]) {
+  openMenu(e: MouseEvent | { x: number; y: number }, items: MenuItem[], leftOf = false) {
     const x = 'clientX' in e ? e.clientX : e.x;
     const y = 'clientY' in e ? e.clientY : e.y;
-    this.menu = { x, y, items };
+    this.menu = { x, y, items, leftOf };
   }
 
   highlight(id: string) {
