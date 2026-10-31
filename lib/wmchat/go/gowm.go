@@ -1125,6 +1125,14 @@ func (handler *WmEventHandler) HandleGroupInfo(groupInfo *events.GroupInfo) {
 	}
 	chatId := GetChatId(client, &groupInfo.JID, nil)
 
+	if groupInfo.Topic != nil {
+		topic := groupInfo.Topic.Topic
+		if groupInfo.Topic.TopicDeleted {
+			topic = ""
+		}
+		CWmNewDescriptionNotify(connId, chatId, topic)
+	}
+
 	if groupInfo.Ephemeral != nil {
 		SetExpiration(connId, chatId, groupInfo.Ephemeral.DisappearingTimer)
 	}

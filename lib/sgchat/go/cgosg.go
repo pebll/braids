@@ -13,6 +13,7 @@ package main
 // extern void SgNewChatsNotify(int p_ConnId, char* p_ChatId, int p_IsUnread, int p_IsMuted, int p_IsPinned, int p_IsArchived, int p_LastMessageTime);
 // extern void SgNewGroupMembersNotify(int p_ConnId, char* p_ChatId, char* p_MembersJson);
 // extern void SgNewAvatarNotify(int p_ConnId, char* p_Id, char* p_FilePath);
+// extern void SgNewDescriptionNotify(int p_ConnId, char* p_Id, char* p_Description);
 // extern void SgNewMessagesNotify(int p_ConnId, char* p_ChatId, char* p_MsgId, char* p_SenderId, char* p_Text, int p_FromMe, char* p_QuotedId, char* p_FileId, char* p_FilePath, int p_FileStatus, int p_TimeSent, int p_IsRead, int p_IsEdited);
 // extern void SgNewHistoryMessagesNotify(int p_ConnId, char* p_ChatId, char* p_MsgId, char* p_SenderId, char* p_Text, int p_FromMe, char* p_QuotedId, char* p_FileId, char* p_FilePath, int p_FileStatus, int p_TimeSent, int p_IsRead, int p_IsEdited, char* p_FromMsgId, int p_Notify);
 // extern void SgNewStatusNotify(int p_ConnId, char* p_UserId, int p_IsOnline, int p_TimeSeen);
@@ -87,6 +88,11 @@ func CSgGetAvatar(connId int, avatarId *C.char) int {
 	return SgGetAvatar(connId, C.GoString(avatarId))
 }
 
+//export CSgGetDescription
+func CSgGetDescription(connId int, id *C.char) int {
+	return SgGetDescription(connId, C.GoString(id))
+}
+
 //export CSgGetGroupMembers
 func CSgGetGroupMembers(connId int, chatId *C.char) int {
 	return SgGetGroupMembers(connId, C.GoString(chatId))
@@ -157,6 +163,10 @@ func CSgNewChatsNotify(connId int, chatId string, isUnread int, isMuted int, isP
 
 func CSgNewAvatarNotify(connId int, avatarId string, filePath string) {
 	C.SgNewAvatarNotify(C.int(connId), C.CString(avatarId), C.CString(filePath))
+}
+
+func CSgNewDescriptionNotify(connId int, id string, description string) {
+	C.SgNewDescriptionNotify(C.int(connId), C.CString(id), C.CString(description))
 }
 
 func CSgNewGroupMembersNotify(connId int, chatId string, membersJson string) {

@@ -74,6 +74,7 @@ class Store {
   typing = $state<Record<string, Record<string, string>>>({}); // key -> userId -> name
   presence = $state<Record<string, { isOnline: boolean; timeSeen: number }>>({}); // accountId\u0001userId
   avatars = $state<Record<string, string>>({}); // accountId\u0001user or chat id -> image path ('' none)
+  descriptions = $state<Record<string, string>>({}); // accountId\u0001user or chat id -> group description / bio ('' none)
   setups = $state<Record<string, Setup>>({});
   accountPrompts = $state<Record<string, AuthPrompt>>({}); // runtime prompts per account
 
@@ -88,6 +89,7 @@ class Store {
 
   private typingTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private avatarAsked = new Set<string>();
+  private descriptionAsked = new Set<string>();
   private avatarBatch = new Map<string, Set<string>>(); // accountId -> ids
   private avatarTimer: ReturnType<typeof setTimeout> | undefined;
   private toastId = 1;
@@ -237,6 +239,22 @@ class Store {
     this.avatarBatch.clear();
   }
 
+  // Group description or user bio; asked for once, arrives later as
+  // description.updated. '' while unknown or without one.
+  description(accountId: string, id: string): string {
+    const key = chatKey(accountId, id);
+    const text = this.descriptions[key];
+    if (text === undefined && !this.descriptionAsked.has(key) && this.accounts[accountId]?.capabilities.descriptions) {
+      this.descriptionAsked.add(key);
+      api.call('descriptions.get', { accountId, ids: [id] })
+        .then((r) => {
+          for (const [id, text] of Object.entries(r.descriptions as Record<string, string>)) this.descriptions[chatKey(accountId, id)] = text;
+        })
+        .catch(() => {});
+    }
+    return text ?? '';
+  }
+
   isOnline(accountId: string, userId: string): boolean {
     return this.presence[`${accountId}\u0001${userId}`]?.isOnline ?? false;
   }
@@ -292,6 +310,7 @@ class Store {
       }
       // avatars are asked for again after a reconnect
       this.avatarAsked.clear();
+      this.descriptionAsked.clear();
       this.synced = true;
     } catch (e) {
       console.error('resync failed', e);
@@ -401,6 +420,9 @@ class Store {
       case 'avatar.updated':
         this.avatars[chatKey(p.accountId, p.id)] = p.path;
         break;
+      case 'description.updated':
+        this.descriptions[chatKey(p.accountId, p.id)] = p.description;
+        break;
       case 'presence':
         this.presence[`${p.accountId}\u0001${p.userId}`] = { isOnline: p.isOnline, timeSeen: p.timeSeen };
         break;
@@ -500,6 +522,9 @@ class Store {
     if (this.filter.kind === 'account' && this.filter.accountId === accountId) this.filter = { kind: 'all' };
     for (const key of Object.keys(this.avatars)) {
       if (splitKey(key)[0] === accountId) delete this.avatars[key];
+    }
+    for (const key of Object.keys(this.descriptions)) {
+      if (splitKey(key)[0] === accountId) delete this.descriptions[key];
     }
     for (const key of Object.keys(settings.categories)) {
       if (splitKey(key)[0] === accountId) delete settings.categories[key];

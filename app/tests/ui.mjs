@@ -195,6 +195,8 @@ try {
   await page.keyboard.press('Control+i');
   await page.getByText('Group info').waitFor();
   check(true, 'info panel opens');
+  await page.locator('.info .description', { hasText: 'Dunder Mifflin Scranton' }).waitFor();
+  check(await page.locator('.info .description a[data-link]').count() === 1, 'group description shown with link');
   await page.keyboard.press('Control+,');
   await page.getByRole('button', { name: 'Dark' }).click();
   check(await page.evaluate(() => document.documentElement.classList.contains('t-dark')), 'dark theme applied');

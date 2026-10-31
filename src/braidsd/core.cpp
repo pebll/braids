@@ -26,7 +26,7 @@
 #include "timeutil.h"
 
 // semver of the API; clients must match the major version
-static const std::string s_ApiVersion = "0.4.0";
+static const std::string s_ApiVersion = "0.5.0";
 static const int64_t s_StartTime = TimeUtil::GetCurrentTimeMSec();
 
 static const char* AuthStepToString(AuthStep p_Step)
@@ -389,7 +389,7 @@ void Core::Dispatch(const std::string& p_Method, const json& p_Params, const Rep
                             ParamBool(params, "isTyping", true));
     p_Reply.Ok(json::object());
   }
-  else if (p_Method == "avatars.get")
+  else if ((p_Method == "avatars.get") || (p_Method == "descriptions.get"))
   {
     if (!params.contains("ids") || !params["ids"].is_array())
     {
@@ -402,7 +402,9 @@ void Core::Dispatch(const std::string& p_Method, const json& p_Params, const Rep
       if (id.is_string()) ids.push_back(id.get<std::string>());
     }
 
-    p_Reply.Ok(m_ChatModel->GetAvatars(ParamStr(params, "accountId"), ids));
+    const std::string accountId = ParamStr(params, "accountId");
+    p_Reply.Ok((p_Method == "avatars.get") ? m_ChatModel->GetAvatars(accountId, ids)
+                                           : m_ChatModel->GetDescriptions(accountId, ids));
   }
   else if (p_Method == "members.get")
   {

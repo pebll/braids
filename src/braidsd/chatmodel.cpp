@@ -486,6 +486,18 @@ void ChatModel::OnServiceMessage(std::shared_ptr<ServiceMessage> p_ServiceMessag
       }
       break;
 
+    case NewDescriptionNotifyType:
+      {
+        std::shared_ptr<NewDescriptionNotify> notify = std::static_pointer_cast<NewDescriptionNotify>(p_ServiceMessage);
+        auto dit = account.descriptions.find(notify->id);
+        if ((dit != account.descriptions.end()) && (dit->second == notify->description)) break;
+
+        account.descriptions[notify->id] = notify->description;
+        Emit("description.updated", json{ { "accountId", accountId }, { "id", notify->id },
+               { "description", notify->description } });
+      }
+      break;
+
     case NewGroupMembersNotifyType:
       {
         std::shared_ptr<NewGroupMembersNotify> notify =
@@ -1403,6 +1415,32 @@ json ChatModel::GetAvatars(const std::string& p_AccountId, const std::vector<std
   return json{ { "accountId", p_AccountId }, { "avatars", avatars } };
 }
 
+// Known descriptions (group description, user bio) of the given users /
+// chats; the others are requested once per session from the protocol and
+// arrive as description.updated events.
+json ChatModel::GetDescriptions(const std::string& p_AccountId, const std::vector<std::string>& p_Ids)
+{
+  AccountState& account = GetAccountOrThrow(p_AccountId);
+  const bool hasDescriptions = HasFeature(p_AccountId, FeatureDescriptions);
+  json descriptions = json::object();
+  for (const auto& id : p_Ids)
+  {
+    auto dit = account.descriptions.find(id);
+    if (dit != account.descriptions.end())
+    {
+      descriptions[id] = dit->second;
+    }
+    else if (hasDescriptions && account.descriptionsRequested.insert(id).second)
+    {
+      std::shared_ptr<GetDescriptionRequest> getDescriptionRequest = std::make_shared<GetDescriptionRequest>();
+      getDescriptionRequest->id = id;
+      SendProtocolRequest(p_AccountId, getDescriptionRequest);
+    }
+  }
+
+  return json{ { "accountId", p_AccountId }, { "descriptions", descriptions } };
+}
+
 void ChatModel::GetMembers(const std::string& p_AccountId, const std::string& p_ChatId, const Reply& p_Reply)
 {
   GetAccountOrThrow(p_AccountId);
@@ -1776,6 +1814,7 @@ json ChatModel::CapabilitiesToJson(std::shared_ptr<Protocol> p_Protocol, const s
     { "archiveChat", p_Protocol->HasFeature(FeatureArchiveChat) },
     { "pinMessage", p_Protocol->HasFeature(FeaturePinMessage) },
     { "avatars", p_Protocol->HasFeature(FeatureAvatars) },
+    { "descriptions", p_Protocol->HasFeature(FeatureDescriptions) },
     { "limitedReactions", p_Protocol->HasFeature(FeatureLimitedReactions) },
     { "readReceiptsPerMessage", HasPerMessageReadReceipts(p_ProtocolName) },
   };

@@ -1395,6 +1395,16 @@ func (handler *SgEventHandler) handleGroupChange(chatId string, senderId string,
 			}
 			if actions.GetModifyDescription() != nil {
 				texts = append(texts, "[Changed group description]")
+				newDescription := ""
+				if gsp != nil {
+					if decrypted, err := gsp.DecryptBlobWithPadding(actions.GetModifyDescription().GetDescription()); err == nil {
+						var blob signalpb.GroupAttributeBlob
+						if err := proto.Unmarshal(decrypted, &blob); err == nil {
+							newDescription = blob.GetDescriptionText()
+						}
+					}
+				}
+				CSgNewDescriptionNotify(connId, chatId, newDescription)
 			}
 			if actions.GetModifyAvatar() != nil {
 				texts = append(texts, "[Changed group avatar]")

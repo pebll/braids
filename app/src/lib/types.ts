@@ -17,6 +17,7 @@ export interface Capabilities {
   limitedReactions: boolean;
   readReceiptsPerMessage: boolean;
   avatars: boolean;
+  descriptions: boolean;
 }
 
 export interface Account {

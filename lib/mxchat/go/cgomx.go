@@ -21,6 +21,7 @@ package main
 // extern void MxNewStatusNotify(int p_ConnId, char* p_UserId, int p_IsOnline, long long p_TimeSeen);
 // extern void MxNewGroupMembersNotify(int p_ConnId, char* p_ChatId, char* p_MembersJson);
 // extern void MxNewAvatarNotify(int p_ConnId, char* p_Id, char* p_FilePath);
+// extern void MxNewDescriptionNotify(int p_ConnId, char* p_Id, char* p_Description);
 // extern void MxDeleteChatNotify(int p_ConnId, char* p_ChatId);
 // extern void MxDeleteMessageNotify(int p_ConnId, char* p_ChatId, char* p_MsgId, int p_IsOutgoing);
 // extern void MxUpdateMuteNotify(int p_ConnId, char* p_ChatId, int p_IsMuted);
@@ -180,6 +181,11 @@ func CMxGetAvatar(connId int, avatarId *C.char) int {
 	return MxGetAvatar(connId, C.GoString(avatarId))
 }
 
+//export CMxGetDescription
+func CMxGetDescription(connId int, id *C.char) int {
+	return MxGetDescription(connId, C.GoString(id))
+}
+
 //export CMxGetGroupMembers
 func CMxGetGroupMembers(connId int, chatId *C.char) int {
 	return MxGetGroupMembers(connId, C.GoString(chatId))
@@ -234,6 +240,10 @@ func CMxNewGroupMembersNotify(connId int, chatId string, membersJson string) {
 
 func CMxNewAvatarNotify(connId int, avatarId string, filePath string) {
 	C.MxNewAvatarNotify(C.int(connId), C.CString(avatarId), C.CString(filePath))
+}
+
+func CMxNewDescriptionNotify(connId int, id string, description string) {
+	C.MxNewDescriptionNotify(C.int(connId), C.CString(id), C.CString(description))
 }
 
 func CMxDeleteChatNotify(connId int, chatId string) {

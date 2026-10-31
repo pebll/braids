@@ -79,7 +79,7 @@ bool MxChat::HasFeature(ProtocolFeature p_ProtocolFeature) const
     FeatureEditMessagesAnytime |
     FeatureAutoGetContactsOnLogin |
     FeaturePinChat |
-    FeatureAvatars;
+    FeatureAvatars | FeatureDescriptions;
   return (p_ProtocolFeature & customFeatures);
 }
 
@@ -644,6 +644,14 @@ void MxChat::PerformRequest(std::shared_ptr<RequestMessage> p_RequestMessage)
       }
       break;
 
+    case GetDescriptionRequestType:
+      {
+        std::shared_ptr<GetDescriptionRequest> getDescriptionRequest =
+          std::static_pointer_cast<GetDescriptionRequest>(p_RequestMessage);
+        CMxGetDescription(m_ConnId, const_cast<char*>(getDescriptionRequest->id.c_str()));
+      }
+      break;
+
     case GetGroupMembersRequestType:
       {
         std::shared_ptr<GetGroupMembersRequest> getGroupMembersRequest =
@@ -1189,6 +1197,21 @@ void MxNewAvatarNotify(int p_ConnId, char* p_Id, char* p_FilePath)
 
   free(p_Id);
   free(p_FilePath);
+}
+
+void MxNewDescriptionNotify(int p_ConnId, char* p_Id, char* p_Description)
+{
+  MxChat* instance = MxChat::GetInstance(p_ConnId);
+  if (instance != nullptr)
+  {
+    std::shared_ptr<NewDescriptionNotify> notify = std::make_shared<NewDescriptionNotify>(instance->GetProfileId());
+    notify->id = std::string(p_Id);
+    notify->description = std::string(p_Description);
+    DeferNotify(instance, notify);
+  }
+
+  free(p_Id);
+  free(p_Description);
 }
 
 void MxDeleteChatNotify(int p_ConnId, char* p_ChatId)

@@ -11,6 +11,7 @@
 <script lang="ts">
   import { Archive, ArchiveRestore, LogOut, Search, Star, StarOff, Trash2, X } from '@lucide/svelte';
   import * as api from '../lib/api';
+  import { linkify } from '../lib/format';
   import { protocolMeta } from '../lib/protocols';
   import { fileMime, fileReady, splitKey, store } from '../lib/store.svelte';
   import { ui } from '../lib/ui.svelte';
@@ -28,6 +29,21 @@
     (store.messages[chatKey]?.items ?? []).filter((m) => fileReady(m.file) && fileMime(m.file).startsWith('image/')).slice(-9).reverse(),
   );
   const contact = $derived(chat && !chat.isGroup ? store.contacts[accountId]?.[chatId] : undefined);
+  const description = $derived(chat ? store.description(accountId, chatId).trim() : '');
+  const longDescription = $derived(description.length > 220 || description.split('\n').length > 4);
+  let descriptionOpen = $state(false);
+  $effect(() => {
+    void chatId;
+    descriptionOpen = false;
+  });
+
+  function onDescriptionClick(e: MouseEvent) {
+    const a = (e.target as HTMLElement).closest('a[data-link]') as HTMLAnchorElement | null;
+    if (a) {
+      e.preventDefault();
+      api.openUrl(a.href).catch(() => {});
+    }
+  }
 
   async function leave() {
     if (!chat) return;
@@ -59,6 +75,17 @@
         {#if contact?.phone}<div class="sub">{contact.phone}</div>{/if}
         {#if !chat.isGroup}<div class="sub mono">{chat.id}</div>{/if}
       </div>
+
+      {#if description}
+        <div class="description">
+          <div class="desc-label">{chat.isGroup ? 'Description' : 'About'}</div>
+          <!-- eslint-disable-next-line svelte/no-at-html-tags: linkify escapes all input -->
+          <p class:clamped={longDescription && !descriptionOpen} onclick={onDescriptionClick} role="presentation">{@html linkify(description)}</p>
+          {#if longDescription}
+            <button class="more" onclick={() => (descriptionOpen = !descriptionOpen)}>{descriptionOpen ? 'Show less' : 'Show more'}</button>
+          {/if}
+        </div>
+      {/if}
 
       <div class="actions">
         <button onclick={() => (ui.chatSearchOpen = true)}><Search size={18} />Search</button>
@@ -123,6 +150,12 @@
   .name { font-size: 18px; font-weight: 650; margin-top: 8px; overflow-wrap: anywhere; }
   .sub { font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 6px; justify-content: center; flex-wrap: wrap; }
   .sub.mono { font-family: var(--mono); font-size: 11px; overflow-wrap: anywhere; }
+  .description { display: flex; flex-direction: column; gap: 4px; }
+  .desc-label { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+  .description p { margin: 0; font-size: 13px; line-height: 19px; color: var(--text); overflow-wrap: anywhere; user-select: text; -webkit-user-select: text; }
+  .description p.clamped { display: -webkit-box; -webkit-line-clamp: 4; line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+  .description :global(a) { color: var(--accent); }
+  .more { align-self: flex-start; border: 0; background: none; padding: 0; font-size: 12px; font-weight: 600; color: var(--accent); }
   .actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(76px, 1fr)); gap: 8px; }
   .actions button {
     display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 4px; border-radius: var(--radius-lg); border: 1px solid var(--border);

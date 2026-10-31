@@ -44,7 +44,7 @@ std::string DuChat::GetProfileId() const
 bool DuChat::HasFeature(ProtocolFeature p_ProtocolFeature) const
 {
   static int customFeatures =
-    FeatureAutoGetContactsOnLogin | FeatureEditMessagesAnytime | FeatureAvatars;
+    FeatureAutoGetContactsOnLogin | FeatureEditMessagesAnytime | FeatureAvatars | FeatureDescriptions;
   return (p_ProtocolFeature & customFeatures);
 }
 
@@ -572,6 +572,29 @@ void DuChat::PerformRequest(std::shared_ptr<RequestMessage> p_RequestMessage)
         }
 
         m_MessageHandler(newAvatarNotify);
+      }
+      break;
+
+    case GetDescriptionRequestType:
+      {
+        // demo description for the group and a bio, none for the others
+        std::shared_ptr<GetDescriptionRequest> getDescriptionRequest =
+          std::static_pointer_cast<GetDescriptionRequest>(p_RequestMessage);
+        static const std::map<std::string, std::string> s_Descriptions = {
+          { s_GroupId, "Dunder Mifflin Scranton.\nPaper sales and everything else: https://example.com/dundermifflin" },
+          { "Michael_0", "World's best boss" },
+        };
+
+        std::shared_ptr<NewDescriptionNotify> newDescriptionNotify =
+          std::make_shared<NewDescriptionNotify>(m_ProfileId);
+        newDescriptionNotify->id = getDescriptionRequest->id;
+        auto dit = s_Descriptions.find(getDescriptionRequest->id);
+        if (dit != s_Descriptions.end())
+        {
+          newDescriptionNotify->description = dit->second;
+        }
+
+        m_MessageHandler(newDescriptionNotify);
       }
       break;
 

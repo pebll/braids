@@ -334,6 +334,11 @@ func (conn *MxConn) applyStateEvent(ctx context.Context, roomID id.RoomID, evt *
 			conn.stateDirty = true
 		}
 
+	case event.StateTopic:
+		if content, ok := evt.Content.Parsed.(*event.TopicEventContent); ok {
+			CMxNewDescriptionNotify(conn.connId, string(roomID), content.Topic)
+		}
+
 	case event.StateCanonicalAlias:
 		if content, ok := evt.Content.Parsed.(*event.CanonicalAliasEventContent); ok {
 			ri.Alias = string(content.Alias)

@@ -201,6 +201,9 @@ private:
   void GetAvatar(const std::string& p_AvatarId);
   void DownloadAvatar(const std::string& p_AvatarId, td::td_api::object_ptr<td::td_api::file>& p_File);
   void NotifyAvatar(const std::string& p_AvatarId, const std::string& p_FilePath);
+  void GetDescription(const std::string& p_DescId);
+  void GetUserDescription(const std::string& p_DescId, int64_t p_UserId);
+  void NotifyDescription(const std::string& p_DescId, const std::string& p_Description);
   void DownloadFile(std::string p_ChatId, std::string p_MsgId, std::string p_FileId, std::string p_DownloadId,
                     DownloadFileAction p_DownloadFileAction);
   void RequestSponsoredMessagesIfNeeded();
@@ -366,7 +369,8 @@ bool TgChat::Impl::HasFeature(ProtocolFeature p_ProtocolFeature) const
     FeaturePinChat |
     FeatureArchiveChat |
     FeaturePinMessage |
-    FeatureAvatars;
+    FeatureAvatars |
+    FeatureDescriptions;
   return (p_ProtocolFeature & customFeatures);
 }
 
@@ -1721,6 +1725,14 @@ void TgChat::Impl::PerformRequest(std::shared_ptr<RequestMessage> p_RequestMessa
       }
       break;
 
+    case GetDescriptionRequestType:
+      {
+        std::shared_ptr<GetDescriptionRequest> getDescriptionRequest =
+          std::static_pointer_cast<GetDescriptionRequest>(p_RequestMessage);
+        GetDescription(getDescriptionRequest->id);
+      }
+      break;
+
     case GetGroupMembersRequestType:
       {
         std::shared_ptr<GetGroupMembersRequest> getGroupMembersRequest =
@@ -1922,6 +1934,39 @@ void TgChat::Impl::ProcessUpdate(td::td_api::object_ptr<td::td_api::Object> upda
       std::make_shared<NewContactsNotify>(m_ProfileId);
     newContactsNotify->contactInfos = std::vector<ContactInfo>({ contactInfo });
     CallMessageHandler(newContactsNotify);
+  },
+  [this](td::td_api::updateUserFullInfo& update_user_full_info)
+  {
+    LOG_TRACE("user full info update");
+
+    // the private chat with a user has the user's id
+    if (update_user_full_info.user_full_info_)
+    {
+      auto& bio = update_user_full_info.user_full_info_->bio_;
+      NotifyDescription(StrUtil::NumToHex(update_user_full_info.user_id_), bio ? bio->text_ : "");
+    }
+  },
+  [this](td::td_api::updateBasicGroupFullInfo& update_basic_group_full_info)
+  {
+    LOG_TRACE("basic group full info update");
+
+    // chat id of a basic group: -id
+    if (update_basic_group_full_info.basic_group_full_info_)
+    {
+      NotifyDescription(StrUtil::NumToHex(-update_basic_group_full_info.basic_group_id_),
+                        update_basic_group_full_info.basic_group_full_info_->description_);
+    }
+  },
+  [this](td::td_api::updateSupergroupFullInfo& update_supergroup_full_info)
+  {
+    LOG_TRACE("supergroup full info update");
+
+    // chat id of a supergroup / channel: -1000000000000 - id
+    if (update_supergroup_full_info.supergroup_full_info_)
+    {
+      NotifyDescription(StrUtil::NumToHex(-1000000000000LL - update_supergroup_full_info.supergroup_id_),
+                        update_supergroup_full_info.supergroup_full_info_->description_);
+    }
   },
   [this](td::td_api::updateChatPhoto& update_chat_photo)
   {
@@ -3829,6 +3874,116 @@ void TgChat::Impl::NotifyAvatar(const std::string& p_AvatarId, const std::string
   newAvatarNotify->id = p_AvatarId;
   newAvatarNotify->filePath = p_FilePath;
   CallMessageHandler(newAvatarNotify);
+}
+
+// Description of a group / channel, or the bio of a user (for a private or
+// secret chat, the other user's).
+void TgChat::Impl::GetDescription(const std::string& p_DescId)
+{
+  const int64_t idNum = StrUtil::NumFromHex<int64_t>(p_DescId);
+  auto get_chat = td::td_api::make_object<td::td_api::getChat>();
+  get_chat->chat_id_ = idNum;
+  SendQuery(std::move(get_chat), [this, p_DescId, idNum](Object object)
+  {
+    if (object->get_id() != td::td_api::chat::ID)
+    {
+      // a user without a private chat (e.g. a group member)
+      if (idNum > 0)
+      {
+        GetUserDescription(p_DescId, idNum);
+      }
+      else
+      {
+        NotifyDescription(p_DescId, "");
+      }
+
+      return;
+    }
+
+    auto tchat = td::move_tl_object_as<td::td_api::chat>(object);
+    if (!tchat->type_)
+    {
+      NotifyDescription(p_DescId, "");
+      return;
+    }
+
+    switch (tchat->type_->get_id())
+    {
+      case td::td_api::chatTypePrivate::ID:
+        GetUserDescription(p_DescId, static_cast<td::td_api::chatTypePrivate&>(*tchat->type_).user_id_);
+        break;
+
+      case td::td_api::chatTypeSecret::ID:
+        GetUserDescription(p_DescId, static_cast<td::td_api::chatTypeSecret&>(*tchat->type_).user_id_);
+        break;
+
+      case td::td_api::chatTypeBasicGroup::ID:
+        {
+          auto get_info = td::td_api::make_object<td::td_api::getBasicGroupFullInfo>();
+          get_info->basic_group_id_ = static_cast<td::td_api::chatTypeBasicGroup&>(*tchat->type_).basic_group_id_;
+          SendQuery(std::move(get_info), [this, p_DescId](Object infoObject)
+        {
+          std::string description;
+          if (infoObject->get_id() == td::td_api::basicGroupFullInfo::ID)
+          {
+            description = td::move_tl_object_as<td::td_api::basicGroupFullInfo>(infoObject)->description_;
+          }
+
+          NotifyDescription(p_DescId, description);
+        });
+        }
+        break;
+
+      case td::td_api::chatTypeSupergroup::ID:
+        {
+          auto get_info = td::td_api::make_object<td::td_api::getSupergroupFullInfo>();
+          get_info->supergroup_id_ = static_cast<td::td_api::chatTypeSupergroup&>(*tchat->type_).supergroup_id_;
+          SendQuery(std::move(get_info), [this, p_DescId](Object infoObject)
+        {
+          std::string description;
+          if (infoObject->get_id() == td::td_api::supergroupFullInfo::ID)
+          {
+            description = td::move_tl_object_as<td::td_api::supergroupFullInfo>(infoObject)->description_;
+          }
+
+          NotifyDescription(p_DescId, description);
+        });
+        }
+        break;
+
+      default:
+        NotifyDescription(p_DescId, "");
+        break;
+    }
+  });
+}
+
+void TgChat::Impl::GetUserDescription(const std::string& p_DescId, int64_t p_UserId)
+{
+  auto get_info = td::td_api::make_object<td::td_api::getUserFullInfo>();
+  get_info->user_id_ = p_UserId;
+  SendQuery(std::move(get_info), [this, p_DescId](Object object)
+  {
+    std::string bio;
+    if (object->get_id() == td::td_api::userFullInfo::ID)
+    {
+      auto info = td::move_tl_object_as<td::td_api::userFullInfo>(object);
+      if (info->bio_)
+      {
+        bio = info->bio_->text_;
+      }
+    }
+
+    NotifyDescription(p_DescId, bio);
+  });
+}
+
+void TgChat::Impl::NotifyDescription(const std::string& p_DescId, const std::string& p_Description)
+{
+  std::shared_ptr<NewDescriptionNotify> newDescriptionNotify = std::make_shared<NewDescriptionNotify>(m_ProfileId);
+  newDescriptionNotify->id = p_DescId;
+  newDescriptionNotify->description = p_Description;
+  CallMessageHandler(newDescriptionNotify);
 }
 
 void TgChat::Impl::DownloadFile(std::string p_ChatId, std::string p_MsgId, std::string p_FileId,

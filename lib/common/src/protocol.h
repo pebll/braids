@@ -36,6 +36,7 @@ enum ProtocolFeature
   FeaturePresenceRequiresOnline = (1 << 10),
   FeatureEditMessagesAnytime = (1 << 11), // braids extension
   FeatureAvatars = (1 << 12), // braids extension: handles GetAvatarRequest
+  FeatureDescriptions = (1 << 13), // braids extension: handles GetDescriptionRequest
 };
 
 // Interactive authentication (account setup and re-login), braids extension.
@@ -167,6 +168,7 @@ enum MessageType
   FindMessageRequestType,
   GetGroupMembersRequestType,
   GetAvatarRequestType, // braids extension
+  GetDescriptionRequestType, // braids extension
   // Service messages
   ServiceMessageType,
   NewContactsNotifyType,
@@ -196,6 +198,7 @@ enum MessageType
   UpdateArchivedNotifyType,
   MoveChatNotifyType,
   NewAvatarNotifyType, // braids extension
+  NewDescriptionNotifyType, // braids extension
 };
 
 struct ContactInfo
@@ -543,6 +546,15 @@ public:
   std::string id; // user id or chat id
 };
 
+// Description of a group or a user's bio ("about"; for a one-to-one chat the
+// other user's), answered with NewDescriptionNotify.
+class GetDescriptionRequest : public RequestMessage
+{
+public:
+  virtual MessageType GetMessageType() const { return GetDescriptionRequestType; }
+  std::string id; // user id or chat id
+};
+
 // Service messages
 class ServiceMessage
 {
@@ -756,6 +768,18 @@ public:
   virtual MessageType GetMessageType() const { return NewAvatarNotifyType; }
   std::string id;
   std::string filePath;
+};
+
+// Group description or user bio, empty if there is none. Sent for
+// GetDescriptionRequest and when the protocol learns of a change.
+class NewDescriptionNotify : public ServiceMessage
+{
+public:
+  explicit NewDescriptionNotify(const std::string& p_ProfileId)
+    : ServiceMessage(p_ProfileId) { }
+  virtual MessageType GetMessageType() const { return NewDescriptionNotifyType; }
+  std::string id;
+  std::string description;
 };
 
 class UpdateMuteNotify : public ServiceMessage

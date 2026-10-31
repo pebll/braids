@@ -120,6 +120,15 @@ function inline(text: string, mentions: Record<string, string>, selfId: string):
   return s.replace(/\u0000(\d+)\u0000/g, (_, i) => slots[Number(i)]);
 }
 
+// Plain text (group description, bio) to safe HTML: line breaks and links.
+export function linkify(text: string): string {
+  return text
+    .split(URL_RE)
+    .map((part, i) => (i % 2 === 1 ? `<a href="${escapeHtml(part)}" data-link="1">${escapeHtml(part)}</a>` : escapeHtml(part)))
+    .join('')
+    .replace(/\n/g, '<br>');
+}
+
 // Message text (internal markdown-like format, doc/API.md) to safe HTML.
 export function renderText(text: string, mentions: Record<string, string> = {}, selfId = ''): string {
   const parts = text.split(/```(?:[a-z0-9_+-]*\n)?([\s\S]*?)```/g);
