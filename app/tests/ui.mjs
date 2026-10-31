@@ -102,7 +102,9 @@ try {
   check((await own.locator('code').textContent()) === 'code', 'sent message rendered with markup');
   check((await page.getByRole('option', { name: /The Office/ }).textContent()).includes('You:'), 'chat preview shows own message');
 
-  await page.keyboard.press('Control+r');
+  const lastTheirs = page.locator('.msg:not(.own)').last();
+  await lastTheirs.hover();
+  await lastTheirs.getByRole('button', { name: 'Reply' }).click();
   await page.getByText(/^Replying to/).waitFor();
   await composer.fill('a reply');
   await composer.press('Enter');
@@ -233,6 +235,12 @@ try {
   await page.keyboard.press('Alt+k');
   await page.waitForFunction((b) => document.querySelector('[role=option][aria-selected=true] .name')?.textContent === b, before);
   check(true, 'Alt+K back to the previous chat');
+  await page.keyboard.press('Control+b');
+  await page.locator('.chatlist h2', { hasText: 'Favorites' }).waitFor();
+  check(true, 'Ctrl+B shows favorites');
+  await page.keyboard.press('Control+a');
+  await page.locator('.chatlist h2', { hasText: 'All chats' }).waitFor();
+  check(true, 'Ctrl+A shows all chats');
 
   // changing a shortcut
   await page.keyboard.press('Control+,');

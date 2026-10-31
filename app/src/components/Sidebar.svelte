@@ -51,7 +51,7 @@
   {#if drawer}
     <div class="brand"><Logo size={22} /><span class="name">braids</span></div>
   {:else}
-    <button class="brand logo-toggle" title={`${collapsed ? 'Expand' : 'Collapse'} sidebar${hint('toggleSidebar')}`} aria-label="Toggle sidebar" onclick={toggle}>
+    <button class="brand logo-toggle" title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} aria-label="Toggle sidebar" onclick={toggle}>
       <Logo size={22} />
       {#if !collapsed}<span class="name">braids</span>{/if}
     </button>

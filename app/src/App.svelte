@@ -26,7 +26,7 @@
   import Wizard from './components/Wizard.svelte';
   import { editLastOwnMessage } from './lib/actions';
   import * as api from './lib/api';
-  import { actionFor, type Action } from './lib/keybinds.svelte';
+  import { ACCOUNT_ACTIONS, actionFor, type Action } from './lib/keybinds.svelte';
   import { settings } from './lib/settings.svelte';
   import { store } from './lib/store.svelte';
   import { ui } from './lib/ui.svelte';
@@ -82,6 +82,16 @@
     }
   }
 
+  // the account of a protocol; with several, the next one after the shown one
+  function goAccount(protocol: string): boolean {
+    const accounts = store.accountList.filter((a) => a.protocol === protocol);
+    if (!accounts.length) return false;
+    const f = store.filter;
+    const i = f.kind === 'account' ? accounts.findIndex((a) => a.accountId === f.accountId) : -1;
+    store.filter = { kind: 'account', accountId: accounts[(i + 1) % accounts.length].accountId };
+    return true;
+  }
+
   function run(action: Action): boolean {
     switch (action) {
       case 'nextChat':
@@ -99,17 +109,6 @@
       case 'nextUnread':
         nextUnread();
         return true;
-      case 'replyLast': {
-        if (!store.current) return false;
-        const items = store.messages[store.current]?.items ?? [];
-        const last = [...items].reverse().find((m) => !m.isOutgoing && !m.isDeleted);
-        if (last) {
-          ui.edit = null;
-          ui.reply = last;
-          ui.focusComposer++;
-        }
-        return true;
-      }
       case 'editLast':
         if (!store.current) return false;
         if (editLastOwnMessage()) ui.focusComposer++;
@@ -118,10 +117,17 @@
         if (!store.current) return false;
         ui.infoOpen = !ui.infoOpen;
         return true;
-      case 'toggleSidebar':
-        settings.sidebarCollapsed = !settings.sidebarCollapsed;
-        settings.save();
+      case 'goAll':
+        store.filter = { kind: 'all' };
         return true;
+      case 'goFavorites':
+        store.filter = { kind: 'favorites' };
+        return true;
+      case 'goMatrix':
+      case 'goSignal':
+      case 'goTelegram':
+      case 'goWhatsApp':
+        return goAccount(ACCOUNT_ACTIONS[action]!);
       case 'settings':
         ui.settingsSection = 'general';
         ui.settingsOpen = true;

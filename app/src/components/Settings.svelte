@@ -10,7 +10,7 @@
   import * as api from '../lib/api';
   import { ACCOUNT_COLORS, protocolMeta } from '../lib/protocols';
   import {
-    ACTIONS, addBinding, bindings, comboKeys, comboLabel, comboOf, isDefault, isMac, isUsableCombo, removeBinding, resetBindings, type Action,
+    ACTIONS, GROUPS, addBinding, bindings, comboKeys, comboLabel, comboOf, isDefault, isMac, isUsableCombo, removeBinding, resetBindings, type Action,
   } from '../lib/keybinds.svelte';
   import { settings, type Theme } from '../lib/settings.svelte';
   import { store } from '../lib/store.svelte';
@@ -183,27 +183,30 @@
           <span>Shortcuts</span>
           <button class="btn ghost" onclick={() => resetBindings()} disabled={!Object.keys(settings.keybinds).length}><RotateCcw size={14} />Reset all</button>
         </div>
-        {#each ACTIONS as a (a.id)}
-          <div class="row compact shortcut" data-action={a.id}>
-            <span>{a.label}</span>
-            <span class="keys">
-              {#each bindings(a.id) as combo (combo)}
-                <span class="combo">
-                  {#each comboKeys(combo) as k}<kbd>{k}</kbd>{/each}
-                  <button class="remove" aria-label={`Remove ${comboLabel(combo)} from ${a.label}`} title="Remove" onclick={() => removeBinding(a.id, combo)}><X size={12} /></button>
-                </span>
-              {/each}
-              {#if recording === a.id}
-                <span class="recording" role="status">Press keys… <span class="hint">Esc cancels</span></span>
-              {:else}
-                <button class="icon-btn sm" aria-label={`Add shortcut for ${a.label}`} title="Add shortcut" onclick={() => startRecording(a.id)}><Plus size={14} /></button>
-              {/if}
-              <button class="icon-btn sm" class:invisible={isDefault(a.id)} aria-label={`Reset ${a.label}`} title="Reset to default" onclick={() => resetBindings(a.id)}><RotateCcw size={14} /></button>
-            </span>
-          </div>
-          {#if recording === a.id && recordError}<div class="record-error">{recordError}</div>{/if}
+        {#each GROUPS as g (g.id)}
+          <div class="group-label">{g.label}</div>
+          {#each ACTIONS.filter((a) => a.group === g.id) as a (a.id)}
+            <div class="row compact shortcut" data-action={a.id}>
+              <span>{a.label}</span>
+              <span class="keys">
+                {#each bindings(a.id) as combo (combo)}
+                  <span class="combo">
+                    {#each comboKeys(combo) as k}<kbd>{k}</kbd>{/each}
+                    <button class="remove" aria-label={`Remove ${comboLabel(combo)} from ${a.label}`} title="Remove" onclick={() => removeBinding(a.id, combo)}><X size={12} /></button>
+                  </span>
+                {/each}
+                {#if recording === a.id}
+                  <span class="recording" role="status">Press keys… <span class="hint">Esc cancels</span></span>
+                {:else}
+                  <button class="icon-btn sm" aria-label={`Add shortcut for ${a.label}`} title="Add shortcut" onclick={() => startRecording(a.id)}><Plus size={14} /></button>
+                {/if}
+                <button class="icon-btn sm" class:invisible={isDefault(a.id)} aria-label={`Reset ${a.label}`} title="Reset to default" onclick={() => resetBindings(a.id)}><RotateCcw size={14} /></button>
+              </span>
+            </div>
+            {#if recording === a.id && recordError}<div class="record-error">{recordError}</div>{/if}
+          {/each}
         {/each}
-        <p class="hint">In the message field, ↑ also edits your last message and Esc cancels a reply or edit.</p>
+        <p class="hint">In the message field, ↑ also edits your last message and Esc cancels a reply or edit. {mod}+A selects the text when the field has some.</p>
       {:else if ui.settingsSection === 'accounts' && account}
         <h2 class="with-back">
           <button class="icon-btn sm" aria-label="Back to accounts" onclick={() => (ui.settingsAccount = '')}><ChevronLeft size={18} /></button>
@@ -293,6 +296,7 @@
   .shortcuts-head { display: flex; align-items: center; justify-content: space-between; }
   .shortcuts-head .btn { height: 26px; padding: 0 8px; gap: 4px; font-size: 12px; text-transform: none; letter-spacing: 0; }
   .shortcut { gap: 12px; }
+  .group-label { font-size: 13px; font-weight: 600; color: var(--text-2); margin-top: 12px; }
   .combo { display: inline-flex; align-items: center; gap: 3px; padding: 2px 2px 2px 4px; border-radius: 6px; background: var(--surface-2); }
   .combo .remove { border: 0; background: none; padding: 2px; display: flex; color: var(--text-muted); border-radius: 4px; }
   .combo .remove:hover { color: var(--danger); background: var(--hover); }

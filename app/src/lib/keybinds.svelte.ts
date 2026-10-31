@@ -14,29 +14,56 @@
 import { settings } from './settings.svelte';
 
 export type Action =
+  | 'goAll'
+  | 'goFavorites'
+  | 'goMatrix'
+  | 'goSignal'
+  | 'goTelegram'
+  | 'goWhatsApp'
   | 'nextChat'
   | 'prevChat'
+  | 'nextUnread'
   | 'searchChats'
   | 'searchInChat'
-  | 'nextUnread'
-  | 'replyLast'
   | 'editLast'
   | 'toggleInfo'
-  | 'toggleSidebar'
   | 'settings';
 
-export const ACTIONS: { id: Action; label: string; defaults: string[] }[] = [
-  { id: 'nextChat', label: 'Next chat', defaults: ['Alt+ArrowDown', 'Alt+J'] },
-  { id: 'prevChat', label: 'Previous chat', defaults: ['Alt+ArrowUp', 'Alt+K'] },
-  { id: 'searchChats', label: 'Search chats', defaults: ['Mod+Space'] },
-  { id: 'searchInChat', label: 'Search in chat', defaults: ['Mod+F'] },
-  { id: 'nextUnread', label: 'Next unread chat', defaults: ['Mod+N'] },
-  { id: 'replyLast', label: 'Reply to last message', defaults: ['Mod+R'] },
-  { id: 'editLast', label: 'Edit last own message', defaults: ['Mod+E'] },
-  { id: 'toggleInfo', label: 'Toggle info panel', defaults: ['Mod+I'] },
-  { id: 'toggleSidebar', label: 'Toggle sidebar', defaults: ['Mod+B'] },
-  { id: 'settings', label: 'Settings', defaults: ['Mod+,'] },
+export type ActionGroup = 'goto' | 'action';
+
+export const GROUPS: { id: ActionGroup; label: string }[] = [
+  { id: 'goto', label: 'Go to' },
+  { id: 'action', label: 'Actions' },
 ];
+
+export const ACTIONS: { id: Action; group: ActionGroup; label: string; defaults: string[] }[] = [
+  { id: 'goAll', group: 'goto', label: 'All chats', defaults: ['Mod+A'] },
+  { id: 'goFavorites', group: 'goto', label: 'Favorites', defaults: ['Mod+B'] },
+  { id: 'goMatrix', group: 'goto', label: 'Matrix account', defaults: ['Mod+M'] },
+  { id: 'goSignal', group: 'goto', label: 'Signal account', defaults: ['Mod+S'] },
+  { id: 'goTelegram', group: 'goto', label: 'Telegram account', defaults: ['Mod+T'] },
+  { id: 'goWhatsApp', group: 'goto', label: 'WhatsApp account', defaults: ['Mod+W'] },
+  { id: 'nextChat', group: 'goto', label: 'Next chat', defaults: ['Alt+ArrowDown', 'Alt+J'] },
+  { id: 'prevChat', group: 'goto', label: 'Previous chat', defaults: ['Alt+ArrowUp', 'Alt+K'] },
+  { id: 'nextUnread', group: 'goto', label: 'Next unread chat', defaults: ['Mod+N'] },
+  { id: 'searchChats', group: 'action', label: 'Search chats', defaults: ['Mod+Space'] },
+  { id: 'searchInChat', group: 'action', label: 'Search in chat', defaults: ['Mod+F'] },
+  { id: 'editLast', group: 'action', label: 'Edit last own message', defaults: ['Mod+E'] },
+  { id: 'toggleInfo', group: 'action', label: 'Toggle info panel', defaults: ['Mod+I'] },
+  { id: 'settings', group: 'action', label: 'Settings', defaults: ['Mod+,'] },
+];
+
+// protocol of the account shortcuts (several accounts of one protocol: cycled)
+export const ACCOUNT_ACTIONS: Partial<Record<Action, string>> = {
+  goMatrix: 'Matrix',
+  goSignal: 'Signal',
+  goTelegram: 'Telegram',
+  goWhatsApp: 'WhatsAppMd',
+};
+
+// text editing keys keep their usual meaning in a text field with text
+// (Ctrl+A selects all there, in an empty field it is the shortcut)
+const TEXT_EDITING = new Set(['Mod+A', 'Mod+C', 'Mod+V', 'Mod+X', 'Mod+Z', 'Mod+Shift+Z', 'Mod+Y']);
 
 export const isMac = typeof navigator !== 'undefined' && navigator.platform.toLowerCase().includes('mac');
 
@@ -100,6 +127,9 @@ export function hint(action: Action): string {
 export function actionFor(e: KeyboardEvent): Action | undefined {
   const combo = comboOf(e);
   if (!combo) return undefined;
+  const target = e.target as HTMLInputElement | null;
+  const hasText = !!target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') && target.value !== '';
+  if (hasText && TEXT_EDITING.has(combo)) return undefined;
   return ACTIONS.find((a) => bindings(a.id).includes(combo))?.id;
 }
 
