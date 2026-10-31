@@ -97,12 +97,13 @@ export async function pickFiles(): Promise<string[]> {
   });
 }
 
-// Copies a received file into the Downloads folder; returns the new path
-// ('' in the browser, which saves through its own download).
-export async function saveToDownloads(path: string, name: string): Promise<string> {
+// Saves a copy of a received file where the user picks (system save
+// dialog); returns the new path, '' when cancelled or in the browser (which
+// saves through its own download).
+export async function saveFileAs(path: string, name: string): Promise<string> {
   if (isTauri) {
     const { invoke } = await import('@tauri-apps/api/core');
-    return invoke<string>('save_to_downloads', { path, name });
+    return invoke<string>('save_file_as', { path, name });
   }
   const a = document.createElement('a');
   a.href = fileUrl(path);

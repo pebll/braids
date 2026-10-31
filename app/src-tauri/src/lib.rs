@@ -95,32 +95,25 @@ fn save_temp_file(state: State<'_, AppState>, name: String, data: Vec<u8>) -> Re
     Ok(path.to_string_lossy().into_owned())
 }
 
-/// Copies a received file into the user's Downloads folder under its name
-/// (never overwriting: "name (1).ext" etc.), returns the new path.
+/// Saves a copy of a received file where the user picks in the system save
+/// dialog (starting in Downloads), returns the new path, "" if cancelled.
 #[tauri::command]
-fn save_to_downloads(app: AppHandle, path: String, name: String) -> Result<String, String> {
-    let dir = app.path().download_dir().map_err(|e| e.to_string())?;
-    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+async fn save_file_as(app: AppHandle, path: String, name: String) -> Result<String, String> {
+    use tauri_plugin_dialog::DialogExt;
     // the attachment's name, else the cached file's
     let file_name = [&name, &path]
         .iter()
-        .find_map(|p| PathBuf::from(p).file_name().map(|n| n.to_owned()))
+        .find_map(|p| PathBuf::from(p).file_name().map(|n| n.to_string_lossy().into_owned()))
         .unwrap_or_else(|| "file".into());
-    let stem = PathBuf::from(&file_name).file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
-    let ext = PathBuf::from(&file_name).extension().map(|s| format!(".{}", s.to_string_lossy())).unwrap_or_default();
-    for n in 0..1000 {
-        let target = if n == 0 { dir.join(&file_name) } else { dir.join(format!("{stem} ({n}){ext}")) };
-        match fs::OpenOptions::new().write(true).create_new(true).open(&target) {
-            Ok(mut out) => {
-                let mut input = fs::File::open(&path).map_err(|e| e.to_string())?;
-                std::io::copy(&mut input, &mut out).map_err(|e| e.to_string())?;
-                return Ok(target.to_string_lossy().into_owned());
-            }
-            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
-            Err(e) => return Err(e.to_string()),
-        }
+    let mut dialog = app.dialog().file().set_file_name(&file_name);
+    if let Ok(dir) = app.path().download_dir() {
+        dialog = dialog.set_directory(dir);
     }
-    Err("too many files with this name".into())
+    // blocking is fine here: async commands run off the main thread
+    let Some(target) = dialog.blocking_save_file() else { return Ok(String::new()) };
+    let target = target.into_path().map_err(|e| e.to_string())?;
+    fs::copy(&path, &target).map_err(|e| e.to_string())?;
+    Ok(target.to_string_lossy().into_owned())
 }
 
 fn show_window(app: &AppHandle) {
@@ -187,7 +180,7 @@ pub fn run() {
                 }
             }
         })
-        .invoke_handler(tauri::generate_handler![api_call, daemon_connected, set_close_to_tray, set_badge, save_temp_file, save_to_downloads])
+        .invoke_handler(tauri::generate_handler![api_call, daemon_connected, set_close_to_tray, set_badge, save_temp_file, save_file_as])
         .run(tauri::generate_context!())
         .expect("error while running braids");
 }

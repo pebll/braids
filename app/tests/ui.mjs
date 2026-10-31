@@ -102,6 +102,16 @@ try {
   check((await own.locator('code').textContent()) === 'code', 'sent message rendered with markup');
   check((await page.getByRole('option', { name: /The Office/ }).textContent()).includes('You:'), 'chat preview shows own message');
 
+  // one-line message: react and reply side by side
+  const oneLiner = page.locator('.msg.own', { hasText: 'Hello team' }).last();
+  await oneLiner.hover();
+  check(await oneLiner.locator('.actions').evaluate((el) => getComputedStyle(el).flexDirection === 'row' && el.querySelectorAll('button').length === 2),
+    'hover bar of a one-line message: react, reply, horizontal');
+  // sender name + three lines: two more actions (copy text, forward)
+  const threeLiner = page.locator('.msg', { hasText: 'storm your village' }).last();
+  await threeLiner.hover();
+  check(await threeLiner.locator('.actions').evaluate((el) => [...el.querySelectorAll('button')].map((b) => b.getAttribute('aria-label')).join(',')) === 'React,Reply,Copy text,Forward…',
+    'hover bar grows with the message: react, reply, copy text, forward');
   const lastTheirs = page.locator('.msg:not(.own)').last();
   await lastTheirs.hover();
   await lastTheirs.getByRole('button', { name: 'Reply' }).click();
@@ -113,7 +123,7 @@ try {
 
   const last = page.locator('.msg.own').last();
   await last.hover();
-  check(await last.locator('.actions').evaluate((el) => getComputedStyle(el).flexDirection === 'column'), 'hover bar is vertical');
+  check(await last.locator('.actions').evaluate((el) => el.querySelectorAll('button').length >= 2), 'hover bar shown');
   await last.getByRole('button', { name: 'React', exact: true }).click();
   await page.locator('.react-pop button').first().click();
   await last.locator('.chip.mine').waitFor();
@@ -144,13 +154,15 @@ try {
   await theirs.waitFor();
   await theirs.hover();
   await shot('hover-bar');
-  await theirs.getByRole('button', { name: 'More' }).click();
-  await shot('more-menu');
+  // two-line message: react and reply stacked, nothing more
+  check(await theirs.locator('.actions').evaluate((el) => getComputedStyle(el).flexDirection === 'column' && el.querySelectorAll('button').length === 2),
+    'hover bar of a two-line message: react, reply, vertical');
+  await theirs.click({ button: 'right' });
   check(await page.getByRole('menuitem', { name: 'Copy text' }).count() === 1 && await page.getByRole('menuitem', { name: 'Open file' }).count() === 0,
-    'more menu has copy, no open');
+    'context menu has copy, no open');
   await page.getByRole('menuitem', { name: 'Forward…' }).click();
   await page.getByText('Forward message').waitFor();
-  await page.getByLabel('Add “Forwarded from” line').check();
+  check(await page.getByLabel('Add “Forwarded from” line').isChecked(), '"Forwarded from" line on by default');
   await page.fill('input[aria-label="Search chats to forward to"]', 'Michael');
   await page.locator('.target', { hasText: 'Michael' }).first().click();
   await page.locator('.toast', { hasText: 'Forwarded to Michael' }).waitFor();

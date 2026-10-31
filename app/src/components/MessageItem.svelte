@@ -9,7 +9,7 @@
   groups, quote, attachment, reactions, hover actions.
 -->
 <script lang="ts">
-  import { Check, CheckCheck, Copy, Download, FileText, Forward, LoaderCircle, MoreHorizontal, Pencil, Pin, PinOff, Reply, SmilePlus, Trash2, TriangleAlert } from '@lucide/svelte';
+  import { Check, CheckCheck, Copy, Download, FileText, Forward, LoaderCircle, Pencil, Pin, PinOff, Reply, SmilePlus, Trash2, TriangleAlert } from '@lucide/svelte';
   import * as api from '../lib/api';
   import { isOnlyEmoji, renderText, senderColor, timeOfDay } from '../lib/format';
   import { fileMime, fileReady, store } from '../lib/store.svelte';
@@ -46,7 +46,7 @@
   const html = $derived(m.isDeleted ? '' : renderText(m.text, m.mentions, account.selfId));
   const reactions = $derived(Object.entries(m.reactions.counts).filter(([, n]) => n > 0));
   const mentionsMe = $derived(!own && (m.hasMention || Object.values(m.mentions).includes(account.selfId)));
-  let moreBtn: HTMLButtonElement | undefined = $state();
+  let bubbleHeight = $state(0);
   let reactBtn: HTMLButtonElement | undefined = $state();
   let requestedDownload = false;
   let saveWhenReady = $state(false);
@@ -74,7 +74,7 @@
     api.call('files.download', { accountId: m.accountId, chatId: m.chatId, msgId: m.id }).catch((e) => store.toastError(e));
   }
 
-  // "Download file": a copy in the Downloads folder (fetched first if needed)
+  // "Download file": a copy where the user picks (fetched first if needed)
   async function saveFile() {
     if (!m.file) return;
     if (!ready) {
@@ -83,7 +83,7 @@
       return;
     }
     try {
-      const saved = await api.saveToDownloads(m.file.path, m.file.name);
+      const saved = await api.saveFileAs(m.file.path, m.file.name);
       if (saved) store.toast(`Saved to ${saved}`, 'info', { label: 'Open', run: () => api.openPath(saved).catch((e) => store.toastError(e)) });
     } catch (e) {
       store.toastError(e);
@@ -137,28 +137,41 @@
     if (ok) await api.call('messages.delete', { accountId: m.accountId, chatId: m.chatId, msgId: m.id }).catch((e) => store.toastError(e));
   }
 
-  // the "…" menu of the hover bar
-  function moreItems(): MenuItem[] {
+  function pinItem(): MenuItem {
+    return {
+      label: m.isPinned ? 'Unpin message' : 'Pin message',
+      icon: m.isPinned ? PinOff : Pin,
+      run: () => api.call('messages.pin', { accountId: m.accountId, chatId: m.chatId, msgId: m.id, isPinned: !m.isPinned }).catch((e) => store.toastError(e)),
+    };
+  }
+
+  // actions after react and reply, in the order the hover bar adds them
+  function extraItems(): MenuItem[] {
     const items: MenuItem[] = [];
     if (m.text) items.push({ label: 'Copy text', icon: Copy, run: () => navigator.clipboard.writeText(m.text).catch(() => {}) });
     if (m.file) items.push({ label: 'Download file', icon: Download, run: saveFile });
     items.push({ label: 'Forward…', icon: Forward, run: () => (ui.forward = m) });
-    if (account.capabilities.pinMessage) {
-      items.push({
-        label: m.isPinned ? 'Unpin message' : 'Pin message',
-        icon: m.isPinned ? PinOff : Pin,
-        run: () => api.call('messages.pin', { accountId: m.accountId, chatId: m.chatId, msgId: m.id, isPinned: !m.isPinned }).catch((e) => store.toastError(e)),
-      });
-    }
+    if (account.capabilities.pinMessage) items.push(pinItem());
+    if (editState.ok) items.push({ label: 'Edit', icon: Pencil, run: edit });
+    if (own) items.push({ label: 'Delete for everyone', icon: Trash2, danger: true, run: remove });
     return items;
   }
+
+  // hover bar sized to the bubble: a one-line message gets react and reply
+  // side by side, two lines the same stacked, each further line one more
+  // action (line: 20 px, bubble padding: 14 px)
+  const lines = $derived(Math.max(1, Math.round((bubbleHeight - 14) / 20)));
+  const barItems = $derived(lines <= 2 ? [] : extraItems().slice(0, lines - 2));
 
   // right-click menu: everything
   export function menuItems(): MenuItem[] {
     if (m.isDeleted) return [{ label: 'Remove', icon: Trash2, danger: true, run: remove }];
     const items: MenuItem[] = [{ label: 'Reply', icon: Reply, run: reply }];
     if (editState.show) items.push({ label: 'Edit', icon: Pencil, run: edit, disabled: !editState.ok, hint: editState.reason });
-    items.push(...moreItems());
+    if (m.text) items.push({ label: 'Copy text', icon: Copy, run: () => navigator.clipboard.writeText(m.text).catch(() => {}) });
+    if (m.file) items.push({ label: 'Download file', icon: Download, run: saveFile });
+    items.push({ label: 'Forward…', icon: Forward, run: () => (ui.forward = m) });
+    if (account.capabilities.pinMessage) items.push(pinItem());
     if (own) items.push({ label: 'Delete for everyone', icon: Trash2, danger: true, run: remove });
     return items;
   }
@@ -207,6 +220,7 @@
   <div class="col">
     <div
       class="bubble"
+      bind:clientHeight={bubbleHeight}
       class:emoji={emojiOnly}
       class:mention={mentionsMe}
       class:deleted={m.isDeleted}
@@ -279,19 +293,12 @@
     {/if}
 
     {#if !m.isDeleted}
-      <div class="actions" role="toolbar" aria-label="Message actions" aria-orientation="vertical">
+      <div class="actions" class:row={lines <= 1} role="toolbar" aria-label="Message actions" aria-orientation={lines <= 1 ? 'horizontal' : 'vertical'}>
         <button class="icon-btn sm" bind:this={reactBtn} onclick={() => onReact(m, reactBtn!)} title="React" aria-label="React"><SmilePlus size={17} /></button>
         <button class="icon-btn sm" onclick={reply} title="Reply" aria-label="Reply"><Reply size={17} /></button>
-        <button class="icon-btn sm" bind:this={moreBtn} title="More" aria-label="More"
-          onclick={() => { const r = moreBtn!.getBoundingClientRect(); ui.openMenu({ x: own ? r.left - 4 : r.right + 4, y: r.top }, moreItems(), own); }}>
-          <MoreHorizontal size={17} />
-        </button>
-        {#if editState.ok}
-          <button class="icon-btn sm" onclick={edit} title="Edit" aria-label="Edit"><Pencil size={16} /></button>
-        {/if}
-        {#if own}
-          <button class="icon-btn sm danger" onclick={remove} title="Delete for everyone" aria-label="Delete for everyone"><Trash2 size={16} /></button>
-        {/if}
+        {#each barItems as item (item.label)}
+          <button class="icon-btn sm" class:danger={item.danger} onclick={item.run} title={item.label} aria-label={item.label}><item.icon size={16} /></button>
+        {/each}
       </div>
     {/if}
   </div>
@@ -371,5 +378,6 @@
   }
   .own .actions { left: auto; right: calc(100% + 6px); }
   .msg:hover .actions, .actions:focus-within { display: flex; }
+  .actions.row { flex-direction: row; }
   .actions .danger:hover { color: var(--danger); }
 </style>

@@ -21,7 +21,7 @@
   let { m }: { m: Message } = $props();
 
   let query = $state('');
-  let withOrigin = $state(false);
+  let withOrigin = $state(true);
   let busy = $state('');
   let input: HTMLInputElement | undefined = $state();
 
