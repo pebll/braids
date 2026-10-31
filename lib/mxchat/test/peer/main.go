@@ -14,6 +14,7 @@
 //
 // Commands:
 //   create <invitee> [encrypted]      create room, prints room id
+//   publicroom <alias> [name...]      create a public room #alias:server, prints room id
 //   join <room>                       join room
 //   send <room> <text...>             send text (markdown)
 //   reply <room> <event> <text...>    send reply
@@ -262,6 +263,13 @@ func (p *peer) command(ctx context.Context, line string) (map[string]any, error)
 	cli := p.client
 
 	switch f[0] {
+	case "publicroom":
+		resp, err := cli.CreateRoom(ctx, &mautrix.ReqCreateRoom{Preset: "public_chat", RoomAliasName: arg(1), Name: rest(2)})
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{"room": resp.RoomID.String()}, nil
+
 	case "create":
 		req := &mautrix.ReqCreateRoom{Preset: "private_chat", Invite: []id.UserID{id.UserID(arg(1))}}
 		if arg(2) == "encrypted" {

@@ -205,6 +205,8 @@ private:
   void DownloadAvatar(const std::string& p_AvatarId, td::td_api::object_ptr<td::td_api::file>& p_File);
   void NotifyAvatar(const std::string& p_AvatarId, const std::string& p_FilePath);
   void GetDescription(const std::string& p_DescId);
+  void JoinChat(const std::string& p_Link);
+  void NotifyJoinChat(const std::string& p_Link, bool p_Success, int64_t p_ChatId, const std::string& p_Error);
   void GetUserDescription(const std::string& p_DescId, int64_t p_UserId);
   void NotifyDescription(const std::string& p_DescId, const std::string& p_Description);
   void DownloadFile(std::string p_ChatId, std::string p_MsgId, std::string p_FileId, std::string p_DownloadId,
@@ -378,7 +380,8 @@ bool TgChat::Impl::HasFeature(ProtocolFeature p_ProtocolFeature) const
     FeatureArchiveChat |
     FeaturePinMessage |
     FeatureAvatars |
-    FeatureDescriptions;
+    FeatureDescriptions |
+    FeatureJoinChat;
   return (p_ProtocolFeature & customFeatures);
 }
 
@@ -1762,6 +1765,13 @@ void TgChat::Impl::PerformRequest(std::shared_ptr<RequestMessage> p_RequestMessa
         std::shared_ptr<GetDescriptionRequest> getDescriptionRequest =
           std::static_pointer_cast<GetDescriptionRequest>(p_RequestMessage);
         GetDescription(getDescriptionRequest->id);
+      }
+      break;
+
+    case JoinChatRequestType:
+      {
+        std::shared_ptr<JoinChatRequest> joinChatRequest = std::static_pointer_cast<JoinChatRequest>(p_RequestMessage);
+        JoinChat(joinChatRequest->link);
       }
       break;
 
@@ -3914,6 +3924,93 @@ void TgChat::Impl::NotifyAvatar(const std::string& p_AvatarId, const std::string
   newAvatarNotify->id = p_AvatarId;
   newAvatarNotify->filePath = p_FilePath;
   CallMessageHandler(newAvatarNotify);
+}
+
+// Joins by invite link (https://t.me/+…, t.me/joinchat/…, tg://join?invite=…)
+// or public name (@name, https://t.me/name).
+void TgChat::Impl::JoinChat(const std::string& p_Link)
+{
+  std::string link = p_Link;
+  StrUtil::Trim(link);
+  auto errorText = [](Object& object)
+  {
+    if (object->get_id() == td::td_api::error::ID)
+    {
+      return "Could not join: " + td::move_tl_object_as<td::td_api::error>(object)->message_;
+    }
+
+    return std::string("Could not join.");
+  };
+
+  if ((link.find("t.me/+") != std::string::npos) || (link.find("/joinchat/") != std::string::npos) ||
+      (link.find("tg://join") != std::string::npos))
+  {
+    auto join = td::td_api::make_object<td::td_api::joinChatByInviteLink>();
+    join->invite_link_ = link;
+    SendQuery(std::move(join), [this, p_Link, errorText](Object object)
+    {
+      if (object->get_id() == td::td_api::chat::ID)
+      {
+        NotifyJoinChat(p_Link, true, td::move_tl_object_as<td::td_api::chat>(object)->id_, "");
+      }
+      else
+      {
+        NotifyJoinChat(p_Link, false, 0, errorText(object));
+      }
+    });
+    return;
+  }
+
+  std::string username = link;
+  for (const std::string& prefix : { std::string("https://"), std::string("http://"), std::string("t.me/"),
+                                     std::string("telegram.me/"), std::string("@") })
+  {
+    if (username.rfind(prefix, 0) == 0) username = username.substr(prefix.size());
+  }
+
+  username = username.substr(0, username.find_first_of("/?"));
+  if (username.empty() || (username.find_first_of(" .:") != std::string::npos))
+  {
+    NotifyJoinChat(p_Link, false, 0, "Not a Telegram invite link or public name (@name, https://t.me/…).");
+    return;
+  }
+
+  auto search = td::td_api::make_object<td::td_api::searchPublicChat>();
+  search->username_ = username;
+  SendQuery(std::move(search), [this, p_Link, errorText](Object object)
+  {
+    if (object->get_id() != td::td_api::chat::ID)
+    {
+      NotifyJoinChat(p_Link, false, 0, errorText(object));
+      return;
+    }
+
+    const int64_t chatId = td::move_tl_object_as<td::td_api::chat>(object)->id_;
+    auto join = td::td_api::make_object<td::td_api::joinChat>();
+    join->chat_id_ = chatId;
+    SendQuery(std::move(join), [this, p_Link, chatId, errorText](Object joinObject)
+    {
+      if (joinObject->get_id() == td::td_api::ok::ID)
+      {
+        NotifyJoinChat(p_Link, true, chatId, "");
+      }
+      else
+      {
+        NotifyJoinChat(p_Link, false, 0, errorText(joinObject));
+      }
+    });
+  });
+}
+
+void TgChat::Impl::NotifyJoinChat(const std::string& p_Link, bool p_Success, int64_t p_ChatId,
+                                  const std::string& p_Error)
+{
+  std::shared_ptr<JoinChatNotify> joinChatNotify = std::make_shared<JoinChatNotify>(m_ProfileId);
+  joinChatNotify->link = p_Link;
+  joinChatNotify->success = p_Success;
+  joinChatNotify->chatId = p_Success ? StrUtil::NumToHex(p_ChatId) : "";
+  joinChatNotify->error = p_Error;
+  CallMessageHandler(joinChatNotify);
 }
 
 // Description of a group / channel, or the bio of a user (for a private or

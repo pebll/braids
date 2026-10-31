@@ -5,10 +5,11 @@
 
   braids is distributed under the GNU AGPL v3 license, see LICENSE for details.
 
-  Start a chat with a contact of one of the accounts.
+  Start a chat with a contact of one of the accounts, or join a group by
+  invite link / address.
 -->
 <script lang="ts">
-  import { LoaderCircle, Search, X } from '@lucide/svelte';
+  import { Link, LoaderCircle, Search, X } from '@lucide/svelte';
   import { tick } from 'svelte';
   import { chatKey, store } from '../lib/store.svelte';
   import { ui } from '../lib/ui.svelte';
@@ -19,6 +20,51 @@
   let query = $state('');
   let busy = $state('');
   let input: HTMLInputElement | undefined = $state();
+
+  // join mode
+  let mode = $state<'contact' | 'join'>('contact');
+  let link = $state('');
+  let joinError = $state('');
+  let linkInput: HTMLInputElement | undefined = $state();
+  const joinAccounts = $derived(store.accountList.filter((a) => a.capabilities.joinChat));
+
+  // the messenger a link belongs to, '' when it does not tell
+  function linkProtocol(l: string): string {
+    const s = l.trim();
+    if (/(^|\/\/)(t\.me|telegram\.me)\/|^tg:\/\/|^@/.test(s)) return 'Telegram';
+    if (/chat\.whatsapp\.com\//.test(s)) return 'WhatsAppMd';
+    if (/matrix\.to\/|^[#!][^:\s]+:\S+$/.test(s)) return 'Matrix';
+    if (/dummy\.example\//.test(s)) return 'Dummy';
+    return '';
+  }
+
+  // follow the link: pick an account of its messenger
+  $effect(() => {
+    const protocol = linkProtocol(link);
+    if (mode !== 'join' || !protocol) return;
+    const current = store.accounts[accountId];
+    if (current?.protocol === protocol) return;
+    const match = joinAccounts.find((a) => a.protocol === protocol);
+    if (match) accountId = match.accountId;
+  });
+
+  $effect(() => {
+    if (mode === 'join') tick().then(() => linkInput?.focus());
+  });
+
+  async function join() {
+    if (!link.trim() || !accountId) return;
+    joinError = '';
+    busy = 'join';
+    try {
+      await store.joinChat(accountId, link.trim());
+      ui.newChatOpen = false;
+    } catch (e) {
+      joinError = (e as Error).message;
+    } finally {
+      busy = '';
+    }
+  }
 
   const contacts = $derived.by(() => {
     const q = query.trim().toLowerCase();
@@ -60,10 +106,35 @@
 <div class="scrim" role="presentation" onclick={(e) => e.target === e.currentTarget && (ui.newChatOpen = false)}>
   <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="newchat-title">
     <div class="dialog-head">
-      <h2 id="newchat-title">New chat</h2>
+      <h2 id="newchat-title">{mode === 'join' ? 'Join a group' : 'New chat'}</h2>
       <button class="icon-btn" aria-label="Close" onclick={() => (ui.newChatOpen = false)}><X size={18} /></button>
     </div>
     <div class="dialog-body">
+      <div class="modes" role="tablist">
+        <button role="tab" aria-selected={mode === 'contact'} onclick={() => (mode = 'contact')}>Message a contact</button>
+        <button role="tab" aria-selected={mode === 'join'} onclick={() => (mode = 'join')} disabled={!joinAccounts.length}
+          title={joinAccounts.length ? undefined : 'None of your accounts can join groups by link'}>Join a group</button>
+      </div>
+      {#if mode === 'join'}
+        <div class="accounts">
+          {#each joinAccounts as a (a.accountId)}
+            <button class="acct" aria-pressed={a.accountId === accountId} onclick={() => (accountId = a.accountId)}>
+              <ProtocolBadge protocol={a.protocol} color={store.accountColor(a.accountId)} size={16} />{store.accountName(a.accountId)}
+            </button>
+          {/each}
+        </div>
+        <form class="join" onsubmit={(e) => { e.preventDefault(); join(); }}>
+          <label class="search">
+            <Link size={16} />
+            <input bind:this={linkInput} bind:value={link} placeholder="Invite link or address" aria-label="Invite link or address" oninput={() => (joinError = '')} />
+          </label>
+          <p class="hint">Telegram: https://t.me/+… or @name · WhatsApp: https://chat.whatsapp.com/… · Matrix: #room:server or a matrix.to link. Signal invite links are not supported yet.</p>
+          {#if joinError}<p class="error" role="alert">{joinError}</p>{/if}
+          <button class="btn primary" type="submit" disabled={!link.trim() || !accountId || !joinAccounts.some((a) => a.accountId === accountId) || busy === 'join'}>
+            {#if busy === 'join'}<LoaderCircle size={16} class="spin" />Joining…{:else}Join{/if}
+          </button>
+        </form>
+      {:else}
       <div class="accounts">
         {#each store.accountList as a (a.accountId)}
           <button class="acct" aria-pressed={a.accountId === accountId} onclick={() => (accountId = a.accountId)}>
@@ -93,6 +164,7 @@
           {#if !direct}<p class="empty">{query ? 'No matching contacts.' : 'No contacts for this account yet.'}</p>{/if}
         {/each}
       </div>
+      {/if}
     </div>
   </div>
 </div>
@@ -109,4 +181,11 @@
   .cname { flex: 1; min-width: 0; display: flex; flex-direction: column; font-size: 14px; }
   .cname small { font-size: 12px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .empty { color: var(--text-muted); font-size: 13px; text-align: center; }
+  .modes { display: flex; gap: 4px; padding: 3px; border-radius: var(--radius-md); background: var(--surface-2); }
+  .modes button { flex: 1; height: 30px; border: 0; border-radius: calc(var(--radius-md) - 2px); background: none; font-size: 13px; color: var(--text-2); }
+  .modes button[aria-selected='true'] { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: var(--shadow-1); }
+  .join { display: flex; flex-direction: column; gap: 10px; }
+  .join .btn { align-self: flex-end; }
+  .hint { font-size: 12px; color: var(--text-muted); margin: 0; }
+  .error { font-size: 13px; color: var(--danger); margin: 0; }
 </style>

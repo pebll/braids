@@ -63,6 +63,7 @@ public:
   void GetMembers(const std::string& p_AccountId, const std::string& p_ChatId, const Reply& p_Reply);
   json GetAvatars(const std::string& p_AccountId, const std::vector<std::string>& p_Ids);
   json GetDescriptions(const std::string& p_AccountId, const std::vector<std::string>& p_Ids);
+  void JoinChat(const std::string& p_AccountId, const std::string& p_Link);
   void CreateChat(const std::string& p_AccountId, const std::string& p_UserId);
   void PinChat(const std::string& p_AccountId, const std::string& p_ChatId, bool p_IsPinned);
   void ArchiveChat(const std::string& p_AccountId, const std::string& p_ChatId, bool p_IsArchived);

@@ -15,6 +15,7 @@ package main
 // extern void WmNewGroupMembersNotify(int p_ConnId, char* p_ChatId, char* p_MembersJson);
 // extern void WmNewAvatarNotify(int p_ConnId, char* p_Id, char* p_FilePath);
 // extern void WmNewDescriptionNotify(int p_ConnId, char* p_Id, char* p_Description);
+// extern void WmJoinChatNotify(int p_ConnId, char* p_Link, int p_Success, char* p_ChatId, char* p_Error);
 // extern void WmNewMessagesNotify(int p_ConnId, char* p_ChatId, char* p_MsgId, char* p_SenderId, char* p_Text, int p_FromMe, char* p_QuotedId, char* p_FileId, char* p_FilePath, int p_FileStatus, int p_TimeSent, int p_IsRead, int p_IsEdited);
 // extern void WmNewStatusNotify(int p_ConnId, char* p_UserId, int p_IsOnline, int p_TimeSeen);
 // extern void WmNewTypingNotify(int p_ConnId, char* p_ChatId, char* p_UserId, int p_IsTyping);
@@ -100,6 +101,11 @@ func CWmGetAvatar(connId int, avatarId *C.char) int {
 	return WmGetAvatar(connId, C.GoString(avatarId))
 }
 
+//export CWmJoinChat
+func CWmJoinChat(connId int, link *C.char) int {
+	return WmJoinChat(connId, C.GoString(link))
+}
+
 //export CWmGetDescription
 func CWmGetDescription(connId int, id *C.char) int {
 	return WmGetDescription(connId, C.GoString(id))
@@ -170,6 +176,10 @@ func CWmNewChatsNotify(connId int, chatId string, isUnread int, isMuted int, isP
 
 func CWmNewAvatarNotify(connId int, avatarId string, filePath string) {
 	C.WmNewAvatarNotify(C.int(connId), C.CString(avatarId), C.CString(filePath))
+}
+
+func CWmJoinChatNotify(connId int, link string, success bool, chatId string, errText string) {
+	C.WmJoinChatNotify(C.int(connId), C.CString(link), C.int(BoolToInt(success)), C.CString(chatId), C.CString(errText))
 }
 
 func CWmNewDescriptionNotify(connId int, id string, description string) {

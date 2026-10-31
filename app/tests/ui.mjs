@@ -230,6 +230,19 @@ try {
   await page.getByRole('menuitem', { name: 'Unarchive' }).click();
   await page.getByRole('button', { name: 'All chats' }).click();
   check((await page.getByRole('option', { name: /Jim/ }).count()) === 1, 'unarchived chat back in the inbox');
+
+  // join a group by link
+  await page.getByRole('button', { name: 'New chat' }).click();
+  await page.getByRole('tab', { name: 'Join a group' }).click();
+  await page.fill('input[aria-label="Invite link or address"]', 'https://dummy.example/nope');
+  await page.getByRole('button', { name: 'Join', exact: true }).click();
+  await page.locator('.join .error').waitFor();
+  check((await page.locator('.join .error').textContent()).includes('Not a Dummy invite link'), 'invalid invite link reported');
+  await shot('join-group');
+  await page.fill('input[aria-label="Invite link or address"]', 'https://dummy.example/join/Accounting');
+  await page.getByRole('button', { name: 'Join', exact: true }).click();
+  await page.locator('.conv header', { hasText: 'Accounting' }).waitFor();
+  check(await page.getByText('Join a group').count() === 0, 'joined group opened');
   await page.getByRole('option', { name: /The Office/ }).click();
   await page.keyboard.press('Control+i');
   await page.getByText('Group info').waitFor();

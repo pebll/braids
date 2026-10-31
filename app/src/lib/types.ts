@@ -18,6 +18,7 @@ export interface Capabilities {
   readReceiptsPerMessage: boolean;
   avatars: boolean;
   descriptions: boolean;
+  joinChat: boolean;
 }
 
 export interface Account {

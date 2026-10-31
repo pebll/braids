@@ -393,6 +393,9 @@ class Store {
       case 'chat.created':
         this.pendingCreated?.(chatKey(p.accountId, p.chatId));
         break;
+      case 'chat.joined':
+        this.pendingJoins.get(`${p.accountId}\u0001${p.link}`)?.(p);
+        break;
       case 'contacts.updated': {
         const map = p.fullSync ? {} : { ...(this.contacts[p.accountId] ?? {}) };
         for (const c of p.contacts as Contact[]) map[c.id] = c;
@@ -433,6 +436,7 @@ class Store {
   }
 
   private pendingCreated: ((key: string) => void) | null = null;
+  private pendingJoins = new Map<string, (p: { success: boolean; chatId: string; error: string }) => void>();
 
   private onAuth(p: AuthPrompt) {
     if (p.setupId) {
@@ -608,6 +612,26 @@ class Store {
       // the chat.updated event may arrive just after chat.created
       for (let i = 0; i < 20 && !this.chats[key]; i++) await new Promise((r) => setTimeout(r, 100));
       await this.openChat(key);
+    }
+  }
+
+  // Joins a group by invite link / address and opens it; throws with the
+  // protocol's reason when that fails.
+  async joinChat(accountId: string, link: string): Promise<void> {
+    const id = `${accountId}\u0001${link}`;
+    const result = new Promise<{ success: boolean; chatId: string; error: string }>((resolve) => {
+      this.pendingJoins.set(id, resolve);
+      setTimeout(() => resolve({ success: false, chatId: '', error: 'No answer from the messenger.' }), 60000);
+    });
+    try {
+      await api.call('chats.join', { accountId, link });
+      const r = await result;
+      if (!r.success) throw new Error(r.error || 'Could not join.');
+      const key = chatKey(accountId, r.chatId);
+      for (let i = 0; i < 100 && !this.chats[key]; i++) await new Promise((res) => setTimeout(res, 100));
+      if (this.chats[key]) await this.openChat(key);
+    } finally {
+      this.pendingJoins.delete(id);
     }
   }
 

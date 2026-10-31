@@ -8,8 +8,8 @@ Agreed features not scheduled in a milestone yet. Newest first.
 - **Custom muting rules**: notification rules instead of only per-chat mute,
   e.g. mute personal chats during work hours, notify only for favorites,
   don't notify for groups.
-- **Join groups**: join a group or room by invite link / address (all
-  protocols that support it).
+- **Join Signal groups by invite link**: signalmeow has no API for it
+  (needs the group join flow with the invite password).
 - **Mentions (tags)**: @-mention people in the composer (e.g. `@janine`,
   autocomplete from the group members), sent as real mentions where the
   protocol supports them.

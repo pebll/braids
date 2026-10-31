@@ -19,6 +19,7 @@
 #include "status.h"
 #include "strutil.h"
 #include "timeutil.h"
+#include "timeutil.h"
 
 static const std::string s_GroupId = "The Office_0";
 
@@ -44,13 +45,13 @@ std::string DuChat::GetProfileId() const
 bool DuChat::HasFeature(ProtocolFeature p_ProtocolFeature) const
 {
   static int customFeatures =
-    FeatureAutoGetContactsOnLogin | FeatureEditMessagesAnytime | FeatureAvatars | FeatureDescriptions;
+    FeatureAutoGetContactsOnLogin | FeatureEditMessagesAnytime | FeatureAvatars | FeatureDescriptions | FeatureJoinChat;
   return (p_ProtocolFeature & customFeatures);
 }
 
 bool DuChat::IsGroupChat(const std::string& p_ChatId) const
 {
-  return (p_ChatId == s_GroupId);
+  return (p_ChatId == s_GroupId) || ((p_ChatId.size() > 5) && (p_ChatId.compare(p_ChatId.size() - 5, 5, "_join") == 0));
 }
 
 std::string DuChat::GetSelfId() const
@@ -572,6 +573,44 @@ void DuChat::PerformRequest(std::shared_ptr<RequestMessage> p_RequestMessage)
         }
 
         m_MessageHandler(newAvatarNotify);
+      }
+      break;
+
+    case JoinChatRequestType:
+      {
+        // test groups: https://dummy.example/join/<Name> joins "<Name>"
+        std::shared_ptr<JoinChatRequest> joinChatRequest = std::static_pointer_cast<JoinChatRequest>(p_RequestMessage);
+        static const std::string s_Prefix = "https://dummy.example/join/";
+        std::shared_ptr<JoinChatNotify> joinChatNotify = std::make_shared<JoinChatNotify>(m_ProfileId);
+        joinChatNotify->link = joinChatRequest->link;
+        const std::string name = (joinChatRequest->link.rfind(s_Prefix,
+                                                              0) ==
+                                  0) ? joinChatRequest->link.substr(s_Prefix.size()) : "";
+        if (name.empty())
+        {
+          joinChatNotify->error = "Not a Dummy invite link (https://dummy.example/join/Name).";
+          m_MessageHandler(joinChatNotify);
+          break;
+        }
+
+        ContactInfo contactInfo;
+        contactInfo.id = name + "_join";
+        contactInfo.name = name;
+        std::shared_ptr<NewContactsNotify> newContactsNotify = std::make_shared<NewContactsNotify>(m_ProfileId);
+        newContactsNotify->contactInfos.push_back(contactInfo);
+        m_MessageHandler(newContactsNotify);
+
+        ChatInfo chatInfo;
+        chatInfo.id = contactInfo.id;
+        chatInfo.lastMessageTime = TimeUtil::GetCurrentTimeMSec();
+        std::shared_ptr<NewChatsNotify> newChatsNotify = std::make_shared<NewChatsNotify>(m_ProfileId);
+        newChatsNotify->success = true;
+        newChatsNotify->chatInfos.push_back(chatInfo);
+        m_MessageHandler(newChatsNotify);
+
+        joinChatNotify->success = true;
+        joinChatNotify->chatId = chatInfo.id;
+        m_MessageHandler(joinChatNotify);
       }
       break;
 

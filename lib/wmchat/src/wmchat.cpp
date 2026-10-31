@@ -69,7 +69,7 @@ bool WmChat::HasFeature(ProtocolFeature p_ProtocolFeature) const
     FeaturePinChat |
     FeatureArchiveChat |
     FeaturePresenceRequiresOnline |
-    FeatureAvatars | FeatureDescriptions;
+    FeatureAvatars | FeatureDescriptions | FeatureJoinChat;
   return (p_ProtocolFeature & customFeatures);
 }
 
@@ -701,6 +701,13 @@ void WmChat::PerformRequest(std::shared_ptr<RequestMessage> p_RequestMessage)
       }
       break;
 
+    case JoinChatRequestType:
+      {
+        std::shared_ptr<JoinChatRequest> joinChatRequest = std::static_pointer_cast<JoinChatRequest>(p_RequestMessage);
+        CWmJoinChat(m_ConnId, const_cast<char*>(joinChatRequest->link.c_str()));
+      }
+      break;
+
     case GetGroupMembersRequestType:
       {
         LOG_DEBUG("get group members");
@@ -932,6 +939,27 @@ void WmNewDescriptionNotify(int p_ConnId, char* p_Id, char* p_Description)
 
   free(p_Id);
   free(p_Description);
+}
+
+void WmJoinChatNotify(int p_ConnId, char* p_Link, int p_Success, char* p_ChatId, char* p_Error)
+{
+  WmChat* instance = WmChat::GetInstance(p_ConnId);
+  if (instance != nullptr)
+  {
+    std::shared_ptr<JoinChatNotify> notify = std::make_shared<JoinChatNotify>(instance->GetProfileId());
+    notify->link = std::string(p_Link);
+    notify->success = (p_Success != 0);
+    notify->chatId = std::string(p_ChatId);
+    notify->error = std::string(p_Error);
+
+    std::shared_ptr<DeferNotifyRequest> deferNotifyRequest = std::make_shared<DeferNotifyRequest>();
+    deferNotifyRequest->serviceMessage = notify;
+    instance->SendRequest(deferNotifyRequest);
+  }
+
+  free(p_Link);
+  free(p_ChatId);
+  free(p_Error);
 }
 
 void WmNewGroupMembersNotify(int p_ConnId, char* p_ChatId, char* p_MembersJson)

@@ -1,7 +1,7 @@
 braidsd API
 ===========
 
-Status: draft, API version `0.5.0` (milestone M3). The API is JSON-RPC 2.0
+Status: draft, API version `0.6.0` (milestone M3). The API is JSON-RPC 2.0
 with one JSON object per line, served on a Unix socket and/or stdin/stdout.
 
 Transport
@@ -57,7 +57,7 @@ Objects
      "capabilities": {"editWindowSec": -1 (unlimited) | 0 (none) | seconds,
                       "pinChat", "archiveChat", "pinMessage",
                       "limitedReactions", "readReceiptsPerMessage",
-                      "avatars", "descriptions"}}
+                      "avatars", "descriptions", "joinChat"}}
 
 **Chat**
 
@@ -101,6 +101,7 @@ Methods
 | `chats.get` | `accountId`, `chatId` | `Chat` |
 | `chats.setCurrent` | `accountId`, `chatId` | `{}`; tells the protocol which chat is open, requests presence |
 | `chats.create` | `accountId`, `userId` | `{}`, then `chat.created` |
+| `chats.join` | `accountId`, `link` (invite link, public name or address: `https://t.me/+…`, `@name`, `https://chat.whatsapp.com/…`, `#room:server`, `https://matrix.to/#/…`; capability `joinChat`) | `{}`, then `chat.joined` |
 | `chats.pin` | `accountId`, `chatId`, `isPinned`? (true) | `{}` (error 4 if unsupported) |
 | `chats.archive` | `accountId`, `chatId`, `isArchived`? (true) | `{}` (error 4 if unsupported) |
 | `chats.delete` | `accountId`, `chatId` | `{}`, then `chat.removed` (Matrix: leave + forget) |
@@ -139,6 +140,7 @@ Events
 | `account.connected` | `{accountId, success}` (protocol login done, chats are being fetched) |
 | `chat.updated` | `Chat` (new or changed) |
 | `chat.created` | `{accountId, chatId}` (after `chats.create`) |
+| `chat.joined` | `{accountId, link, success, chatId, error}` (after `chats.join`; `error` is a message for the user) |
 | `chat.removed` | `{accountId, chatId}` |
 | `chat.moved` | `{accountId, chatId, newChatId}` (e.g. Telegram group upgraded) |
 | `contacts.updated` | `{accountId, fullSync, contacts: [Contact]}` |

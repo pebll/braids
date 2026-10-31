@@ -26,7 +26,7 @@
 #include "timeutil.h"
 
 // semver of the API; clients must match the major version
-static const std::string s_ApiVersion = "0.5.0";
+static const std::string s_ApiVersion = "0.6.0";
 static const int64_t s_StartTime = TimeUtil::GetCurrentTimeMSec();
 
 static const char* AuthStepToString(AuthStep p_Step)
@@ -299,6 +299,11 @@ void Core::Dispatch(const std::string& p_Method, const json& p_Params, const Rep
   else if (p_Method == "chats.create")
   {
     m_ChatModel->CreateChat(ParamStr(params, "accountId"), ParamStr(params, "userId"));
+    p_Reply.Ok(json::object());
+  }
+  else if (p_Method == "chats.join")
+  {
+    m_ChatModel->JoinChat(ParamStr(params, "accountId"), ParamStr(params, "link"));
     p_Reply.Ok(json::object());
   }
   else if (p_Method == "chats.pin")

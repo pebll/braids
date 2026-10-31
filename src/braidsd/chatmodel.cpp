@@ -366,6 +366,23 @@ void ChatModel::OnServiceMessage(std::shared_ptr<ServiceMessage> p_ServiceMessag
       }
       break;
 
+    case JoinChatNotifyType:
+      {
+        std::shared_ptr<JoinChatNotify> joinChatNotify = std::static_pointer_cast<JoinChatNotify>(p_ServiceMessage);
+        if (joinChatNotify->success && !account.chatInfos.count(joinChatNotify->chatId))
+        {
+          // make sure the chat shows up even if the protocol does not report it by itself
+          std::shared_ptr<GetChatsRequest> getChatsRequest = std::make_shared<GetChatsRequest>();
+          getChatsRequest->chatIds.insert(joinChatNotify->chatId);
+          SendProtocolRequest(accountId, getChatsRequest);
+        }
+
+        Emit("chat.joined", json{ { "accountId", accountId }, { "link", joinChatNotify->link },
+               { "success", joinChatNotify->success }, { "chatId", joinChatNotify->chatId },
+               { "error", joinChatNotify->error } });
+      }
+      break;
+
     case DeleteChatNotifyType:
       {
         std::shared_ptr<DeleteChatNotify> deleteChatNotify =
@@ -1465,6 +1482,19 @@ void ChatModel::CreateChat(const std::string& p_AccountId, const std::string& p_
   SendProtocolRequest(p_AccountId, createChatRequest);
 }
 
+void ChatModel::JoinChat(const std::string& p_AccountId, const std::string& p_Link)
+{
+  GetAccountOrThrow(p_AccountId);
+  if (!HasFeature(p_AccountId, FeatureJoinChat))
+  {
+    throw ApiException(ApiErrorUnsupported, "joining groups by link is not supported for this account");
+  }
+
+  std::shared_ptr<JoinChatRequest> joinChatRequest = std::make_shared<JoinChatRequest>();
+  joinChatRequest->link = p_Link;
+  SendProtocolRequest(p_AccountId, joinChatRequest);
+}
+
 void ChatModel::PinChat(const std::string& p_AccountId, const std::string& p_ChatId, bool p_IsPinned)
 {
   GetAccountOrThrow(p_AccountId);
@@ -1815,6 +1845,7 @@ json ChatModel::CapabilitiesToJson(std::shared_ptr<Protocol> p_Protocol, const s
     { "pinMessage", p_Protocol->HasFeature(FeaturePinMessage) },
     { "avatars", p_Protocol->HasFeature(FeatureAvatars) },
     { "descriptions", p_Protocol->HasFeature(FeatureDescriptions) },
+    { "joinChat", p_Protocol->HasFeature(FeatureJoinChat) },
     { "limitedReactions", p_Protocol->HasFeature(FeatureLimitedReactions) },
     { "readReceiptsPerMessage", HasPerMessageReadReceipts(p_ProtocolName) },
   };

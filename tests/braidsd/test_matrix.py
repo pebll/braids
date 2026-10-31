@@ -258,6 +258,25 @@ def main():
         members = d.call("members.get", {"accountId": account_id, "chatId": room})
         check({alice_id, bob_id} <= {m["id"] for m in members["members"]}, "members of room")
 
+        # room topic as description
+        bob_peer.cmd(f"topic {room} all about braids")
+        d.call("descriptions.get", {"accountId": account_id, "ids": [room]})
+        wait_until(lambda: d.call("descriptions.get", {"accountId": account_id, "ids": [room]})["descriptions"].get(room)
+                   == "all about braids", "room topic")
+        check(True, "room topic as description")
+
+        # join a public room by alias
+        alias = f"braids{suffix}"
+        public_room = bob_peer.cmd(f"publicroom {alias} public braids")["room"]
+        d.call("chats.join", {"accountId": account_id, "link": f"#{alias}:localhost"})
+        joined = d.wait_event("chat.joined", lambda p: p["accountId"] == account_id, timeout=60)
+        check(joined["success"] and joined["chatId"] == public_room, "joined public room by alias")
+        wait_until(lambda: [c for c in d.call("chats.list") if c["id"] == public_room], "joined room in chat list")
+        check(True, "joined room in chat list")
+        d.call("chats.join", {"accountId": account_id, "link": "not a room"})
+        failed = d.wait_event("chat.joined", lambda p: not p["success"], timeout=30)
+        check("Not a Matrix room" in failed["error"], "invalid join link reported")
+
         # avatars: bob's own and the room's
         bob_peer.cmd(f"avatar {png}")
         bob_peer.cmd(f"roomavatar {room} {png}")

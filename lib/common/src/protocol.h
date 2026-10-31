@@ -37,6 +37,7 @@ enum ProtocolFeature
   FeatureEditMessagesAnytime = (1 << 11), // braids extension
   FeatureAvatars = (1 << 12), // braids extension: handles GetAvatarRequest
   FeatureDescriptions = (1 << 13), // braids extension: handles GetDescriptionRequest
+  FeatureJoinChat = (1 << 14), // braids extension: handles JoinChatRequest
 };
 
 // Interactive authentication (account setup and re-login), braids extension.
@@ -177,6 +178,7 @@ enum MessageType
   GetGroupMembersRequestType,
   GetAvatarRequestType, // braids extension
   GetDescriptionRequestType, // braids extension
+  JoinChatRequestType, // braids extension
   // Service messages
   ServiceMessageType,
   NewContactsNotifyType,
@@ -207,6 +209,7 @@ enum MessageType
   MoveChatNotifyType,
   NewAvatarNotifyType, // braids extension
   NewDescriptionNotifyType, // braids extension
+  JoinChatNotifyType, // braids extension
 };
 
 struct ContactInfo
@@ -563,6 +566,17 @@ public:
   std::string id; // user id or chat id
 };
 
+// Join a group / channel / room by invite link, public name or address
+// (protocol specific, e.g. https://t.me/+abc, @name, https://chat.whatsapp.com/abc,
+// #room:server), answered with JoinChatNotify. The chat itself arrives as for
+// any new chat (NewChatsNotify).
+class JoinChatRequest : public RequestMessage
+{
+public:
+  virtual MessageType GetMessageType() const { return JoinChatRequestType; }
+  std::string link;
+};
+
 // Service messages
 class ServiceMessage
 {
@@ -776,6 +790,18 @@ public:
   virtual MessageType GetMessageType() const { return NewAvatarNotifyType; }
   std::string id;
   std::string filePath;
+};
+
+class JoinChatNotify : public ServiceMessage
+{
+public:
+  explicit JoinChatNotify(const std::string& p_ProfileId)
+    : ServiceMessage(p_ProfileId) { }
+  virtual MessageType GetMessageType() const { return JoinChatNotifyType; }
+  std::string link;
+  bool success = false;
+  std::string chatId; // the joined chat
+  std::string error; // why not, for the user
 };
 
 // Group description or user bio, empty if there is none. Sent for
