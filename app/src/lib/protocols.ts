@@ -100,3 +100,29 @@ export function stepTitle(protocol: string, field: string): string {
     default: return `Connect ${name}`;
   }
 }
+
+// telegram.me paths that are not chats
+const TG_RESERVED = new Set(['share', 'addstickers', 'addemoji', 'addtheme', 'proxy', 'socks', 'login', 'iv', 'setlanguage', 'bg', 'confirmphone', 'invoice', 's']);
+
+// The messenger of a group invite link (or public group / channel / room
+// link) in a message, '' for any other link.
+export function inviteLinkProtocol(url: string): string {
+  let u: URL;
+  try {
+    u = new URL(url.trim());
+  } catch {
+    return '';
+  }
+  const host = u.hostname.toLowerCase();
+  const parts = u.pathname.split('/').filter(Boolean);
+  if (host === 't.me' || host === 'telegram.me') {
+    if (parts.length === 1 && /^\+[\w-]+$/.test(parts[0])) return 'Telegram';
+    if (parts.length === 2 && parts[0] === 'joinchat') return 'Telegram';
+    if (parts.length === 1 && /^[A-Za-z][\w]{3,31}$/.test(parts[0]) && !TG_RESERVED.has(parts[0].toLowerCase())) return 'Telegram';
+    return '';
+  }
+  if (host === 'chat.whatsapp.com' && parts.length === 1) return 'WhatsAppMd';
+  if (host === 'matrix.to' && /^#\/(#|!|%23|%21)/.test(u.hash)) return 'Matrix';
+  if (host === 'dummy.example' && parts[0] === 'join') return 'Dummy';
+  return '';
+}

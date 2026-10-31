@@ -11,6 +11,7 @@
 <script lang="ts">
   import { Link, LoaderCircle, Search, X } from '@lucide/svelte';
   import { tick } from 'svelte';
+  import * as api from '../lib/api';
   import { chatKey, store } from '../lib/store.svelte';
   import { ui } from '../lib/ui.svelte';
   import Avatar from './Avatar.svelte';
@@ -22,8 +23,11 @@
   let input: HTMLInputElement | undefined = $state();
 
   // join mode
-  let mode = $state<'contact' | 'join'>('contact');
-  let link = $state('');
+  // a link clicked in a message opens the dialog on "Join a group"
+  const fromLink = ui.joinLink;
+  ui.joinLink = '';
+  let mode = $state<'contact' | 'join'>(fromLink ? 'join' : 'contact');
+  let link = $state(fromLink);
   let joinError = $state('');
   let linkInput: HTMLInputElement | undefined = $state();
   const joinAccounts = $derived(store.accountList.filter((a) => a.capabilities.joinChat));
@@ -44,7 +48,10 @@
     if (mode !== 'join' || !protocol) return;
     const current = store.accounts[accountId];
     if (current?.protocol === protocol) return;
-    const match = joinAccounts.find((a) => a.protocol === protocol);
+    // prefer the account of the open chat (the link was probably sent there)
+    const openAccount = store.current ? store.accounts[store.current.split('\u0001')[0]] : undefined;
+    const match = (openAccount?.protocol === protocol && openAccount.capabilities.joinChat ? openAccount : undefined) ??
+      joinAccounts.find((a) => a.protocol === protocol);
     if (match) accountId = match.accountId;
   });
 
@@ -130,6 +137,9 @@
           </label>
           <p class="hint">Telegram: https://t.me/+… or @name · WhatsApp: https://chat.whatsapp.com/… · Matrix: #room:server or a matrix.to link. Signal invite links are not supported yet.</p>
           {#if joinError}<p class="error" role="alert">{joinError}</p>{/if}
+          {#if fromLink}
+            <button type="button" class="linkish" onclick={() => { api.openUrl(fromLink).catch(() => {}); ui.newChatOpen = false; }}>Open in the browser instead</button>
+          {/if}
           <button class="btn primary" type="submit" disabled={!link.trim() || !accountId || !joinAccounts.some((a) => a.accountId === accountId) || busy === 'join'}>
             {#if busy === 'join'}<LoaderCircle size={16} class="spin" />Joining…{:else}Join{/if}
           </button>
@@ -188,4 +198,5 @@
   .join .btn { align-self: flex-end; }
   .hint { font-size: 12px; color: var(--text-muted); margin: 0; }
   .error { font-size: 13px; color: var(--danger); margin: 0; }
+  .linkish { align-self: flex-start; border: 0; background: none; padding: 0; font-size: 12px; color: var(--accent); }
 </style>

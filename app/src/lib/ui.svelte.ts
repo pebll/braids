@@ -30,6 +30,7 @@ class Ui {
   settingsSection = $state('general');
   settingsAccount = $state('');
   newChatOpen = $state(false);
+  joinLink = $state(''); // opens the New chat dialog on "Join a group" with this link
   drawerOpen = $state(false); // sidebar as drawer (narrow layout)
   chatSearchOpen = $state(false);
   lightbox = $state<{ src: string; name: string; path: string } | null>(null);

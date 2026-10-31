@@ -255,6 +255,16 @@ try {
   await page.getByRole('button', { name: 'Join', exact: true }).click();
   await page.locator('.conv header', { hasText: 'Accounting' }).waitFor();
   check(await page.getByText('Join a group').count() === 0, 'joined group opened');
+
+  // an invite link in a message opens "Join a group" with the link
+  await composer.fill('come to https://dummy.example/join/Sales');
+  await composer.press('Enter');
+  await page.locator('.msg.own a[data-link]', { hasText: 'dummy.example/join/Sales' }).last().click();
+  await page.getByRole('tab', { name: 'Join a group', selected: true }).waitFor();
+  check((await page.inputValue('input[aria-label="Invite link or address"]')) === 'https://dummy.example/join/Sales', 'invite link in a message opens Join a group');
+  await page.getByRole('button', { name: 'Join', exact: true }).click();
+  await page.locator('.conv header', { hasText: 'Sales' }).waitFor();
+  check(true, 'joined from the link');
   await page.getByRole('option', { name: /The Office/ }).click();
   await page.keyboard.press('Control+i');
   await page.getByText('Group info').waitFor();

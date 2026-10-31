@@ -93,7 +93,13 @@ export function plainText(text: string): string {
     .trim();
 }
 
-const URL_RE = /\b(https?:\/\/[^\s<>"']+[^\s<>"'.,;:!?)\]])/g;
+// http(s) links, and invite links often written without the scheme
+const URL_RE = /\b((?:https?:\/\/|(?:t\.me|telegram\.me|chat\.whatsapp\.com|matrix\.to)\/)[^\s<>"']+[^\s<>"'.,;:!?)\]])/g;
+
+function linkHtml(url: string): string {
+  const href = /^https?:\/\//.test(url) ? url : `https://${url}`;
+  return `<a href="${escapeHtml(href)}" data-link="1">${escapeHtml(url)}</a>`;
+}
 
 function inline(text: string, mentions: Record<string, string>, selfId: string): string {
   // tokens that must not be touched by the emphasis rules: code and mentions
@@ -108,7 +114,7 @@ function inline(text: string, mentions: Record<string, string>, selfId: string):
     const isMe = userId !== undefined && userId === selfId;
     return keep(`<span class="mention${isMe ? ' me' : ''}">@${escapeHtml(name)}</span>`);
   });
-  s = s.replace(URL_RE, (url) => keep(`<a href="${escapeHtml(url)}" data-link="1">${escapeHtml(url)}</a>`));
+  s = s.replace(URL_RE, (url) => keep(linkHtml(url)));
 
   s = escapeHtml(s);
   const emphasis: [RegExp, string][] = [
@@ -124,7 +130,7 @@ function inline(text: string, mentions: Record<string, string>, selfId: string):
 export function linkify(text: string): string {
   return text
     .split(URL_RE)
-    .map((part, i) => (i % 2 === 1 ? `<a href="${escapeHtml(part)}" data-link="1">${escapeHtml(part)}</a>` : escapeHtml(part)))
+    .map((part, i) => (i % 2 === 1 ? linkHtml(part) : escapeHtml(part)))
     .join('')
     .replace(/\n/g, '<br>');
 }

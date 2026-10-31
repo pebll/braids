@@ -8,6 +8,7 @@
 
 import { Archive, ArchiveRestore, MailCheck, Star, StarOff, Trash2 } from '@lucide/svelte';
 import * as api from './api';
+import { inviteLinkProtocol } from './protocols';
 import { splitKey, store } from './store.svelte';
 import type { Chat } from './types';
 import { ui, type MenuItem } from './ui.svelte';
@@ -64,4 +65,16 @@ export function editLastOwnMessage(): boolean {
   ui.reply = null;
   ui.edit = m;
   return true;
+}
+
+// Opens a link from a message or description: a group invite link of a
+// messenger with a connected account opens "Join a group", others the browser.
+export function openLink(url: string) {
+  const protocol = inviteLinkProtocol(url);
+  if (protocol && store.accountList.some((a) => a.protocol === protocol && a.capabilities.joinChat)) {
+    ui.joinLink = url;
+    ui.newChatOpen = true;
+    return;
+  }
+  api.openUrl(url).catch((e) => store.toastError(e));
 }

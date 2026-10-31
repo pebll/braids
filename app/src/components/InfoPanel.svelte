@@ -10,6 +10,7 @@
 -->
 <script lang="ts">
   import { Archive, ArchiveRestore, LogOut, Search, Star, StarOff, Trash2, X } from '@lucide/svelte';
+  import { openLink } from '../lib/actions';
   import * as api from '../lib/api';
   import { linkify } from '../lib/format';
   import { protocolMeta } from '../lib/protocols';
@@ -41,7 +42,7 @@
     const a = (e.target as HTMLElement).closest('a[data-link]') as HTMLAnchorElement | null;
     if (a) {
       e.preventDefault();
-      api.openUrl(a.href).catch(() => {});
+      openLink(a.href);
     }
   }
 

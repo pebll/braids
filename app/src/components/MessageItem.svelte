@@ -10,6 +10,7 @@
 -->
 <script lang="ts">
   import { Check, CheckCheck, Copy, Download, FileText, Forward, LoaderCircle, Pencil, Pin, PinOff, Reply, SmilePlus, Trash2, TriangleAlert } from '@lucide/svelte';
+  import { openLink } from '../lib/actions';
   import * as api from '../lib/api';
   import { isOnlyEmoji, renderText, senderColor, timeOfDay } from '../lib/format';
   import { fileMime, fileReady, store } from '../lib/store.svelte';
@@ -185,7 +186,7 @@
     const a = (e.target as HTMLElement).closest('a[data-link]') as HTMLAnchorElement | null;
     if (a) {
       e.preventDefault();
-      api.openUrl(a.href).catch(() => {});
+      openLink(a.href);
     }
   }
 
