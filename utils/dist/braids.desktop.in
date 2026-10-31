@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=braids
+GenericName=Messenger
+Comment=Telegram, WhatsApp, Signal and Matrix in one app
+Exec=@EXEC@
+Icon=braids
+Terminal=false
+Categories=Network;InstantMessaging;Chat;
+Keywords=telegram;whatsapp;signal;matrix;chat;messenger;
+StartupWMClass=braids

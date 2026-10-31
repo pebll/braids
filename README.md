@@ -2,12 +2,15 @@ braids
 ======
 
 braids is an open source desktop messenger for **Telegram, WhatsApp, Signal
-and Matrix** in one app, for Linux and macOS.
+and Matrix** in one app. Website: https://pebll.github.io/braids/
 
-> **Status: early development (milestone M0).** There is no usable app yet:
-> this repository currently contains the protocol layer and a skeleton core
-> daemon. See [doc/REQUIREMENTS.md](doc/REQUIREMENTS.md) and
-> [doc/ARCHITECTURE.md](doc/ARCHITECTURE.md) for the plan.
+Install (Linux, x86_64; installs to your home folder, no root needed):
+
+    curl -fsSL https://pebll.github.io/braids/install.sh | sh
+
+A .deb package and a self-contained archive are attached to every
+[release](https://github.com/pebll/braids/releases). macOS and Windows are
+not available yet.
 
 braids is based on [nchat](https://github.com/d99kris/nchat) by Kristofer
 Berggren, a terminal messenger. braids keeps nchat's protocol implementations
@@ -36,6 +39,19 @@ Requirements: CMake, a C++14 compiler, Go >= 1.23 (the Go toolchain pinned in
 the protocol modules is downloaded automatically with `GOTOOLCHAIN=auto`),
 OpenSSL, SQLite, zlib, libmagic, gperf. Signal support downloads a pre-built
 libsignal, or builds it from source (Rust, protoc) if unavailable.
+
+Packaging and releases
+----------------------
+
+    utils/dist/package-linux     dist/braids-linux-x86_64.tar.gz and a .deb
+    utils/dist/install.sh        the install script (curl ... | sh)
+
+Pushing a tag `vX.Y.Z` (matching the version in `app/src-tauri/tauri.conf.json`)
+runs `.github/workflows/release.yml`, which builds the packages with braids'
+Telegram API credentials (repository secrets `TG_API_ID`, `TG_API_HASH`) and
+publishes the GitHub release that `install.sh` downloads from. The website in
+`site/` is published to GitHub Pages by `.github/workflows/pages.yml`
+(screenshots: `cd app && node scripts/site-screenshots.mjs`).
 
 Repository layout
 -----------------

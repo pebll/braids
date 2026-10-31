@@ -116,13 +116,19 @@ async fn save_file_as(app: AppHandle, path: String, name: String) -> Result<Stri
     Ok(target.to_string_lossy().into_owned())
 }
 
-/// The bundled third-party notices file, "" when not installed (development).
+/// The shipped third-party notices file: in the app's resources, or in the
+/// release tree (bin/../share/doc/braids); "" when not installed (development).
 #[tauri::command]
 fn licenses_path(app: AppHandle) -> String {
-    app.path()
-        .resolve("THIRD_PARTY_LICENSES", tauri::path::BaseDirectory::Resource)
+    let resource = app.path().resolve("THIRD_PARTY_LICENSES", tauri::path::BaseDirectory::Resource).ok();
+    let tree = std::env::current_exe()
         .ok()
-        .filter(|p| p.exists())
+        .and_then(|exe| exe.parent().map(|dir| dir.join("../share/doc/braids/THIRD_PARTY_LICENSES")));
+    [resource, tree]
+        .into_iter()
+        .flatten()
+        .find(|p| p.is_file())
+        .and_then(|p| p.canonicalize().ok())
         .map(|p| p.to_string_lossy().into_owned())
         .unwrap_or_default()
 }

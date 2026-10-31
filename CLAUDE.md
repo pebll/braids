@@ -69,6 +69,12 @@ be blocked; use `--no-signal` there, CI builds it. Docker may need `dockerd`
 started by hand. `./make.sh deps` asks for apt confirmation; install
 `libmagic-dev` etc. non-interactively if it aborts.
 
+Packaging (Linux x86_64 only): `utils/dist/package-linux` builds a relocatable
+tree (rpath `$ORIGIN/../lib`, `-DBRAIDS_RELOCATABLE=ON`, no Dummy) into a
+tarball and a .deb; `utils/dist/install.sh` installs the tarball per user;
+tag `v*` runs `.github/workflows/release.yml`. Website: `site/` (GitHub Pages,
+`.github/workflows/pages.yml`).
+
 ## Conventions
 
 - C++ style as in nchat: 2-space indent, braces on own lines, `m_` members,

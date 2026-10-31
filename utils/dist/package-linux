@@ -1,0 +1,116 @@
+#!/usr/bin/env bash
+
+# package-linux
+#
+# Copyright (c) 2026 braids contributors
+#
+# braids is distributed under the GNU AGPL v3 license, see LICENSE for details.
+#
+# Builds the Linux release packages of braids into dist/:
+#
+#   braids-linux-x86_64.tar.gz (+ .sha256)  relocatable tree, used by install.sh
+#   braids_<version>_amd64.deb (+ .sha256)  installs to /opt/braids
+#
+# The tree (bin/braids app, bin/braidsd, lib/*.so protocols, share/...) works
+# from any directory: braidsd finds its libraries through $ORIGIN, the app
+# finds braidsd next to itself.
+#
+# Usage: utils/dist/package-linux [--no-telegram] [--no-whatsapp] [--no-signal] [--no-matrix]
+#
+# Needs the build dependencies (./make.sh deps), Node 22, Rust and the Tauri
+# Linux dependencies (app/README.md). Telegram: set TG_API_ID / TG_API_HASH
+# (braids' API credentials) for release builds.
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "${ROOT}"
+
+CMAKEARGS=()
+for arg in "$@"; do
+  case "${arg}" in
+    --no-telegram) CMAKEARGS+=("-DHAS_TELEGRAM=OFF") ;;
+    --no-whatsapp) CMAKEARGS+=("-DHAS_WHATSAPP=OFF") ;;
+    --no-signal) CMAKEARGS+=("-DHAS_SIGNAL=OFF") ;;
+    --no-matrix) CMAKEARGS+=("-DHAS_MATRIX=OFF") ;;
+    *) echo "usage: $0 [--no-telegram] [--no-whatsapp] [--no-signal] [--no-matrix]" >&2; exit 2 ;;
+  esac
+done
+
+VERSION="$(sed -n 's/^ *"version": *"\([^"]*\)".*/\1/p' app/src-tauri/tauri.conf.json | head -1)"
+ARCH="$(uname -m)"
+if [[ "${ARCH}" != "x86_64" ]]; then
+  echo "only x86_64 is packaged for now (this is ${ARCH})" >&2
+  exit 1
+fi
+
+BUILD="${ROOT}/build-release"
+STAGE="${ROOT}/dist/stage"
+TREE="${STAGE}/braids"
+mkdir -p "${ROOT}/dist"
+rm -rf "${STAGE}"
+
+if [[ -z "${TG_API_ID:-}" ]] || [[ -z "${TG_API_HASH:-}" ]]; then
+  echo "note: TG_API_ID / TG_API_HASH not set, Telegram uses the development fallback credentials" >&2
+fi
+
+echo "== braidsd and protocols (${VERSION})"
+cmake -S . -B "${BUILD}" -DCMAKE_BUILD_TYPE=Release -DBRAIDS_RELOCATABLE=ON -DHAS_DUMMY=OFF \
+  -DCMAKE_INSTALL_LIBDIR=lib "${CMAKEARGS[@]}"
+cmake --build "${BUILD}" -j "$(nproc)"
+cmake --install "${BUILD}" --prefix "${TREE}"
+
+echo "== app"
+(cd app && npm ci && npm run tauri build -- --no-bundle)
+install -m 0755 app/src-tauri/target/release/braids "${TREE}/bin/braids"
+
+echo "== desktop integration files"
+install -d "${TREE}/share/applications" "${TREE}/share/icons/hicolor/128x128/apps" "${TREE}/share/icons/hicolor/256x256/apps"
+install -m 0644 app/src-tauri/icons/128x128.png "${TREE}/share/icons/hicolor/128x128/apps/braids.png"
+install -m 0644 app/src-tauri/icons/128x128@2x.png "${TREE}/share/icons/hicolor/256x256/apps/braids.png"
+sed "s|@EXEC@|braids|" utils/dist/braids.desktop.in > "${TREE}/share/applications/braids.desktop"
+install -m 0644 utils/dist/install.sh "${TREE}/share/braids-install.sh"
+echo "${VERSION}" > "${TREE}/share/braids-version"
+
+# sanity check: every library resolves inside the tree or the system
+if ldd "${TREE}/bin/braidsd" "${TREE}"/lib/*.so | grep -q "not found"; then
+  ldd "${TREE}/bin/braidsd" "${TREE}"/lib/*.so | grep "not found" >&2
+  exit 1
+fi
+"${TREE}/bin/braidsd" --list-protocols
+
+echo "== tarball"
+TARBALL="${ROOT}/dist/braids-linux-${ARCH}.tar.gz"
+tar -C "${STAGE}" --owner=0 --group=0 -czf "${TARBALL}" braids
+(cd "${ROOT}/dist" && sha256sum "$(basename "${TARBALL}")" > "$(basename "${TARBALL}").sha256")
+
+echo "== deb"
+DEBROOT="${STAGE}/deb"
+install -d "${DEBROOT}/opt" "${DEBROOT}/usr/bin" "${DEBROOT}/usr/share/applications" \
+  "${DEBROOT}/usr/share/icons/hicolor/128x128/apps" "${DEBROOT}/usr/share/icons/hicolor/256x256/apps" "${DEBROOT}/DEBIAN"
+cp -a "${TREE}" "${DEBROOT}/opt/braids"
+rm "${DEBROOT}/opt/braids/share/braids-install.sh"
+ln -s /opt/braids/bin/braids "${DEBROOT}/usr/bin/braids"
+sed "s|@EXEC@|/opt/braids/bin/braids|" utils/dist/braids.desktop.in > "${DEBROOT}/usr/share/applications/braids.desktop"
+cp "${TREE}/share/icons/hicolor/128x128/apps/braids.png" "${DEBROOT}/usr/share/icons/hicolor/128x128/apps/"
+cp "${TREE}/share/icons/hicolor/256x256/apps/braids.png" "${DEBROOT}/usr/share/icons/hicolor/256x256/apps/"
+cat > "${DEBROOT}/DEBIAN/control" <<EOF
+Package: braids
+Version: ${VERSION}
+Architecture: amd64
+Maintainer: braids contributors <noreply@braids.invalid>
+Depends: libwebkit2gtk-4.1-0, libgtk-3-0, libayatana-appindicator3-1 | libappindicator3-1, libssl3 | libssl1.1, libsqlite3-0, libmagic1, zlib1g
+Section: net
+Priority: optional
+Homepage: https://github.com/pebll/braids
+Description: Telegram, WhatsApp, Signal and Matrix in one desktop app
+ braids is an open source desktop messenger for Telegram, WhatsApp, Signal
+ and Matrix with a unified inbox. WhatsApp support is unofficial; WhatsApp
+ may restrict accounts using it.
+EOF
+DEB="${ROOT}/dist/braids_${VERSION}_amd64.deb"
+dpkg-deb --root-owner-group --build "${DEBROOT}" "${DEB}"
+(cd "${ROOT}/dist" && sha256sum "$(basename "${DEB}")" > "$(basename "${DEB}").sha256")
+
+rm -rf "${STAGE}"
+ls -l "${ROOT}/dist"

@@ -1,5 +1,6 @@
 /build
 /build-dist
+/build-release
 /build-static
 /build-static-ext
 /dbgbuild

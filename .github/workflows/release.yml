@@ -1,0 +1,97 @@
+name: Release
+
+# Linux release packages (utils/dist/package-linux): on a version tag (v*)
+# they are attached to a GitHub release, which install.sh downloads from;
+# started by hand they are kept as workflow artifacts only.
+#
+# Telegram needs braids' API credentials as repository secrets TG_API_ID and
+# TG_API_HASH (Settings -> Secrets and variables -> Actions).
+#
+# Built on the oldest supported Ubuntu runner so the binaries run on older
+# glibc versions too.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  linux:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v5
+    - name: Setup ccache
+      uses: ./.github/actions/setup-ccache
+      with:
+        cache_key_prefix: release
+    - name: Setup Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: 22
+        cache: npm
+        cache-dependency-path: app/package-lock.json
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: lib/wmchat/go/go.mod
+        cache: false
+    - name: System dependencies
+      run: |
+        ./make.sh deps -y
+        sudo apt-get install -y libwebkit2gtk-4.1-dev librsvg2-dev libayatana-appindicator3-dev libxdo-dev
+    - name: Version matches the tag
+      if: startsWith(github.ref, 'refs/tags/v')
+      run: |
+        version="$(sed -n 's/^ *"version": *"\([^"]*\)".*/\1/p' app/src-tauri/tauri.conf.json | head -1)"
+        test "v${version}" = "${GITHUB_REF_NAME}" || { echo "tag ${GITHUB_REF_NAME} but app version ${version}"; exit 1; }
+    - name: Telegram credentials present
+      env:
+        TG_API_ID: ${{ secrets.TG_API_ID }}
+        TG_API_HASH: ${{ secrets.TG_API_HASH }}
+      run: |
+        if [ -z "${TG_API_ID}" ] || [ -z "${TG_API_HASH}" ]; then
+          echo "::error::repository secrets TG_API_ID / TG_API_HASH are missing"
+          exit 1
+        fi
+    - name: Rust cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          app/src-tauri/target
+        key: cargo-release-${{ runner.os }}-${{ hashFiles('app/src-tauri/Cargo.lock') }}
+    - name: Package
+      env:
+        TG_API_ID: ${{ secrets.TG_API_ID }}
+        TG_API_HASH: ${{ secrets.TG_API_HASH }}
+      run: utils/dist/package-linux
+    - name: Install script works with the package
+      run: |
+        HOME="$(mktemp -d)" BRAIDS_TARBALL="$PWD/dist/braids-linux-x86_64.tar.gz" sh utils/dist/install.sh
+    - name: Keep packages
+      uses: actions/upload-artifact@v4
+      with:
+        name: braids-linux-x86_64
+        path: |
+          dist/*.tar.gz
+          dist/*.deb
+          dist/*.sha256
+    - name: Publish release
+      if: startsWith(github.ref, 'refs/tags/v')
+      uses: softprops/action-gh-release@v2
+      with:
+        draft: false
+        generate_release_notes: true
+        files: |
+          dist/braids-linux-x86_64.tar.gz
+          dist/braids-linux-x86_64.tar.gz.sha256
+          dist/*.deb
+          dist/*.deb.sha256
+          utils/dist/install.sh
