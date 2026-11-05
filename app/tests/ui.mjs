@@ -162,6 +162,32 @@ try {
   await page.locator('.msg.own', { hasText: 'thanks @Andy' }).last().waitFor();
   check(true, 'message with mention sent');
 
+  await composer.fill('nice '); 
+  await composer.pressSequentially(':thu');
+  await page.locator('.emoji-suggest .glyph', { hasText: '👍' }).waitFor({ timeout: 5000 }).catch(() => {});
+  const glyphs = await page.locator('.emoji-suggest .glyph').allTextContents();
+  check(glyphs.includes('👍'), 'emoji suggestions appear after ":" and two letters');
+  await shot('emoji-suggest');
+  await composer.press('Enter');
+  check((await composer.inputValue()) === `nice ${glyphs[0]}`, 'Enter inserts the emoji');
+  // a time or a single letter is not a suggestion
+  await composer.fill('at 12:30 and :t');
+  await page.waitForTimeout(300);
+  check(await page.locator('.emoji-suggest').count() === 0, 'no emoji suggestions for a time or a single letter');
+  // arrows and Tab pick another one, Esc closes
+  await composer.fill(':thu');
+  await page.locator('.emoji-suggest .glyph', { hasText: '👍' }).waitFor({ timeout: 5000 }).catch(() => {});
+  const second = await page.locator('.emoji-suggest .glyph').nth(1).textContent();
+  await composer.press('ArrowDown');
+  await composer.press('Tab');
+  check((await composer.inputValue()) === second, 'arrows and Tab pick another suggestion');
+  await composer.fill(':thu');
+  await page.locator('.emoji-suggest').waitFor();
+  await composer.press('Escape');
+  await page.locator('.emoji-suggest').waitFor({ state: 'detached' });
+  check(true, 'Esc closes the emoji suggestions');
+  await composer.fill('');
+
   // one-line message: react and reply side by side
   const oneLiner = page.locator('.msg.own', { hasText: 'Hello team' }).last();
   await oneLiner.hover();

@@ -10,15 +10,6 @@
   time. Esc or a click outside closes it.
 -->
 <script module lang="ts">
-  interface Emoji { unicode: string; label: string; tags?: string[]; group?: number; order?: number }
-  let data: Promise<Emoji[]> | null = null;
-
-  function loadEmoji(): Promise<Emoji[]> {
-    data ??= import('emojibase-data/en/compact.json').then((m) =>
-      (m.default as Emoji[]).filter((e) => e.group !== undefined && e.group !== 2).sort((a, b) => (a.order ?? 0) - (b.order ?? 0)));
-    return data;
-  }
-
   const RECENT_KEY = 'braids.emoji.recent';
   function recent(): string[] {
     try {
@@ -32,6 +23,7 @@
 <script lang="ts">
   import { Apple, Car, Clock, Flag, Heart, Lightbulb, PawPrint, Search, Smile, Trophy, Users } from '@lucide/svelte';
   import { onMount, tick } from 'svelte';
+  import { loadEmoji, type Emoji } from '../lib/emoji';
 
   let { onPick, onClose }: { onPick: (emoji: string) => void; onClose: () => void } = $props();
   let root: HTMLDivElement | undefined = $state();
