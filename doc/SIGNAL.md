@@ -1,5 +1,6 @@
 Signal
 ======
+>
 > **braids note:** inherited from nchat. In braids Signal is enabled by
 > default; disable it with `./make.sh --no-signal build`.
 
@@ -20,6 +21,7 @@ the number of Telegram and WhatsApp users.
 
 libsignal
 ---------
+
 Signal support requires the `libsignal_ffi` library. By default nchat
 downloads a pre-built binary (supported on Linux and macOS, amd64 and
 arm64). If the download is not available for the current platform, it

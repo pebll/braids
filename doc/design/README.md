@@ -4,16 +4,15 @@ braids — GUI design handoff
 The visual design for the M3 Tauri app, made from
 [DESIGN_BRIEF.md](../DESIGN_BRIEF.md). The source of truth is the design
 canvas (owner access; ask the maintainer for a share link):
-https://claude.ai/artifact/NcqJg7PBPMj7kT5VMPeG4z
+<https://claude.ai/artifact/NcqJg7PBPMj7kT5VMPeG4z>
 
 Everything a coding agent needs is in this folder, so the canvas is optional.
-
 
 Contents
 --------
 
 | Path | What |
-|---|---|
+| --- | --- |
 | `tokens.css` | All design tokens as CSS custom properties (light on `:root, .t-light`, dark on `.t-dark`). Use these names directly in the app. |
 | `screenshots/*.png` | Rendered screenshot of every artboard (1×). Start here. |
 | `mockups/*.html` | The same artboards as standalone HTML/CSS. Open in a browser; inspect for exact spacing, sizes and colors. Static markup, not app code. |
@@ -26,7 +25,6 @@ add-account steps), `Main-wide` / `Main-medium` / `Main-narrow`
 brief 3.3), `ChatList-states`, `EmptyStates`, `Settings`, `Dialogs`
 (confirmations, new chat, lightbox, banners, toasts, notifications,
 tray/dock badge, composer states). Plus `Tokens` and `Logo`.
-
 
 Key decisions
 -------------
