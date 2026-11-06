@@ -11,6 +11,7 @@ import * as api from './api';
 import { plainText } from './format';
 import { ACCOUNT_COLORS, protocolMeta } from './protocols';
 import { settings, type ChatCategory } from './settings.svelte';
+import type { LightboxItem } from './ui.svelte';
 import type { Account, ApiEvent, AuthPrompt, Chat, Contact, FileRef, Message } from './types';
 import { ApiError } from './types';
 
@@ -936,10 +937,11 @@ export function fileReady(f: FileRef | null): boolean {
 }
 
 // images and videos of messages, for the viewer
-export function galleryItems(messages: Message[]): { path: string; name: string; video?: boolean }[] {
+export function galleryItems(messages: Message[]): LightboxItem[] {
   return messages
     .filter((x) => fileReady(x.file) && x.file!.kind !== 'sticker' && /^(image|video)\//.test(fileMime(x.file)))
-    .map((x) => ({ path: x.file!.path, name: x.file!.name, video: fileMime(x.file).startsWith('video/') }));
+    .map((x) => ({ path: x.file!.path, name: x.file!.name, video: fileMime(x.file).startsWith('video/'),
+                   msg: { accountId: x.accountId, chatId: x.chatId, id: x.id } }));
 }
 
 export function fileLabel(m: Message): string {

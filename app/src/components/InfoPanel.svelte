@@ -14,7 +14,7 @@
   import * as api from '../lib/api';
   import { linkify } from '../lib/format';
   import { protocolMeta } from '../lib/protocols';
-  import { fileMime, fileReady, splitKey, store } from '../lib/store.svelte';
+  import { fileMime, fileReady, galleryItems, splitKey, store } from '../lib/store.svelte';
   import type { Message } from '../lib/types';
   import { openLightbox, ui } from '../lib/ui.svelte';
   import Avatar from './Avatar.svelte';
@@ -162,7 +162,7 @@
         <div class="section media-head">Shared media<button class="link" onclick={() => (ui.media = { chatKey })}>Show all</button></div>
         <div class="media">
           {#each images as m (m.id)}
-            <button onclick={() => openLightbox(images.map((x) => ({ path: x.file!.path, name: x.file!.name })), m.file!.path)} aria-label="Open {m.file!.name}">
+            <button onclick={() => openLightbox(galleryItems(images), m.file!.path)} aria-label="Open {m.file!.name}">
               <img src={api.fileUrl(m.file!.path)} alt={m.file!.name} loading="lazy" />
             </button>
           {/each}

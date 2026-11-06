@@ -445,6 +445,22 @@ try {
   await page.locator('.lightbox').waitFor({ state: 'detached' });
   check(true, 'Esc closes the viewer');
 
+  // viewer actions: copy, Ctrl+C, show in chat
+  await page.locator('.msg .image:not(.video-thumb)').last().click();
+  await page.locator('.lightbox img').waitFor();
+  check(await page.locator('.lightbox').getByRole('button', { name: 'Download' }).count() === 1, 'viewer: download button');
+  await page.evaluate(() => navigator.clipboard.writeText(''));
+  await page.locator('.lightbox').getByRole('button', { name: 'Copy image' }).click();
+  await page.waitForFunction(async () => (await navigator.clipboard.read()).some((i) => i.types.includes('image/png')));
+  check(true, 'viewer: Copy image puts a PNG on the clipboard');
+  await page.evaluate(() => navigator.clipboard.writeText(''));
+  await page.keyboard.press('Control+c');
+  await page.waitForFunction(async () => (await navigator.clipboard.read()).some((i) => i.types.includes('image/png')));
+  check(true, 'viewer: Ctrl+C copies the image');
+  await page.locator('.lightbox').getByRole('button', { name: 'Show in chat' }).click();
+  await page.locator('.lightbox').waitFor({ state: 'detached' });
+  check(true, 'viewer: Show in chat closes the viewer');
+
   // no browser context menu outside text fields
   const prevented = (sel) => page.locator(sel).first().evaluate((el) => {
     const ev = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });

@@ -28,6 +28,7 @@ export interface LightboxItem {
   name: string;
   video?: boolean; // played in the viewer instead of shown
   fullAvatar?: string; // profile picture (chat key): shown in full size once fetched
+  msg?: { accountId: string; chatId: string; id: string }; // the message it is in ("Show in chat")
 }
 
 class Ui {

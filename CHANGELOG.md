@@ -20,6 +20,8 @@ release workflow publishes the section of a version as its release notes.
 - "Copy image" in the menu of photos. Contributed by @Pierre-Pln-Bys
   (#22, #9).
 - Settings → About: Report a bug, Suggest a feature, Known issues (GitHub).
+- Image viewer: Show in chat, Copy image (also Ctrl+C) and Save as (also
+  Ctrl+S) next to "Open with default app".
 
 ### Fixed
 - Links no longer open inside braids, with no way back (when no browser was
