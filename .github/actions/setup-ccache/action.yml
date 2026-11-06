@@ -44,8 +44,11 @@ runs:
       uses: actions/cache@v5
       with:
         path: ${{ steps.cache-key.outputs.ccache_dir }}
-        key: ${{ steps.cache-key.outputs.prefix }}-${{ runner.os }}-${{ steps.cache-key.outputs.compiler_hash }}-${{ hashFiles('**/CMakeLists.txt','**/*.cmake') }}
+        # cache entries cannot be overwritten: a key per run saves the grown
+        # cache every time, the restore keys pick the newest one
+        key: ${{ steps.cache-key.outputs.prefix }}-${{ runner.os }}-${{ steps.cache-key.outputs.compiler_hash }}-${{ github.run_id }}-${{ github.run_attempt }}
         restore-keys: |
+          ${{ steps.cache-key.outputs.prefix }}-${{ runner.os }}-${{ steps.cache-key.outputs.compiler_hash }}-
           ${{ steps.cache-key.outputs.prefix }}-${{ runner.os }}-
 
     - name: Configure ccache
