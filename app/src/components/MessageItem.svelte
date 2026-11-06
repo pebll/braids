@@ -9,7 +9,7 @@
   groups, quote, attachment, reactions, hover actions.
 -->
 <script lang="ts">
-  import { Check, CheckCheck, Clock, Copy, Download, FileText, Forward, LoaderCircle, Pencil, Pin, PinOff, Play, Reply, RotateCw, SmilePlus, Trash2, TriangleAlert } from '@lucide/svelte';
+  import { Check, CheckCheck, Clock, Copy, Download, FileText, Forward, Image, LoaderCircle, Pencil, Pin, PinOff, Play, Reply, RotateCw, SmilePlus, Trash2, TriangleAlert } from '@lucide/svelte';
   import { copyText, openLink, personMenu } from '../lib/actions';
   import * as api from '../lib/api';
   import { mediaSrc } from '../lib/media';
@@ -177,6 +177,7 @@
   function extraItems(): MenuItem[] {
     const items: MenuItem[] = [];
     if (m.text) items.push({ label: 'Copy text', icon: Copy, run: () => copyText(m.text, 'Copied') });
+    if (m.file && isImage && !isSticker && ready) items.push({ label: 'Copy image', icon: Image, run: () => api.copyImage(m.file!.path).then(() => store.toast('Copied')).catch((e) => store.toastError(e)) });
     if (m.file) items.push({ label: 'Download file', icon: Download, run: saveFile });
     items.push({ label: 'Forward…', icon: Forward, run: () => (ui.forward = m) });
     if (account.capabilities.pinMessage) items.push(pinItem());
@@ -204,6 +205,7 @@
     const items: MenuItem[] = [{ label: 'Reply', icon: Reply, run: reply }];
     if (editState.show) items.push({ label: 'Edit', icon: Pencil, run: edit, disabled: !editState.ok, hint: editState.reason });
     if (m.text) items.push({ label: 'Copy text', icon: Copy, run: () => copyText(m.text, 'Copied') });
+    if (m.file && isImage && !isSticker && ready) items.push({ label: 'Copy image', icon: Image, run: () => api.copyImage(m.file!.path).then(() => store.toast('Copied')).catch((e) => store.toastError(e)) });
     if (m.file) items.push({ label: 'Download file', icon: Download, run: saveFile });
     items.push({ label: 'Forward…', icon: Forward, run: () => (ui.forward = m) });
     if (account.capabilities.pinMessage) items.push(pinItem());

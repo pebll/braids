@@ -1,5 +1,6 @@
 Matrix
 ======
+>
 > **braids note:** this page was written for nchat. The protocol behaviour,
 > security notes and licensing apply to braids; the setup instructions refer to
 > nchat's terminal setup (`nchat --setup`), which braids replaces with a GUI
@@ -12,9 +13,9 @@ implementation (no libolm dependency).
 
 Matrix support is experimental and currently disabled by default.
 
-
 Building
 --------
+
 Enable the Matrix protocol explicitly:
 
     NCHAT_CMAKEARGS="-DHAS_MATRIX=ON" ./make.sh build
@@ -31,9 +32,9 @@ A fully static build (`HAS_SHARED_LIBS=OFF`) cannot currently combine Matrix
 with WhatsApp or Signal, as each has its own Go runtime. Use the default shared
 library build, or enable only one Go-based protocol in a static build.
 
-
 Setup
 -----
+
 Run nchat in setup mode and select Matrix:
 
     $ nchat --setup
@@ -61,9 +62,9 @@ using Matrix Authentication Service) are not supported yet.
 The profile is named `Matrix_<user>_<server>`. Restarting nchat reuses the
 session, it does not create a new device.
 
-
 Recovery Key (Verification and Encrypted History)
 -------------------------------------------------
+
 If the account uses secure backup / recovery (as set up by Element and most
 other clients), nchat asks for the recovery key during setup, and again at
 startup while the nchat device is not yet verified:
@@ -75,6 +76,7 @@ startup while the nchat device is not yet verified:
     Recovery key:
 
 Entering the recovery key (or security passphrase):
+
 - fetches the cross-signing keys from secret storage and signs the nchat
   device, so other clients show it as verified,
 - enables the server-side key backup: older encrypted messages are decrypted
@@ -88,9 +90,9 @@ Messages that cannot be decrypted yet are shown as `🔒 waiting for keys`.
 nchat requests the keys from your other devices and the key backup, and the
 message is updated in place once the keys arrive.
 
-
 Supported Features
 ------------------
+
 - Direct and group chats, encrypted and unencrypted
 - Message history (backfill from the server)
 - Send and receive text (markdown sent as HTML), replies, edits, deletion
@@ -109,9 +111,9 @@ Not supported: SSO login, account registration, interactive (emoji)
 verification, threads (thread messages are shown inline as replies), spaces,
 calls.
 
-
 Files and Security
 ------------------
+
 All Matrix state is stored in the profile directory
 `~/.config/nchat/profiles/Matrix_*`, created with owner-only permissions
 (files 0600, directories 0700):
@@ -137,9 +139,9 @@ the server; remove the "nchat" device from another client's session list
 revoked or expires, nchat shows an error and the profile has to be set up
 again.
 
-
 Licensing
 ---------
+
 mautrix-go and its dependencies are under permissive licenses (MPL-2.0, MIT,
 BSD, Apache-2.0), see `lib/mxchat/THIRD_PARTY_LICENSES`. Enabling Matrix does
 not change the license of the combined distribution. MPL-2.0 requires the

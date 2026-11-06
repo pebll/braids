@@ -1,5 +1,6 @@
 WhatsApp and Signal on musl Systems (e.g. Alpine Linux)
 =======================================================
+
 On musl-based systems, the WhatsApp and Signal support (both Go/cgo) built with
 a stock Go toolchain crashes at startup (nchat issue
 [#204](https://github.com/d99kris/nchat/issues/204), caused by Go issue

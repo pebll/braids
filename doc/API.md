@@ -49,7 +49,7 @@ Error codes: JSON-RPC (`-32700` parse error, `-32600` invalid request,
 Objects
 -------
 
-**Account**
+- **Account**
 
     {"accountId", "protocol": "Telegram|WhatsAppMd|Signal|Matrix|Dummy",
      "displayName", "selfId", "state": "connecting|online|offline|error",
@@ -59,7 +59,7 @@ Objects
                       "limitedReactions", "readReceiptsPerMessage",
                       "avatars", "descriptions", "joinChat", "createGroup", "muteChat"}}
 
-**Chat**
+- **Chat**
 
     {"accountId", "id", "name", "isGroup", "isUnread", "isUnreadMention",
      "unreadCount", "unreadEvents", "isMuted", "isPinned", "isArchived",
@@ -76,7 +76,7 @@ muted chat); with neither known, `unreadCount` is 1. `isUnread` is also true for
 `chats.mute`, else the messenger's; muted chats send no `notification`
 (except for mentions).
 
-**Message**
+- **Message**
 
     {"accountId", "chatId", "id", "senderId", "senderName", "text", "time",
      "isOutgoing", "isRead", "isEdited", "isDeleted", "isPinned", "hasMention",
@@ -119,7 +119,7 @@ Methods
 -------
 
 | Method | Params | Result |
-|---|---|---|
+| --- | --- | --- |
 | `hello` | | `{apiVersion, version, protocols: [name], startTime, pid}` (`startTime`: ms; clients restart a daemon older than its binary) |
 | `daemon.shutdown` | | `{}`, then braidsd exits (also on SIGTERM/SIGINT) |
 | `accounts.list` | | `[Account]` |
@@ -168,7 +168,7 @@ Events
 ------
 
 | Event | Params |
-|---|---|
+| --- | --- |
 | `ready` | `{apiVersion}` |
 | `account.auth` | `{setupId or accountId, step, field, message, data, isSecret, isOptional}` |
 | `account.added` | `{setupId, account: Account}` |
@@ -218,7 +218,7 @@ The flow ends with `account.added` or `account.setupFailed`.
 `accounts.authCancel` aborts a pending input. Fields per protocol:
 
 | Protocol | Steps |
-|---|---|
+| --- | --- |
 | Telegram | `phone`, QR code (or code via `USE_PAIRING_CODE`), `code`, `password` (2FA), `firstName`/`lastName` (new accounts) |
 | WhatsApp | `phone`, QR code or pairing code (`USE_PAIRING_CODE`), `passkeyResponse` and `confirm` for passkey-locked accounts |
 | Signal | `phone`, QR code |

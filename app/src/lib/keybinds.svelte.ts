@@ -29,6 +29,9 @@ export type Action =
   | 'searchInChat'
   | 'editLast'
   | 'toggleInfo'
+  | 'textSizeIncrease'
+  | 'textSizeDecrease'
+  | 'textSizeReset'
   | 'settings'
   | 'shortcuts';
 
@@ -55,6 +58,9 @@ export const ACTIONS: { id: Action; group: ActionGroup; label: string; defaults:
   { id: 'searchInChat', group: 'action', label: 'Search in chat', defaults: ['Mod+F'] },
   { id: 'editLast', group: 'action', label: 'Edit last own message', defaults: ['Mod+E'] },
   { id: 'toggleInfo', group: 'action', label: 'Toggle info panel', defaults: ['Mod+I'] },
+  { id: 'textSizeIncrease', group: 'action', label: 'Increase text size', defaults: ['Mod++'] },
+  { id: 'textSizeDecrease', group: 'action', label: 'Decrease text size', defaults: ['Mod+-'] },
+  { id: 'textSizeReset', group: 'action', label: 'Reset text size', defaults: ['Mod+0'] },
   { id: 'settings', group: 'action', label: 'Settings', defaults: ['Mod+,'] },
   { id: 'shortcuts', group: 'action', label: 'Keyboard shortcuts', defaults: ['Mod+/'] },
 ];

@@ -1,5 +1,6 @@
 Building on Low Memory / RAM Systems
 ====================================
+
 The Telegram client library subcomponent requires relatively large amount of
 RAM to build by default (3.5GB using g++, and 1.5 GB for clang++). It is
 possible to adjust the Telegram client library source code so that it requires
@@ -41,4 +42,3 @@ Steps to build nchat on a low memory system:
 **Revert Source Code Split (Optional)**
 
     cd ../lib/tgchat/ext/td ; php SplitSource.php --undo ; cd -
-
