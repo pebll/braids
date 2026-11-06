@@ -11,6 +11,7 @@
   import { X } from '@lucide/svelte';
   import { tick } from 'svelte';
   import * as api from '../lib/api';
+  import { settings } from '../lib/settings.svelte';
   import { store } from '../lib/store.svelte';
   import { ui } from '../lib/ui.svelte';
   import Lightbox from './Lightbox.svelte';
@@ -23,13 +24,15 @@
   $effect(() => {
     const m = ui.menu;
     if (!m) return;
-    menuPos = { x: m.x, y: m.y };
+    const zoom = api.isTauri ? 1 : settings.textSize / 100;
+    menuPos = { x: m.x / zoom, y: m.y / zoom };
     tick().then(() => {
       if (!menuEl) return;
       const r = menuEl.getBoundingClientRect();
+      const zoom = api.isTauri ? 1 : settings.textSize / 100;
       menuPos = {
-        x: Math.max(8, Math.min(m.leftOf ? m.x - r.width : m.x, window.innerWidth - r.width - 8)),
-        y: Math.max(8, m.y + r.height > window.innerHeight - 8 ? m.y - r.height : m.y),
+        x: Math.max(8, Math.min(m.leftOf ? m.x - r.width : m.x, window.innerWidth - r.width - 8)) / zoom,
+        y: Math.max(8, m.y + r.height > window.innerHeight - 8 ? m.y - r.height : m.y) / zoom,
       };
       menuEl.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus();
     });

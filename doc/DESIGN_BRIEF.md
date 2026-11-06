@@ -1,4 +1,5 @@
-braids — GUI Design Brief
+# braids — GUI Design Brief
+
 =========================
 
 This brief is meant to be handed to a designer (or design tool) to produce
@@ -7,8 +8,8 @@ the agreed design direction, every screen and state that needs a design, and
 the deliverables. Functional scope comes from
 [REQUIREMENTS.md](REQUIREMENTS.md); this document only adds design decisions.
 
+## 1. The product in one paragraph
 
-1. The product in one paragraph
 -------------------------------
 
 braids is an open source desktop messenger for **Linux and macOS** that puts
@@ -20,12 +21,12 @@ normal, well-made messenger, not like a "web wrapper of four web apps".
 Audience: privacy-aware people and power users who are tired of running four
 messenger apps; many use Linux, many like keyboard control.
 
+## 2. Design direction (agreed)
 
-2. Design direction (agreed)
-----------------------------
+-------------------------------
 
 | Topic | Decision |
-|---|---|
+| --- | --- |
 | Personality | **Calm, native, minimal**, with a **subtle warm "braids" touch**. Neutral greys, one main accent, system fonts, should feel at home on GNOME and macOS. The warmth comes from the brand: a warm accent color and the motif of interwoven strands (used sparingly: logo, empty states, welcome screen, loading/syncing indicators — never as busy decoration in the chat itself). |
 | Layout | **2-pane + collapsible sidebar**: sidebar (folders/filters) · chat list · conversation, plus an optional **right info panel**. |
 | Messages | **Bubbles**: own messages right, others left, rounded bubbles. |
@@ -44,22 +45,22 @@ Accessibility: WCAG AA contrast in both themes, visible keyboard focus rings,
 no information conveyed by color alone (account color always paired with the
 protocol badge and/or account name), hit targets ≥ 32 px.
 
+## 3. Main window
 
-3. Main window
---------------
+-------------------------------
 
-```
+```md
 ┌────────────┬──────────────────┬───────────────────────────────┬────────────┐
 │ Sidebar    │ Chat list        │ Conversation                  │ Info panel │
 │ (folders)  │                  │                               │ (optional) │
 │            │ [search]         │ Header: avatar, name, status  │            │
-│ All chats  │ ● Alice      12:04│ ─────────── Today ──────────  │ members    │
-│ Unread     │   Team chat  11:50│  ┌─────────┐                  │ media      │
-│ ───────    │   Bob        Mon  │  │ message │                  │ mute       │
+│ All chats  │ ● Alice     12:04│ ─────────── Today ──────────  │ members    │
+│ Unread     │   Team chat 11:50│  ┌─────────┐                  │ media      │
+│ ───────    │   Bob       Mon  │  │ message │                  │ mute       │
 │ ● Telegram │                  │  └─────────┘   ┌──────────┐   │ encryption │
 │ ● WA work  │                  │                │ own msg  │   │ leave      │
 │ ● Matrix   │                  │                └──────────┘   │            │
-│ ───────    │                  │ [📎] [ composer        ] [➤] │            │
+│ ───────    │                  │ [📎] [ composer         ] [➤] │            │
 │ Archived   │                  │                               │            │
 │ ⚙  + acct  │                  │                               │            │
 └────────────┴──────────────────┴───────────────────────────────┴────────────┘
@@ -100,6 +101,7 @@ protocol badge and/or account name), hit targets ≥ 32 px.
 chat, toggle info panel, overflow menu.
 
 **Message list** (virtualized, can be very long):
+
 - Day separators ("Today", "Yesterday", date); "New messages" divider at the
   first unread message.
 - Bubbles: own right (accent-tinted), others left (neutral). In groups:
@@ -134,6 +136,7 @@ chat, toggle info panel, overflow menu.
 - Typing indicator at the bottom of the list ("Alice is typing…").
 
 **Composer**:
+
 - Multi-line auto-growing text field, placeholder shows the account the
   message will be sent from ("Message via WA work…").
 - Attach button (file picker), emoji button, send button. Drag & drop of
@@ -159,15 +162,16 @@ highlighted matches with up/down navigation and a match counter.
 - Shared media / files grid (can be a "coming later" placeholder section).
 - On narrow windows it opens as an overlay sheet instead of a column.
 
+## 4. Accounts and login (modal wizard)
 
-4. Accounts and login (modal wizard)
-------------------------------------
+-------------------------------
 
 First launch (no accounts): **full-window welcome** with the braids logo,
 one-line pitch, privacy statement ("Everything stays on this computer") and
 the protocol choice. Later, "Add account" opens the same flow as a modal.
 
 Steps:
+
 1. **Choose protocol**: four large cards (Telegram, WhatsApp, Signal, Matrix)
    with logo and one-line note. WhatsApp card carries a short, honest note:
    "Unofficial client — WhatsApp may restrict accounts using it."
@@ -192,21 +196,21 @@ color picker (6–8 preset colors), notifications on/off, log out / remove
 account (destructive confirm dialog: "Remove local data" and, where possible,
 "Also log out this device").
 
+## 5. Responsive behavior
 
-5. Responsive behavior
-----------------------
+-------------------------------
 
 | Width | Layout |
-|---|---|
+| --- | --- |
 | Wide (≥ ~1280 px) | Sidebar expanded · chat list · conversation · info panel as column |
 | Medium (~900–1280 px) | Sidebar collapsed to icons · chat list · conversation; info panel as overlay |
 | Narrow (< ~700–900 px) | Single pane: chat list **or** conversation with a back button; sidebar as drawer |
 
 Please show the main screen in all three widths, light and dark.
 
+## 6. Protocol differences the UI must handle
 
-6. Protocol differences the UI must handle
-------------------------------------------
+-------------------------------
 
 The UI is unified, but some actions only exist on some protocols. The design
 should hide unsupported actions rather than disable them, except where
@@ -214,7 +218,7 @@ disabling with a tooltip explains something useful (e.g. "Edit window has
 expired").
 
 | Feature | Telegram | WhatsApp | Signal | Matrix |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | Edit | ~48 h | 15 min | ~24 h | always |
 | Delete for everyone | yes | time-limited | time-limited | yes |
 | Reactions per user | 1+ from a chat-specific set | 1 | 1 | 1 in v1 |
@@ -226,8 +230,8 @@ Out of scope for v1 (no design needed): calls, stories/status, polls
 creation, threads view (thread messages appear inline as replies), spaces,
 merging contacts across protocols.
 
+## 7. Other screens and components
 
-7. Other screens and components
 -------------------------------
 
 - **Settings** (modal or full panel with sections): General (theme
@@ -247,9 +251,9 @@ merging contacts across protocols.
   small vim mode indicator (`LIST` / `NORMAL` / `INSERT`) shown only when vim
   mode is enabled (no dedicated vim designs needed now).
 
+## 8. Deliverables
 
-8. Deliverables
----------------
+-------------------------------
 
 1. **Screens** (light + dark): welcome / first launch, add-account wizard
    (protocol choice, QR step, text input step, recovery key step, error,

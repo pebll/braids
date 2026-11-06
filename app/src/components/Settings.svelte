@@ -12,7 +12,7 @@
   import {
     ACTIONS, GROUPS, addBinding, bindings, comboKeys, comboLabel, comboOf, isDefault, isMac, isUsableCombo, removeBinding, resetBindings, type Action,
   } from '../lib/keybinds.svelte';
-  import { settings, type Theme } from '../lib/settings.svelte';
+  import { settings, type TextSize, type Theme } from '../lib/settings.svelte';
   import { store } from '../lib/store.svelte';
   import { ui } from '../lib/ui.svelte';
   import Logo from './Logo.svelte';
@@ -103,6 +103,7 @@
   function set<K extends keyof typeof settings>(key: K, value: (typeof settings)[K]) {
     (settings as any)[key] = value;
     settings.save();
+    if (key === 'textSize') ui.showTextSize(value as number);
     if (key === 'closeToTray') api.setCloseToTray(value as boolean);
   }
 
@@ -149,6 +150,12 @@
     { id: 'light', label: 'Light', icon: Sun },
     { id: 'dark', label: 'Dark', icon: Moon },
   ];
+  const textSizes: TextSize[] = [70, 80, 90, 100, 110, 125, 150];
+
+  function setCustomTextSize(value: string) {
+    const size = Math.round(Number(value));
+    if (Number.isFinite(size) && size >= 50 && size <= 200) set('textSize', size);
+  }
 </script>
 
 <svelte:window onkeydown={(e) => e.key === 'Escape' && !ui.confirmRequest && close()} />
@@ -174,6 +181,20 @@
             {#each themes as t}
               <button aria-pressed={settings.theme === t.id} onclick={() => set('theme', t.id)}><t.icon size={14} />{t.label}</button>
             {/each}
+          </div>
+        </div>
+        <div class="row">
+          <div class="row-text"><b>Text size</b><span>Scale the whole interface, including menus and dialogs.</span></div>
+          <div class="text-size-control">
+            <select aria-label="Text size preset" value={textSizes.includes(settings.textSize) ? settings.textSize : ''}
+              onchange={(e) => set('textSize', Number((e.target as HTMLSelectElement).value))}>
+              {#each textSizes as size}<option value={size}>{size} %</option>{/each}
+            </select>
+            <label class="custom-size">
+              <input aria-label="Custom text size" type="number" min="50" max="200" step="1" value={settings.textSize}
+                oninput={(e) => setCustomTextSize((e.target as HTMLInputElement).value)} />
+              <span>%</span>
+            </label>
           </div>
         </div>
         <div class="row">
@@ -347,6 +368,13 @@
   .row-text { display: flex; flex-direction: column; min-width: 0; font-size: 14px; }
   .row-text b { font-weight: 500; }
   .row-text span { font-size: 12px; color: var(--text-muted); line-height: 16px; overflow-wrap: anywhere; }
+  .text-size-control { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .text-size-control select, .custom-size input {
+    height: 30px; border: 1px solid var(--border-strong); border-radius: var(--radius-md);
+    background: var(--surface-2); padding: 0 8px; color: var(--text); font-size: 13px;
+  }
+  .custom-size { display: flex; align-items: center; gap: 4px; color: var(--text-2); }
+  .custom-size input { width: 64px; }
   .section { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); margin-top: 16px; }
   .keys { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
   .shortcuts-head { display: flex; align-items: center; justify-content: space-between; }
