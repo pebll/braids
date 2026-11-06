@@ -79,7 +79,9 @@ the version's section of `CHANGELOG.md`: add user-facing changes under
 `[Unreleased]` and rename it to the version before tagging). Test builds:
 `.github/workflows/preview.yml` publishes every pull request as the
 pre-release `pr-<N>` (`install.sh --pr N`; `--branch NAME` after running it
-by hand on a branch), deleted when the pull request closes. Website: `site/` (GitHub Pages,
+by hand on a branch), deleted when the pull request closes; it also runs
+(build only) on every push to main, which keeps the ccache/Rust/Go caches
+warm (GitHub shares only main's caches with pull requests and tags). Website: `site/` (GitHub Pages,
 `.github/workflows/pages.yml`); screenshots and the README demo GIF
 (`site/img/demo.gif`) come from `app/scripts/site-screenshots.mjs`.
 
