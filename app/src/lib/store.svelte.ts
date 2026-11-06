@@ -141,18 +141,24 @@ class Store {
   }
 
   // unread chats per folder (each counts once, however many messages);
-  // muted chats count only when mentioned
+  // muted chats count only when mentioned; the archive counts its chats with
+  // new messages (all quiet, like muted chats)
   unreadCount(filter: Filter): number {
     return this.unreadChats(filter).length;
+  }
+
+  // archived chats behave like muted ones: grey count, no notification
+  isQuiet(c: Chat): boolean {
+    return c.isMuted || this.category(c) === 'archived';
   }
 
   private unreadChats(filter: Filter): Chat[] {
     return Object.values(this.chats).filter((c) => {
       if (!c.isUnread || !this.accounts[c.accountId]) return false;
-      if (c.isMuted && !c.isUnreadMention) return false;
       if (this.eventsOnly(c)) return false;
       const category = this.category(c);
       if (filter.kind === 'archived') return category === 'archived';
+      if (c.isMuted && !c.isUnreadMention) return false;
       if (category === 'archived') return false;
       if (filter.kind === 'favorites') return category === 'favorite';
       if (filter.kind === 'account') return c.accountId === filter.accountId;
@@ -648,7 +654,7 @@ class Store {
     if (!settings.notifications || settings.accounts[p.accountId]?.notify === false) return;
     if (this.focused && this.current === key) return;
     const chat = this.chats[key];
-    if (chat && this.category(chat) === 'archived' && !p.hasMention) return;
+    if (chat && this.category(chat) === 'archived') return; // quiet, like muted (braidsd skips them too)
     const title = p.isGroup ? `${p.chatName}` : p.senderName || p.chatName;
     let body = settings.notificationPreview ? plainText(p.text) || (p.hasFile ? 'Attachment' : '') : 'New message';
     if (settings.notificationPreview && p.isGroup && p.senderName) body = `${p.senderName}: ${body}`;

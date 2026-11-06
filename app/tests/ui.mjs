@@ -597,11 +597,19 @@ try {
   await pamRow.locator('.flag[title=Muted]').waitFor({ state: 'detached' });
   check(true, 'chat unmuted');
 
+  const archivedBadge = () => page.locator('.sidebar .item', { hasText: 'Archived' }).locator('.count');
+  const archivedBefore = await archivedBadge().count() ? Number(await archivedBadge().textContent()) : 0;
+  await page.getByRole('option', { name: /Jim/ }).click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Mark as unread' }).click();
+  await page.getByRole('option', { name: /Jim/ }).locator('.unread-count').waitFor();
   await page.getByRole('option', { name: /Jim/ }).click({ button: 'right' });
   await page.getByRole('menuitem', { name: 'Archive' }).click();
   check((await page.getByRole('option', { name: /Jim/ }).count()) === 0, 'archived chat leaves the inbox');
+  await page.waitForFunction((n) => Number(document.querySelector('.sidebar .item:has(.label) .count.muted')?.closest('.item')?.textContent?.match(/Archived\s*(\d+)/)?.[1] ?? 0) === n + 1, archivedBefore);
+  check(true, 'Archived shows a grey count of its chats with new messages');
   await page.getByRole('button', { name: /Archived/ }).click();
   check((await page.getByRole('option', { name: /Jim/ }).count()) === 1, 'archived chat in Archived');
+  check(await page.getByRole('option', { name: /Jim/ }).locator('.unread-count.muted').count() === 1, 'archived chat: grey unread count, like a muted chat');
   await page.getByRole('option', { name: /Jim/ }).click({ button: 'right' });
   await page.getByRole('menuitem', { name: 'Unarchive' }).click();
   await page.getByRole('button', { name: 'All chats' }).click();

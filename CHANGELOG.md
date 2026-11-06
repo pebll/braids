@@ -31,6 +31,9 @@ release workflow publishes the section of a version as its release notes.
 ### Changed
 - An account that is not online has a bigger status dot in the sidebar, so a
   problem stands out.
+- Archived chats are quiet like muted chats: no notifications, a grey
+  unread count, and "Archived" in the sidebar shows how many of them have
+  new messages (it counted all archived chats).
 - Documentation formatting tidied up. Contributed by @Pierre-Pln-Bys (#19).
 
 ## [0.3.1] - 2026-11-05
