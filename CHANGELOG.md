@@ -6,6 +6,31 @@ release workflow publishes the section of a version as its release notes.
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-11-06
+
+### New
+- Polls on all messengers: see them with live results, vote (and take the
+  vote back), make your own with the poll button next to the attach button
+  (single or multiple choice, up to 12 options). Telegram allows polls in
+  groups only. Votes are kept across restarts.
+- Text size: Settings → General, or Ctrl+Plus / Ctrl+Minus / Ctrl+0 (also
+  Ctrl+=). Contributed by @Pierre-Pln-Bys (#21, #7).
+- Emoji shortcodes: type `:` and a few letters (`:thu`) for suggestions,
+  Tab or Enter inserts. Contributed by @Pierre-Pln-Bys (#18, #5).
+- "Copy image" in the menu of photos. Contributed by @Pierre-Pln-Bys
+  (#22, #9).
+- Settings → About: Report a bug, Suggest a feature, Known issues (GitHub).
+
+### Fixed
+- Links no longer open inside braids, with no way back (when no browser was
+  running): the window never leaves braids, web pages go to the default
+  browser. (#20)
+
+### Changed
+- An account that is not online has a bigger status dot in the sidebar, so a
+  problem stands out.
+- Documentation formatting tidied up. Contributed by @Pierre-Pln-Bys (#19).
+
 ## [0.3.1] - 2026-11-05
 
 ### New

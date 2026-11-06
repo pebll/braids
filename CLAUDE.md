@@ -135,5 +135,10 @@ Scheduled-later features are in `doc/BACKLOG.md`.
   wake (timer gap) and when the network returns.
 - Media: WebKitGTK does not play media from the `asset:` protocol; videos and
   audio go through blob URLs (`app/src/lib/media.ts`, `use:mediaSrc`).
+- Polls: `ChatMessage.poll` (JSON), `VotePollRequest`, `NewPollNotify`
+  (protocol.h). Telegram counts votes on its server (`counts`); for the
+  others braidsd counts each vote (`ChatMessage.pollVotes`, cache columns
+  `poll`/`pollVotes`, `ChatModel::OnPoll`). Dummy: `/poll`, `/vote N`,
+  `/endpoll`; the Matrix test peer: `poll`, `vote`, `endpoll`.
 - Chat list keyboard: one highlight (`ui.listCursor`, `ui.list`), Alt+J/K
   move it, Enter opens.

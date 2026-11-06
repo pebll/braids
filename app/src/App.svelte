@@ -22,6 +22,7 @@
   import NewChat from './components/NewChat.svelte';
   import Overlays from './components/Overlays.svelte';
   import Settings from './components/Settings.svelte';
+  import PollDialog from './components/PollDialog.svelte';
   import ShortcutsDialog from './components/ShortcutsDialog.svelte';
   import Sidebar from './components/Sidebar.svelte';
   import Welcome from './components/Welcome.svelte';
@@ -257,7 +258,7 @@
       if (run(action)) e.preventDefault();
       return;
     }
-    const modal = ui.settingsOpen || ui.newChatOpen || !!ui.forward || !!ui.media || ui.shortcuts || !!store.wizardSetupId || !!ui.confirmRequest || !!ui.lightbox || ui.recordingKeys;
+    const modal = ui.settingsOpen || ui.newChatOpen || !!ui.forward || !!ui.pollFor || !!ui.media || ui.shortcuts || !!store.wizardSetupId || !!ui.confirmRequest || !!ui.lightbox || ui.recordingKeys;
     if (modal) {
       // no browser actions (print, new window, ...) behind a dialog either
       if (!ui.recordingKeys && actionFor(e)) e.preventDefault();
@@ -334,6 +335,7 @@
 {#if ui.newChatOpen}<NewChat />{/if}
 {#if ui.forward}<ForwardDialog m={ui.forward} />{/if}
 {#if ui.shortcuts}<ShortcutsDialog />{/if}
+{#if ui.pollFor}<PollDialog chatKey={ui.pollFor} />{/if}
 {#if ui.media}<MediaDialog scope={ui.media.chatKey} />{/if}
 {#if prompt && !store.wizardSetupId}<AccountPrompt {prompt} />{/if}
 <Overlays />

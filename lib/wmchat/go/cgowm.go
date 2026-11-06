@@ -13,6 +13,8 @@ package main
 // extern void WmNewContactsNotify(int p_ConnId, char* p_ChatId, char* p_Name, char* p_Phone, int p_IsSelf, int p_IsAlias, int p_Notify);
 // extern void WmNewChatsNotify(int p_ConnId, char* p_ChatId, int p_IsUnread, int p_IsMuted, int p_IsPinned, int p_IsArchived, int p_LastMessageTime);
 // extern void WmNewGroupMembersNotify(int p_ConnId, char* p_ChatId, char* p_MembersJson);
+// extern void WmNewPollMessageNotify(int p_ConnId, char* p_ChatId, char* p_MsgId, char* p_SenderId, int p_FromMe, int p_TimeSent, int p_IsRead, char* p_Poll);
+// extern void WmNewPollNotify(int p_ConnId, char* p_ChatId, char* p_MsgId, char* p_VoterId, char* p_OptionIdsJson, int p_Closed);
 // extern void WmNewAvatarNotify(int p_ConnId, char* p_Id, char* p_FilePath, int p_Full);
 // extern void WmNewDescriptionNotify(int p_ConnId, char* p_Id, char* p_Description);
 // extern void WmJoinChatNotify(int p_ConnId, char* p_Link, int p_Success, char* p_ChatId, char* p_Error);
@@ -102,6 +104,16 @@ func CWmGetGroupMembers(connId int, chatId *C.char) int {
 	return WmGetGroupMembers(connId, C.GoString(chatId))
 }
 
+//export CWmSendPoll
+func CWmSendPoll(connId int, chatId *C.char, pollJson *C.char) int {
+	return WmSendPoll(connId, C.GoString(chatId), C.GoString(pollJson))
+}
+
+//export CWmVotePoll
+func CWmVotePoll(connId int, chatId *C.char, msgId *C.char, pollSenderId *C.char, fromMe int, optionTextsJson *C.char) int {
+	return WmVotePoll(connId, C.GoString(chatId), C.GoString(msgId), C.GoString(pollSenderId), fromMe, C.GoString(optionTextsJson))
+}
+
 //export CWmGetAvatar
 func CWmGetAvatar(connId int, avatarId *C.char, full int) int {
 	return WmGetAvatar(connId, C.GoString(avatarId), full != 0)
@@ -183,6 +195,14 @@ func CWmNewContactsNotify(connId int, chatId string, name string, phone string, 
 
 func CWmNewChatsNotify(connId int, chatId string, isUnread int, isMuted int, isPinned int, isArchived int, lastMessageTime int) {
 	C.WmNewChatsNotify(C.int(connId), C.CString(chatId), C.int(isUnread), C.int(isMuted), C.int(isPinned), C.int(isArchived), C.int(lastMessageTime))
+}
+
+func CWmNewPollMessageNotify(connId int, chatId string, msgId string, senderId string, fromMe int, timeSent int, isRead int, poll string) {
+	C.WmNewPollMessageNotify(C.int(connId), C.CString(chatId), C.CString(msgId), C.CString(senderId), C.int(fromMe), C.int(timeSent), C.int(isRead), C.CString(poll))
+}
+
+func CWmNewPollNotify(connId int, chatId string, msgId string, voterId string, optionIdsJson string, closed int) {
+	C.WmNewPollNotify(C.int(connId), C.CString(chatId), C.CString(msgId), C.CString(voterId), C.CString(optionIdsJson), C.int(closed))
 }
 
 func CWmNewAvatarNotify(connId int, avatarId string, filePath string, full bool) {

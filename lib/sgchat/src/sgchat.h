@@ -115,6 +115,9 @@ void SgNewContactsNotify(int p_ConnId, char* p_ChatId, char* p_Name, char* p_Pho
 void SgNewChatsNotify(int p_ConnId, char* p_ChatId, int p_IsUnread, int p_IsMuted, int p_IsPinned,
                       int p_IsArchived, int p_LastMessageTime);
 void SgNewGroupMembersNotify(int p_ConnId, char* p_ChatId, char* p_MembersJson);
+void SgNewPollMessageNotify(int p_ConnId, char* p_ChatId, char* p_MsgId, char* p_SenderId, int p_FromMe, int p_TimeSent,
+                            int p_IsRead, char* p_Poll);
+void SgNewPollNotify(int p_ConnId, char* p_ChatId, char* p_MsgId, char* p_VoterId, char* p_OptionIdsJson, int p_Closed);
 void SgNewAvatarNotify(int p_ConnId, char* p_Id, char* p_FilePath, int p_Full);
 void SgNewDescriptionNotify(int p_ConnId, char* p_Id, char* p_Description);
 void SgCreateGroupNotify(int p_ConnId, char* p_Name, int p_Success, char* p_ChatId, char* p_Error);

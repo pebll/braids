@@ -7,4 +7,4 @@
 
 #pragma once
 
-#define NCHAT_VERSION "0.3.1" // braids version (macro name kept from nchat)
+#define NCHAT_VERSION "0.3.2" // braids version (macro name kept from nchat)

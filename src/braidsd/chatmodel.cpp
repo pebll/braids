@@ -37,6 +37,12 @@ static bool IsSameMessage(const ChatMessage& p_Lhs, const ChatMessage& p_Rhs)
          (p_Lhs.poll == p_Rhs.poll) && (p_Lhs.pollVotes == p_Rhs.pollVotes);
 }
 
+static std::string PollQuestion(const std::string& p_Poll)
+{
+  const json poll = json::parse(p_Poll, nullptr, false);
+  return poll.is_object() ? poll.value("question", "") : "";
+}
+
 // Mime type of a file the protocol did not type (e.g. WhatsApp sets only the
 // extension, Telegram download updates carry no type).
 static std::string GuessMimeType(const FileInfo& p_FileInfo)
@@ -1328,7 +1334,8 @@ void ChatModel::MaybeNotify(const std::string& p_AccountId, const std::string& p
     { "senderName", GetContactName(p_AccountId, p_ChatMessage.senderId) },
     { "isGroup", isGroup },
     { "hasMention", p_ChatMessage.hasMention },
-    { "text", p_ChatMessage.text },
+    { "text", p_ChatMessage.poll.empty() ? p_ChatMessage.text
+                                         : "📊 " + PollQuestion(p_ChatMessage.poll) },
     { "hasFile", !p_ChatMessage.fileInfo.empty() },
   });
 }
@@ -1995,8 +2002,7 @@ void ChatModel::MatchOutboxEcho(const std::string& p_AccountId, const std::strin
     const bool sameText = !entry.text.empty() && (entry.text == p_ChatMessage.text);
     const bool sameFile = !entry.filePath.empty() && !fileName.empty() && (FileUtil::BaseName(entry.filePath) == fileName);
     const bool samePoll = !entry.poll.empty() && !p_ChatMessage.poll.empty() &&
-                          (json::parse(entry.poll, nullptr, false).value("question", "") ==
-                           json::parse(p_ChatMessage.poll, nullptr, false).value("question", "-"));
+                          (PollQuestion(entry.poll) == PollQuestion(p_ChatMessage.poll));
     if (sameText || (entry.text.empty() && sameFile) || samePoll)
     {
       match = &entry;
@@ -3171,6 +3177,7 @@ json ChatModel::CapabilitiesToJson(std::shared_ptr<Protocol> p_Protocol, const s
     { "joinChat", p_Protocol->HasFeature(FeatureJoinChat) },
     { "createGroup", p_Protocol->HasFeature(FeatureCreateGroup) },
     { "polls", p_Protocol->HasFeature(FeaturePolls) },
+    { "pollsInGroupsOnly", p_ProtocolName == "Telegram" }, // Telegram: polls only in groups
     { "limitedReactions", p_Protocol->HasFeature(FeatureLimitedReactions) },
     { "readReceiptsPerMessage", HasPerMessageReadReceipts(p_ProtocolName) },
   };

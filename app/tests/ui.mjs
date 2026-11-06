@@ -991,6 +991,33 @@ try {
   await page.locator('main.conv header', { hasText: 'Road trip' }).waitFor();
   check(await page.getByRole('option', { name: /Road trip/ }).count() === 1, 'new group created and opened');
   await shot('new-group');
+
+  // polls: made in a dialog, voted on in the message, others' votes shown
+  await page.getByRole('button', { name: 'New poll' }).click();
+  const pollDialog = page.getByRole('dialog', { name: 'New poll' });
+  await pollDialog.getByLabel('Question').fill('Where to?');
+  await pollDialog.getByLabel('Option 1', { exact: true }).fill('Beach');
+  await pollDialog.getByLabel('Option 2', { exact: true }).fill('Mountains');
+  check(await pollDialog.getByLabel('Option 3', { exact: true }).count() === 1, 'poll dialog: a new option appears while typing');
+  await pollDialog.getByRole('button', { name: 'Send poll' }).click();
+  await pollDialog.waitFor({ state: 'detached' });
+  const pollCard = page.locator('.msg.own .poll', { hasText: 'Where to?' });
+  await pollCard.waitFor();
+  check(await pollCard.locator('.option').count() === 2, 'poll sent and shown with its options');
+  await pollCard.locator('.option', { hasText: 'Beach' }).click();
+  await pollCard.locator('.option[aria-pressed=true]', { hasText: 'Beach' }).waitFor();
+  check((await pollCard.locator('.summary').textContent()).includes('1 vote'), 'own vote shown');
+  check((await page.getByRole('option', { name: /Road trip/ }).textContent()).includes('📊 Where to?'), 'poll in the chat list preview');
+  const pollComposer = page.getByRole('textbox', { name: 'Message' });
+  await pollComposer.fill('/poll');
+  await pollComposer.press('Enter');
+  const lunch = page.locator('.msg:not(.own) .poll', { hasText: 'Lunch?' });
+  await lunch.waitFor();
+  check(await lunch.locator('.option', { hasText: 'Sushi' }).locator('.share').textContent() === '100 %', "others' votes shown");
+  await lunch.locator('.option', { hasText: 'Pizza' }).click();
+  await lunch.locator('.option[aria-pressed=true]', { hasText: 'Pizza' }).waitFor();
+  check(true, "voting in someone else's poll");
+  await shot('poll');
   await page.getByRole('button', { name: 'Settings' }).click();
   await page.locator('[aria-labelledby=newchat-title]').waitFor({ state: 'detached' }).catch(() => {});
   await page.keyboard.press('Control+,');

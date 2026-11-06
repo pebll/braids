@@ -9,7 +9,7 @@
   emoji, Enter to send. Drafts are kept per chat.
 -->
 <script lang="ts">
-  import { File as FileIcon, LoaderCircle, Mic, Paperclip, Pencil, Play, Reply, SendHorizontal, Smile, Trash2, X } from '@lucide/svelte';
+  import { ChartColumnBig, File as FileIcon, LoaderCircle, Mic, Paperclip, Pencil, Play, Reply, SendHorizontal, Smile, Trash2, X } from '@lucide/svelte';
   import { onDestroy, tick } from 'svelte';
   import * as api from '../lib/api';
   import { mediaSrc } from '../lib/media';
@@ -45,6 +45,10 @@
   let loadedKey = '';
 
   const [accountId, chatId] = $derived(splitKey(chatKey));
+  const canPoll = $derived.by(() => {
+    const caps = store.accounts[accountId]?.capabilities;
+    return !!caps?.polls && (!caps.pollsInGroupsOnly || !!store.chats[chatKey]?.isGroup);
+  });
   const account = $derived(store.accounts[accountId]);
 
   // @-mentions: while typing "@na" after a space or at the start, the group's
@@ -445,6 +449,9 @@
   {:else}
   <div class="row">
     <button class="icon-btn lg" aria-label="Attach file" title="Attach file" onclick={pick} disabled={!!ui.edit}><Paperclip size={20} strokeWidth={1.75} /></button>
+    {#if canPoll}
+      <button class="icon-btn lg" aria-label="New poll" title="New poll" onclick={() => (ui.pollFor = chatKey)} disabled={!!ui.edit}><ChartColumnBig size={20} strokeWidth={1.75} /></button>
+    {/if}
     <div class="box">
       <textarea
         bind:this={textarea}

@@ -48,6 +48,7 @@ class Ui {
   reply = $state<Message | null>(null);
   edit = $state<Message | null>(null);
   forward = $state<Message | null>(null); // message being forwarded (dialog open)
+  pollFor = $state(''); // chat key a new poll is being made for (dialog open)
   shortcuts = $state(false); // keyboard shortcuts overview open
   media = $state<{ chatKey: string } | null>(null); // shared media dialog: of a chat, or all ('')
   jumpRequest = $state<{ chatKey: string; msgId: string } | null>(null); // scroll the conversation to a message

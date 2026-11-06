@@ -12,6 +12,8 @@ package main
 // extern void SgNewContactsNotify(int p_ConnId, char* p_ChatId, char* p_Name, char* p_Phone, int p_IsSelf, int p_IsAlias, int p_Notify);
 // extern void SgNewChatsNotify(int p_ConnId, char* p_ChatId, int p_IsUnread, int p_IsMuted, int p_IsPinned, int p_IsArchived, int p_LastMessageTime);
 // extern void SgNewGroupMembersNotify(int p_ConnId, char* p_ChatId, char* p_MembersJson);
+// extern void SgNewPollMessageNotify(int p_ConnId, char* p_ChatId, char* p_MsgId, char* p_SenderId, int p_FromMe, int p_TimeSent, int p_IsRead, char* p_Poll);
+// extern void SgNewPollNotify(int p_ConnId, char* p_ChatId, char* p_MsgId, char* p_VoterId, char* p_OptionIdsJson, int p_Closed);
 // extern void SgNewAvatarNotify(int p_ConnId, char* p_Id, char* p_FilePath, int p_Full);
 // extern void SgNewDescriptionNotify(int p_ConnId, char* p_Id, char* p_Description);
 // extern void SgCreateGroupNotify(int p_ConnId, char* p_Name, int p_Success, char* p_ChatId, char* p_Error);
@@ -87,6 +89,16 @@ func CSgGetMessages(connId int, chatId *C.char, limit int, fromMsgId *C.char, ow
 //export CSgSendMessage
 func CSgSendMessage(connId int, chatId *C.char, text *C.char, quotedId *C.char, quotedText *C.char, quotedSender *C.char, filePath *C.char, fileType *C.char, editMsgId *C.char, editMsgSent int, mentionsJson *C.char) int {
 	return SgSendMessage(connId, C.GoString(chatId), C.GoString(text), C.GoString(quotedId), C.GoString(quotedText), C.GoString(quotedSender), C.GoString(filePath), C.GoString(fileType), C.GoString(editMsgId), editMsgSent, C.GoString(mentionsJson))
+}
+
+//export CSgSendPoll
+func CSgSendPoll(connId int, chatId *C.char, pollJson *C.char) int {
+	return SgSendPoll(connId, C.GoString(chatId), C.GoString(pollJson))
+}
+
+//export CSgVotePoll
+func CSgVotePoll(connId int, chatId *C.char, msgId *C.char, pollSenderId *C.char, optionIdsJson *C.char) int {
+	return SgVotePoll(connId, C.GoString(chatId), C.GoString(msgId), C.GoString(pollSenderId), C.GoString(optionIdsJson))
 }
 
 //export CSgGetAvatar
@@ -170,6 +182,14 @@ func CSgNewContactsNotify(connId int, chatId string, name string, phone string, 
 
 func CSgNewChatsNotify(connId int, chatId string, isUnread int, isMuted int, isPinned int, isArchived int, lastMessageTime int) {
 	C.SgNewChatsNotify(C.int(connId), C.CString(chatId), C.int(isUnread), C.int(isMuted), C.int(isPinned), C.int(isArchived), C.int(lastMessageTime))
+}
+
+func CSgNewPollMessageNotify(connId int, chatId string, msgId string, senderId string, fromMe int, timeSent int, isRead int, poll string) {
+	C.SgNewPollMessageNotify(C.int(connId), C.CString(chatId), C.CString(msgId), C.CString(senderId), C.int(fromMe), C.int(timeSent), C.int(isRead), C.CString(poll))
+}
+
+func CSgNewPollNotify(connId int, chatId string, msgId string, voterId string, optionIdsJson string, closed int) {
+	C.SgNewPollNotify(C.int(connId), C.CString(chatId), C.CString(msgId), C.CString(voterId), C.CString(optionIdsJson), C.int(closed))
 }
 
 func CSgNewAvatarNotify(connId int, avatarId string, filePath string, full bool) {

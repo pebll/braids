@@ -1,7 +1,7 @@
 braidsd API
 ===========
 
-Status: draft, API version `0.11.0`. The API is JSON-RPC 2.0
+Status: draft, API version `0.12.0`. The API is JSON-RPC 2.0
 with one JSON object per line, served on a Unix socket and/or stdin/stdout.
 
 Transport
@@ -57,7 +57,8 @@ Objects
      "capabilities": {"editWindowSec": -1 (unlimited) | 0 (none) | seconds,
                       "pinChat", "archiveChat", "pinMessage",
                       "limitedReactions", "readReceiptsPerMessage",
-                      "avatars", "descriptions", "joinChat", "createGroup", "muteChat"}}
+                      "avatars", "descriptions", "joinChat", "createGroup", "muteChat",
+                      "polls", "pollsInGroupsOnly"}}
 
 - **Chat**
 
@@ -85,7 +86,15 @@ muted chat); with neither known, `unreadCount` is 1. `isUnread` is also true for
               "status": "none|notDownloaded|downloading|downloaded|failed"} | null,
      "reactions": {"counts": {emoji: n}, "senders": {userId: emoji}, "own": emoji},
      "mentions": {displayName: userId}, "link", "system",
+     "poll": {"question", "options": [{"id", "text", "votes", "voters": [userId]}],
+              "multiple", "closed", "anonymous", "own": [optionId], "total"} | null,
      "pending"?: "waiting" | "sending" | "failed"}
+
+`poll` is set for a poll message (its `text` is empty). `votes` per option,
+`total` people who voted, `own` the options of the own vote, `voters` the
+other people per option where the messenger tells (WhatsApp, Signal, Matrix:
+braidsd counts each vote, kept in the message cache; Telegram counts on its
+server and does not name voters). A changed poll arrives as `message.updated`.
 
 `pending` is set on own messages braidsd has not handed to the messenger
 yet (its outbox; ids start with `braids-out-`): `waiting` while the account
@@ -147,7 +156,8 @@ Methods
 | `messages.search` | `text` (case-insensitive for ASCII letters), `accountId`? and `chatId`? (all chats/accounts without), `beforeTime`?, `limit`? (40, max 200) | `{items: [Message] newest first, nextBefore}` like `media.list`; group events are left out |
 | `members.get` | `accountId`, `chatId` | `{accountId, chatId, members: [Contact]}` (async) |
 | `messages.get` | `accountId`, `chatId`, `fromMsgId`? (latest), `limit`? (30) | `{accountId, chatId, fromMsgId, messages: [Message] oldest first, timedOut}` (async, from cache or server) |
-| `messages.send` | `accountId`, `chatId`, `text`?, `quotedId`?, `filePath`? (absolute), `isVoice`? (false; the file, Ogg/Opus, is sent as a voice note: WhatsApp PTT, Telegram voice note, Signal voice message, Matrix MSC3245 voice) | `{msgId}`: the local id of the pending message, which arrives at once as `message.added` with `pending` (see Message) |
+| `messages.send` | `accountId`, `chatId`, `text`?, `quotedId`?, `poll`? (`{question, options: [text], multiple}`, 2–12 options, without text or file; account capability `polls`, on Telegram in groups only: `pollsInGroupsOnly`), `filePath`? (absolute), `isVoice`? (false; the file, Ogg/Opus, is sent as a voice note: WhatsApp PTT, Telegram voice note, Signal voice message, Matrix MSC3245 voice) | `{msgId}`: the local id of the pending message, which arrives at once as `message.added` with `pending` (see Message) |
+| `messages.vote` | `accountId`, `chatId`, `msgId` (a poll), `optionIds` (`[]` takes the vote back; one option unless `multiple`) | `{}`; the poll arrives as `message.updated` |
 | `messages.resend` | `accountId`, `chatId`, `msgId` (a `failed` pending message) | `{}`, then `message.updated` |
 | `messages.edit` | `accountId`, `chatId`, `msgId`, `text` | `{}` (error 4 outside the edit window) |
 | `messages.delete` | `accountId`, `chatId`, `msgId` | `{}`, then `message.removed` (a pending message is only dropped from the outbox) |

@@ -19,6 +19,7 @@
   import type { Account, Chat, Message } from '../lib/types';
   import { openLightbox, ui, type MenuItem } from '../lib/ui.svelte';
   import Avatar from './Avatar.svelte';
+  import PollCard from './PollCard.svelte';
   import LinkPreview from './LinkPreview.svelte';
   import Sticker from './Sticker.svelte';
   import VoicePlayer from './VoicePlayer.svelte';
@@ -332,6 +333,8 @@
 
       {#if m.isDeleted}
         <span class="text deleted-text">Message deleted</span>
+      {:else if m.poll}
+        <PollCard {m} />
       {:else if showText}
         <!-- eslint-disable-next-line svelte/no-at-html-tags: renderText escapes all input -->
         <span class="text msg-text" onclick={onTextClick} role="presentation">{@html html}</span>

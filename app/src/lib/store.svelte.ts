@@ -259,6 +259,7 @@ class Store {
     if (!m) return '';
     if (m.isDeleted) return 'Message deleted';
     if (m.system) return this.systemLine(m);
+    if (m.poll) return `📊 ${m.poll.question}`;
     const text = plainText(m.text);
     if (m.file) return text ? `${fileLabel(m)}: ${text}` : `${fileLabel(m)}: ${m.file.name}`;
     return text;

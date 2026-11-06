@@ -1750,6 +1750,12 @@ func (handler *WmEventHandler) HandleMessage(messageInfo types.MessageInfo, msg 
 	case msg.SecretEncryptedMessage != nil:
 		handler.HandleSecretEncryptedMessage(messageInfo, msg, isSyncRead)
 
+	case msg.PollCreationMessage != nil, msg.PollCreationMessageV2 != nil, msg.PollCreationMessageV3 != nil:
+		handler.HandlePollCreationMessage(messageInfo, msg, isSyncRead)
+
+	case msg.PollUpdateMessage != nil:
+		handler.HandlePollUpdateMessage(messageInfo, msg)
+
 	default:
 		handler.HandleUnsupportedMessage(messageInfo, msg, isSyncRead)
 	}
