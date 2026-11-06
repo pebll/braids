@@ -37,7 +37,7 @@ The app connects to the socket of a running braidsd, or starts one: `BRAIDSD`
 running when the app quits. Environment:
 
 | Variable | Effect |
-|---|---|
+| --- | --- |
 | `BRAIDS_CONFDIR` | config dir for braidsd (`--confdir`), socket `<dir>/braidsd.sock` |
 | `BRAIDS_SOCKET` | socket path (`--socket`) |
 | `BRAIDSD` | braidsd binary to start |

@@ -8,6 +8,7 @@
 // know about them).
 
 export type Theme = 'system' | 'light' | 'dark';
+export type TextSize = number;
 
 // chat category set in braids; without one, a chat archived in the
 // messenger counts as archived, else as default
@@ -23,6 +24,7 @@ const KEY = 'braids.settings.v1';
 
 class Settings {
   theme = $state<Theme>('system');
+  textSize = $state<TextSize>(100);
   notifications = $state(true);
   notificationPreview = $state(true);
   closeToTray = $state(true);
@@ -41,8 +43,8 @@ class Settings {
   constructor() {
     try {
       const saved = JSON.parse(localStorage.getItem(KEY) ?? '{}');
-      for (const k of ['theme', 'notifications', 'notificationPreview', 'closeToTray', 'sidebarCollapsed', 'enterSends', 'linkPreviews', 'checkUpdates', 'chatListWidth', 'favorites', 'accounts', 'categories', 'keybinds'] as const) {
-        if (saved[k] !== undefined) (this as any)[k] = saved[k];
+      for (const k of ['theme', 'textSize', 'notifications', 'notificationPreview', 'closeToTray', 'sidebarCollapsed', 'enterSends', 'linkPreviews', 'checkUpdates', 'chatListWidth', 'favorites', 'accounts', 'categories', 'keybinds'] as const) {
+        if (saved[k] !== undefined && (k !== 'textSize' || Number.isFinite(saved[k]) && saved[k] >= 50 && saved[k] <= 200)) (this as any)[k] = saved[k];
       }
     } catch {
       // defaults
@@ -53,6 +55,7 @@ class Settings {
     try {
       localStorage.setItem(KEY, JSON.stringify({
         theme: this.theme,
+        textSize: this.textSize,
         notifications: this.notifications,
         notificationPreview: this.notificationPreview,
         closeToTray: this.closeToTray,
