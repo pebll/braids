@@ -145,6 +145,55 @@ def main():
         d.call("messages.delete", {"accountId": account_id, "chatId": group["id"], "msgId": own["id"]})
         d.wait_event("message.removed", lambda p: p["msgId"] == own["id"])
         check(True, "delete applied")
+        # polls: sent, own vote counted at once, others' votes (also one that
+        # came before its poll), ended
+        check(account["capabilities"]["polls"], "polls capability")
+        d.call("messages.send", {"accountId": account_id, "chatId": group["id"],
+                                 "poll": {"question": "Meeting day?", "options": ["Monday", " Friday ", ""],
+                                          "multiple": True}})
+        pending = d.wait_event("message.added", lambda p: (p.get("poll") or {}).get("question") == "Meeting day?"
+                               and p.get("pending"))
+        check([o["text"] for o in pending["poll"]["options"]] == ["Monday", "Friday"], "pending poll, options trimmed")
+        sent = d.wait_event("message.added", lambda p: (p.get("poll") or {}).get("question") == "Meeting day?"
+                            and not p.get("pending"))
+        d.wait_event("message.removed", lambda p: p["msgId"] == pending["id"])
+        check(sent["poll"]["multiple"] and [o["id"] for o in sent["poll"]["options"]] == ["0", "1"], "poll sent")
+        d.call("messages.vote", {"accountId": account_id, "chatId": group["id"], "msgId": sent["id"],
+                                 "optionIds": ["0", "1"]})
+        voted = d.wait_event("message.updated", lambda p: p["id"] == sent["id"])
+        check(voted["poll"]["own"] == ["0", "1"] and voted["poll"]["total"] == 1
+              and [o["votes"] for o in voted["poll"]["options"]] == [1, 1], "own vote counted")
+        expect_error(lambda: d.call("messages.vote", {"accountId": account_id, "chatId": group["id"],
+                                                      "msgId": sent["id"], "optionIds": ["7"]}),
+                     -32602, "unknown option rejected")
+        expect_error(lambda: d.call("messages.send", {"accountId": account_id, "chatId": group["id"],
+                                                      "poll": {"question": "x", "options": ["only one"]}}),
+                     -32602, "poll with one option rejected")
+        d.call("messages.send", {"accountId": account_id, "chatId": group["id"], "text": "/poll"})
+        lunch = d.wait_event("message.added", lambda p: (p.get("poll") or {}).get("question") == "Lunch?")
+        check(not lunch["isOutgoing"] and lunch["poll"]["options"][1]["votes"] == 1
+              and lunch["poll"]["options"][1]["voters"] == ["Jim_0"], "a vote that came before its poll is counted")
+        expect_error(lambda: d.call("messages.vote", {"accountId": account_id, "chatId": group["id"],
+                                                      "msgId": lunch["id"], "optionIds": ["0", "1"]}),
+                     -32602, "single-choice poll takes one option")
+        d.call("messages.vote", {"accountId": account_id, "chatId": group["id"], "msgId": lunch["id"],
+                                 "optionIds": ["0"]})
+        d.wait_event("message.updated", lambda p: p["id"] == lunch["id"] and p["poll"]["own"] == ["0"])
+        d.call("messages.send", {"accountId": account_id, "chatId": group["id"], "text": "/vote 0"})
+        two = d.wait_event("message.updated", lambda p: p["id"] == lunch["id"] and p["poll"]["total"] == 3)
+        check(two["poll"]["options"][0]["votes"] == 2 and two["poll"]["options"][0]["voters"] == ["Pam_0"],
+              "others' votes counted with voters")
+        d.call("messages.vote", {"accountId": account_id, "chatId": group["id"], "msgId": lunch["id"], "optionIds": []})
+        d.wait_event("message.updated", lambda p: p["id"] == lunch["id"] and p["poll"]["own"] == []
+                     and p["poll"]["total"] == 2)
+        check(True, "own vote retracted")
+        d.call("messages.send", {"accountId": account_id, "chatId": group["id"], "text": "/endpoll"})
+        d.wait_event("message.updated", lambda p: p["id"] == lunch["id"] and p["poll"]["closed"])
+        expect_error(lambda: d.call("messages.vote", {"accountId": account_id, "chatId": group["id"],
+                                                      "msgId": lunch["id"], "optionIds": ["0"]}),
+                     -32602, "no votes in an ended poll")
+        check(True, "poll ended")
+
         expect_error(lambda: d.call("messages.send", {"accountId": account_id, "chatId": group["id"]}),
                      -32602, "send without text or file rejected")
 

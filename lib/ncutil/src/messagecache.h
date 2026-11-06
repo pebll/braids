@@ -46,6 +46,7 @@ private:
     UpdateMessageIsPinnedRequestType,
     UpdateMessageFileInfoRequestType,
     UpdateMessageReactionsRequestType,
+    UpdateMessagePollRequestType,
     UpdateMuteRequestType,
     UpdatePinRequestType,
     UpdateArchivedRequestType,
@@ -209,6 +210,18 @@ private:
     Reactions reactions;
   };
 
+  // braids: the poll (if not empty) and / or the votes counted by braidsd
+  class UpdateMessagePollRequest : public Request
+  {
+  public:
+    virtual RequestType GetRequestType() const { return UpdateMessagePollRequestType; }
+    std::string profileId;
+    std::string chatId;
+    std::string msgId;
+    std::string poll;
+    std::string pollVotes;
+  };
+
   class UpdateMuteRequest : public Request
   {
   public:
@@ -310,6 +323,8 @@ public:
                                     const std::string& p_MsgId, const std::string& p_FileInfo);
   static void UpdateMessageReactions(const std::string& p_ProfileId, const std::string& p_ChatId,
                                      const std::string& p_MsgId, const Reactions& p_Reactions);
+  static void UpdateMessagePoll(const std::string& p_ProfileId, const std::string& p_ChatId,
+                                const std::string& p_MsgId, const std::string& p_Poll, const std::string& p_PollVotes);
   static void UpdateMute(const std::string& p_ProfileId, const std::string& p_ChatId, bool p_IsMuted);
   static void UpdateArchived(const std::string& p_ProfileId, const std::string& p_ChatId, bool p_IsArchived);
   static void UpdatePin(const std::string& p_ProfileId, const std::string& p_ChatId, bool p_IsPinned,

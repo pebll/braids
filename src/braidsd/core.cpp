@@ -27,7 +27,7 @@
 #include "timeutil.h"
 
 // semver of the API; clients must match the major version
-static const std::string s_ApiVersion = "0.11.0";
+static const std::string s_ApiVersion = "0.12.0";
 static const int64_t s_StartTime = TimeUtil::GetCurrentTimeMSec();
 
 static const char* AuthStepToString(AuthStep p_Step)
@@ -387,8 +387,24 @@ void Core::Dispatch(const std::string& p_Method, const json& p_Params, const Rep
     const std::string msgId =
       m_ChatModel->SendMessage(ParamStr(params, "accountId"), ParamStr(params, "chatId"),
                                ParamStrOpt(params, "text"), ParamStrOpt(params, "quotedId"),
-                               ParamStrOpt(params, "filePath"), ParamBool(params, "isVoice", false));
+                               ParamStrOpt(params, "filePath"), ParamBool(params, "isVoice", false),
+                               params.contains("poll") ? params["poll"] : json());
     p_Reply.Ok(json{ { "msgId", msgId } });
+  }
+  else if (p_Method == "messages.vote")
+  {
+    std::vector<std::string> optionIds;
+    if (params.contains("optionIds") && params["optionIds"].is_array())
+    {
+      for (const auto& id : params["optionIds"])
+      {
+        if (id.is_string()) optionIds.push_back(id.get<std::string>());
+      }
+    }
+
+    m_ChatModel->VotePoll(ParamStr(params, "accountId"), ParamStr(params, "chatId"), ParamStr(params, "msgId"),
+                          optionIds);
+    p_Reply.Ok(json::object());
   }
   else if (p_Method == "messages.resend")
   {

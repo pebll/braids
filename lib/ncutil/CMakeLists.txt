@@ -154,6 +154,7 @@ target_include_directories(ncutil PRIVATE "ext/apathy")
 target_include_directories(ncutil PRIVATE "ext/sqlite_modern_cpp/hdr" ${SQLite3_INCLUDE_DIRS})
 target_include_directories(ncutil PRIVATE "ext/clip")
 target_include_directories(ncutil PRIVATE "ext/cereal/include")
+target_include_directories(ncutil PRIVATE "../../src/braidsd/ext")
 
 # Compiler flags
 set_target_properties(ncutil PROPERTIES COMPILE_FLAGS

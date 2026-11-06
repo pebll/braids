@@ -298,6 +298,31 @@ def main():
         members = d.call("members.get", {"accountId": account_id, "chatId": room})
         check({alice_id, bob_id} <= {m["id"] for m in members["members"]}, "members of room")
 
+        # polls (MSC3381), in the encrypted room: bob's poll, votes, braids' own poll, the end
+        check(account["capabilities"]["polls"], "polls capability")
+        poll_id = bob_peer.cmd(f"poll {room} Pizza or pasta?|Pizza|Pasta")["event"]
+        got = d.wait_event("message.added", lambda p: p["id"] == poll_id, timeout=60)
+        check(got["poll"]["question"] == "Pizza or pasta?" and [o["id"] for o in got["poll"]["options"]] == ["a0", "a1"],
+              "poll received")
+        bob_peer.cmd(f"vote {room} {poll_id} a1")
+        d.wait_event("message.updated", lambda p: p["id"] == poll_id and p["poll"]["options"][1]["voters"] == [bob_id],
+                     timeout=60)
+        check(True, "vote of another user counted")
+        d.call("messages.vote", {"accountId": account_id, "chatId": room, "msgId": poll_id, "optionIds": ["a0"]})
+        d.wait_event("message.updated", lambda p: p["id"] == poll_id and p["poll"]["own"] == ["a0"], timeout=30)
+        time.sleep(3)  # the own response comes back through sync: still one own vote
+        own_vote = d.call("messages.get", {"accountId": account_id, "chatId": room, "limit": 10})["messages"]
+        polled = [m for m in own_vote if m["id"] == poll_id]
+        check(polled and polled[0]["poll"]["total"] == 2 and polled[0]["poll"]["own"] == ["a0"], "own vote counted once")
+        d.call("messages.send", {"accountId": account_id, "chatId": room,
+                                 "poll": {"question": "Which day?", "options": ["Mon", "Tue"], "multiple": True}})
+        mine = d.wait_event("message.added", lambda p: (p.get("poll") or {}).get("question") == "Which day?"
+                            and not p.get("pending"), timeout=60)
+        check(mine["isOutgoing"] and mine["poll"]["multiple"] and len(mine["poll"]["options"]) == 2, "own poll sent")
+        bob_peer.cmd(f"endpoll {room} {poll_id}")
+        d.wait_event("message.updated", lambda p: p["id"] == poll_id and p["poll"]["closed"], timeout=60)
+        check(True, "poll ended")
+
         # room topic as description
         bob_peer.cmd(f"topic {room} all about braids")
         d.call("descriptions.get", {"accountId": account_id, "ids": [room]})
@@ -380,6 +405,10 @@ def main():
         texts = {m["text"] for m in d.call("messages.get", {"accountId": account_id, "chatId": room,
                                                              "limit": 200})["messages"]}
         check({f"filler {i}" for i in range(32)} <= texts, "no messages missing in the backfilled gap")
+        cached_poll = [m for m in d.call("messages.get", {"accountId": account_id, "chatId": room, "limit": 200})["messages"]
+                       if m["id"] == poll_id]
+        check(cached_poll and cached_poll[0]["poll"]["closed"] and cached_poll[0]["poll"]["own"] == ["a0"]
+              and cached_poll[0]["poll"]["total"] == 2, "poll with its votes after restart")
 
         sent = bob_peer.cmd(f"send {room} after restart")["event"]
         d.wait_event("message.added", lambda p: p["id"] == sent, timeout=60)

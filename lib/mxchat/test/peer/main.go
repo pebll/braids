@@ -313,6 +313,38 @@ func (p *peer) command(ctx context.Context, line string) (map[string]any, error)
 		}
 		return map[string]any{"event": resp.EventID}, nil
 
+	case "poll":
+		// poll <room> <question>|<answer>|<answer>...: answers get ids a0, a1, ...
+		parts := strings.Split(rest(2), "|")
+		start := event.PollStart{Kind: "org.matrix.msc3381.poll.disclosed", MaxSelections: 1}
+		start.Question.Text = parts[0]
+		for i, text := range parts[1:] {
+			answer := event.PollOption{ID: fmt.Sprintf("a%d", i)}
+			answer.Text = text
+			start.Answers = append(start.Answers, answer)
+		}
+		resp, err := cli.SendMessageEvent(ctx, id.RoomID(arg(1)), event.EventUnstablePollStart,
+			&event.PollStartEventContent{PollStart: start})
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{"event": resp.EventID}, nil
+
+	case "vote", "endpoll":
+		// vote <room> <poll event> <answer id>...; endpoll <room> <poll event>
+		rel := event.RelatesTo{Type: event.RelReference, EventID: id.EventID(arg(2))}
+		var content any = &event.PollResponseEventContent{RelatesTo: rel, Response: event.PollResponse{Answers: f[3:]}}
+		evtType := event.EventUnstablePollResponse
+		if f[0] == "endpoll" {
+			content = map[string]any{"m.relates_to": rel, "org.matrix.msc3381.poll.end": map[string]any{}}
+			evtType = event.EventUnstablePollEnd
+		}
+		resp, err := cli.SendMessageEvent(ctx, id.RoomID(arg(1)), evtType, content)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{"event": resp.EventID}, nil
+
 	case "react":
 		resp, err := cli.SendReaction(ctx, id.RoomID(arg(1)), id.EventID(arg(2)), arg(3))
 		if err != nil {

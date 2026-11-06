@@ -12,7 +12,8 @@ package main
 // #include <stdlib.h>
 // extern void MxNewContactsNotify(int p_ConnId, char* p_Id, char* p_Name, int p_IsSelf, int p_Notify);
 // extern void MxNewChatsNotify(int p_ConnId, char* p_ChatId, int p_IsUnread, int p_IsMuted, int p_IsPinned, long long p_LastMessageTime);
-// extern void MxNewMessagesNotify(int p_ConnId, char* p_ChatId, char* p_MsgId, char* p_SenderId, char* p_Text, int p_FromMe, char* p_QuotedId, char* p_FileId, char* p_FilePath, int p_FileStatus, long long p_TimeSent, int p_IsRead, int p_IsEdited, int p_Batch);
+// extern void MxNewMessagesNotify(int p_ConnId, char* p_ChatId, char* p_MsgId, char* p_SenderId, char* p_Text, int p_FromMe, char* p_QuotedId, char* p_FileId, char* p_FilePath, int p_FileStatus, long long p_TimeSent, int p_IsRead, int p_IsEdited, int p_Batch, char* p_Poll);
+// extern void MxNewPollNotify(int p_ConnId, char* p_ChatId, char* p_MsgId, char* p_VoterId, char* p_OptionIdsJson, int p_Closed);
 // extern void MxNewMessagesBatchDone(int p_ConnId, char* p_ChatId, char* p_FromMsgId);
 // extern void MxNewMessageStatusNotify(int p_ConnId, char* p_ChatId, char* p_MsgId, int p_IsRead);
 // extern void MxNewMessageFileNotify(int p_ConnId, char* p_ChatId, char* p_MsgId, char* p_FileId, char* p_FilePath, int p_FileStatus, int p_Action);
@@ -198,6 +199,16 @@ func CMxGetStatus(connId int, userId *C.char) int {
 	return MxGetStatus(connId, C.GoString(userId))
 }
 
+//export CMxSendPoll
+func CMxSendPoll(connId int, chatId *C.char, pollJson *C.char) int {
+	return MxSendPoll(connId, C.GoString(chatId), C.GoString(pollJson))
+}
+
+//export CMxVotePoll
+func CMxVotePoll(connId int, chatId *C.char, msgId *C.char, optionIdsJson *C.char) int {
+	return MxVotePoll(connId, C.GoString(chatId), C.GoString(msgId), C.GoString(optionIdsJson))
+}
+
 //export CMxSendReaction
 func CMxSendReaction(connId int, chatId *C.char, msgId *C.char, emoji *C.char) int {
 	return MxSendReaction(connId, C.GoString(chatId), C.GoString(msgId), C.GoString(emoji))
@@ -253,8 +264,12 @@ func CMxNewChatsNotify(connId int, chatId string, isUnread int, isMuted int, isP
 	C.MxNewChatsNotify(C.int(connId), C.CString(chatId), C.int(isUnread), C.int(isMuted), C.int(isPinned), C.longlong(lastMessageTime))
 }
 
-func CMxNewMessagesNotify(connId int, chatId string, msgId string, senderId string, text string, fromMe int, quotedId string, fileId string, filePath string, fileStatus int, timeSent int64, isRead int, isEdited int, batch int) {
-	C.MxNewMessagesNotify(C.int(connId), C.CString(chatId), C.CString(msgId), C.CString(senderId), C.CString(text), C.int(fromMe), C.CString(quotedId), C.CString(fileId), C.CString(filePath), C.int(fileStatus), C.longlong(timeSent), C.int(isRead), C.int(isEdited), C.int(batch))
+func CMxNewMessagesNotify(connId int, chatId string, msgId string, senderId string, text string, fromMe int, quotedId string, fileId string, filePath string, fileStatus int, timeSent int64, isRead int, isEdited int, batch int, poll string) {
+	C.MxNewMessagesNotify(C.int(connId), C.CString(chatId), C.CString(msgId), C.CString(senderId), C.CString(text), C.int(fromMe), C.CString(quotedId), C.CString(fileId), C.CString(filePath), C.int(fileStatus), C.longlong(timeSent), C.int(isRead), C.int(isEdited), C.int(batch), C.CString(poll))
+}
+
+func CMxNewPollNotify(connId int, chatId string, msgId string, voterId string, optionIdsJson string, closed int) {
+	C.MxNewPollNotify(C.int(connId), C.CString(chatId), C.CString(msgId), C.CString(voterId), C.CString(optionIdsJson), C.int(closed))
 }
 
 func CMxNewMessagesBatchDone(connId int, chatId string, fromMsgId string) {
