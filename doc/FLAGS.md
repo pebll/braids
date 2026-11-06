@@ -1,18 +1,12 @@
 # Flags
 
-============
-
 ## Config Flags
-
-============
 >
 > **braids note:** inherited from nchat. braids enables all protocols by
 > default (`HAS_DUMMY`, `HAS_TELEGRAM`, `HAS_WHATSAPP`, `HAS_SIGNAL`,
 > `HAS_MATRIX`); flags only affecting the removed terminal UI no longer apply.
 
 ### Component Loading
-
------------------
 
 The main components of nchat are split into separate libraries, which by
 default are built as shared libraries and dynamically loaded at run-time.
@@ -32,11 +26,7 @@ Link internal libraries statically:
 
 ## Feature Flags
 
-=============
-
 ### Enabling / Disabling Protocol Support
-
------------------
 
 The protocols supported by nchat is controlled by the following cmake flags:
 
@@ -61,8 +51,6 @@ and
     ./make.sh --no-whatsapp build
 
 ### Custom CMake Args
-
-=================
 
 One can pass custom arguments to CMake via the make.sh script by setting the
 environment variable `NCHAT_CMAKEARGS`. Example:

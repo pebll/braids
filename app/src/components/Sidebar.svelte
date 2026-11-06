@@ -234,6 +234,8 @@
   .dot.online { background: var(--success); }
   .dot.fetching, .dot.connecting { background: var(--warning); }
   .dot.error { background: var(--danger); }
+  /* not online: bigger, so a problem stands out */
+  .dot:not(.online) { right: -4px; bottom: -4px; width: 12px; height: 12px; }
   .state.warn { color: var(--warning); }
   .count.corner { position: absolute; top: 1px; right: 4px; min-width: 16px; height: 16px; font-size: 10px; line-height: 16px; padding: 0 4px; }
   .section { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); padding: 14px 10px 6px; }

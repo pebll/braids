@@ -7,7 +7,7 @@ scope and [API.md](API.md) for the daemon API.
 Overview
 --------
 
-```md
+```text
 ┌──────────────────────────────────────────────┐
 │ braids (Tauri app)                           │
 │  web UI (TypeScript)  ◄──►  Rust shell       │
@@ -53,7 +53,7 @@ Process model
 Core daemon (M1)
 ----------------
 
-```md
+```text
  Unix socket clients / stdin+stdout
         │ JSON-RPC (server.cpp: poll loop, per-connection output buffers)
  ApiServer ── Core::Call ──► EventLoop thread ◄── protocol notifications (Post)
@@ -138,7 +138,7 @@ nchat's setup was interactive on the terminal (stdin prompts, QR code printed
 or opened in an image viewer, `ProtocolUiControlNotify` to take over the
 terminal). In braids, `SetupProfile`/`Login` are event driven:
 
-```md
+```text
 app → accounts.add {protocol}
 core → account.auth {step: "qr", data: "<qr payload>"}          (WhatsApp, Signal, Telegram)
 core → account.auth {step: "input", field: "phone"|"code"|"password"|"userId"|"homeserver"|"recoveryKey", secret: bool}

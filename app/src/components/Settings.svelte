@@ -6,7 +6,7 @@
   braids is distributed under the GNU AGPL v3 license, see LICENSE for details.
 -->
 <script lang="ts">
-  import { Bell, ChevronLeft, Info, Keyboard, Monitor, Moon, Pencil, Plus, RotateCcw, Settings as SettingsIcon, Sun, Trash2, Users, X } from '@lucide/svelte';
+  import { Bell, Bug, ChevronLeft, Info, Keyboard, Lightbulb, Monitor, Moon, Pencil, Plus, RotateCcw, Settings as SettingsIcon, Sun, Trash2, Users, X } from '@lucide/svelte';
   import * as api from '../lib/api';
   import { ACCOUNT_COLORS, protocolMeta } from '../lib/protocols';
   import {
@@ -18,6 +18,7 @@
   import Logo from './Logo.svelte';
   import ProtocolBadge from './ProtocolBadge.svelte';
 
+  const ISSUES = 'https://github.com/pebll/braids/issues';
   const SECTIONS = [
     { id: 'general', label: 'General', icon: SettingsIcon },
     { id: 'notifications', label: 'Notifications', icon: Bell },
@@ -339,6 +340,15 @@
             </div>
             <label class="check"><input type="checkbox" checked={settings.checkUpdates} onchange={(e) => set('checkUpdates', e.currentTarget.checked)} />Check for updates automatically</label>
           {/if}
+          <div class="feedback">
+            <b>Feedback</b>
+            <span>Found a bug or have an idea? Tell us on GitHub (needs a GitHub account).</span>
+            <div class="buttons center">
+              <button class="btn" onclick={() => api.openUrl(`${ISSUES}/new?template=bugreport.md`).catch((e) => store.toastError(e))}><Bug size={16} />Report a bug</button>
+              <button class="btn" onclick={() => api.openUrl(`${ISSUES}/new?template=feature_request.md`).catch((e) => store.toastError(e))}><Lightbulb size={16} />Suggest a feature</button>
+              <button class="btn" onclick={() => api.openUrl(ISSUES).catch((e) => store.toastError(e))}>Known issues</button>
+            </div>
+          </div>
           <p>Free software under the GNU Affero General Public License v3.</p>
           <div class="buttons center">
             <button class="btn" onclick={() => api.openUrl('https://github.com/pebll/braids').catch((e) => store.toastError(e))}>Source code</button>
@@ -403,6 +413,10 @@
   .about { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px; padding-top: 24px; }
   .about h2 { margin: 8px 0 0; }
   .about p { color: var(--text-2); max-width: 340px; }
+  .feedback { display: flex; flex-direction: column; align-items: center; gap: 4px; margin: 16px 0 4px; padding: 14px 16px; border: 1px solid var(--border); border-radius: var(--radius-lg); max-width: 460px; }
+  .feedback b { font-weight: 600; }
+  .feedback > span { font-size: 13px; color: var(--text-2); }
+  .feedback .btn { display: inline-flex; align-items: center; gap: 6px; }
   @media (max-width: 700px) {
     .settings { flex-direction: column; height: calc(100vh - 32px); }
     nav { width: auto; flex-direction: row; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--border); }

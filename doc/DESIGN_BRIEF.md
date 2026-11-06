@@ -1,7 +1,5 @@
 # braids — GUI Design Brief
 
-=========================
-
 This brief is meant to be handed to a designer (or design tool) to produce
 the visual design of the braids desktop app. It describes what the app is,
 the agreed design direction, every screen and state that needs a design, and
@@ -9,8 +7,6 @@ the deliverables. Functional scope comes from
 [REQUIREMENTS.md](REQUIREMENTS.md); this document only adds design decisions.
 
 ## 1. The product in one paragraph
-
--------------------------------
 
 braids is an open source desktop messenger for **Linux and macOS** that puts
 **Telegram, WhatsApp, Signal and Matrix** into one app. Users can connect
@@ -22,8 +18,6 @@ Audience: privacy-aware people and power users who are tired of running four
 messenger apps; many use Linux, many like keyboard control.
 
 ## 2. Design direction (agreed)
-
--------------------------------
 
 | Topic | Decision |
 | --- | --- |
@@ -47,9 +41,7 @@ protocol badge and/or account name), hit targets ≥ 32 px.
 
 ## 3. Main window
 
--------------------------------
-
-```md
+```text
 ┌────────────┬──────────────────┬───────────────────────────────┬────────────┐
 │ Sidebar    │ Chat list        │ Conversation                  │ Info panel │
 │ (folders)  │                  │                               │ (optional) │
@@ -164,8 +156,6 @@ highlighted matches with up/down navigation and a match counter.
 
 ## 4. Accounts and login (modal wizard)
 
--------------------------------
-
 First launch (no accounts): **full-window welcome** with the braids logo,
 one-line pitch, privacy statement ("Everything stays on this computer") and
 the protocol choice. Later, "Add account" opens the same flow as a modal.
@@ -198,8 +188,6 @@ account (destructive confirm dialog: "Remove local data" and, where possible,
 
 ## 5. Responsive behavior
 
--------------------------------
-
 | Width | Layout |
 | --- | --- |
 | Wide (≥ ~1280 px) | Sidebar expanded · chat list · conversation · info panel as column |
@@ -209,8 +197,6 @@ account (destructive confirm dialog: "Remove local data" and, where possible,
 Please show the main screen in all three widths, light and dark.
 
 ## 6. Protocol differences the UI must handle
-
--------------------------------
 
 The UI is unified, but some actions only exist on some protocols. The design
 should hide unsupported actions rather than disable them, except where
@@ -232,8 +218,6 @@ merging contacts across protocols.
 
 ## 7. Other screens and components
 
--------------------------------
-
 - **Settings** (modal or full panel with sections): General (theme
   light/dark/system, downloads directory, start on login / keep running in
   tray), Notifications (on/off, show message preview yes/no, sound), Keyboard
@@ -252,8 +236,6 @@ merging contacts across protocols.
   mode is enabled (no dedicated vim designs needed now).
 
 ## 8. Deliverables
-
--------------------------------
 
 1. **Screens** (light + dark): welcome / first launch, add-account wizard
    (protocol choice, QR step, text input step, recovery key step, error,

@@ -1,7 +1,5 @@
 # braids — Requirements
 
-=====================
-
 braids is an open source desktop messenger that brings Telegram, WhatsApp,
 Signal and Matrix together in one app. It is based on the protocol layer of
 [nchat](https://github.com/d99kris/nchat) and replaces nchat's terminal UI with
@@ -11,8 +9,6 @@ Status: draft v0.1 (milestone M0). Decisions below were agreed with the
 maintainer; items marked *open* still need a decision.
 
 ## 1. Goals
-
---------
 
 | # | Requirement |
 | --- | --- |
@@ -27,8 +23,6 @@ maintainer; items marked *open* still need a decision.
 | G9 | **Platforms**: Linux and macOS. |
 
 ## 2. Functional scope (v1)
-
---------
 
 Accounts
 
@@ -71,8 +65,6 @@ App
 
 ## 3. Non-goals (not in v1)
 
---------
-
 - Terminal UI (nchat's ncurses UI is not carried over; it is kept under
   `reference/` only as source material).
 - Windows support.
@@ -83,8 +75,6 @@ App
 - Threads UI (thread messages are shown inline as replies).
 
 ## 4. Vim mode (optional)
-
---------
 
 Off by default; when enabled, keyboard navigation is modal:
 
@@ -98,8 +88,6 @@ A mode indicator is always visible while vim mode is on. Mouse use keeps
 working and switches mode as needed.
 
 ## 5. Protocol unification
-
---------
 
 The unified model is nchat's `lib/common/src/protocol.h` (`ChatInfo`,
 `ChatMessage`, `ContactInfo`, request/notify messages), extended where needed.
@@ -134,8 +122,6 @@ Rules:
 
 ## 6. Non-functional requirements
 
---------
-
 - Start to usable chat list from cache in < 1 s on a typical laptop.
 - Smooth scrolling in chats with 10k+ cached messages (virtualized list).
 - No data loss on crash; core keeps running when the GUI closes (tray).
@@ -145,8 +131,6 @@ Rules:
   protocols.
 
 ## 7. Constraints, risks and open items
-
---------
 
 - **Telegram API id**: `lib/tgchat` currently uses nchat's API credentials
   (overridable with `TG_APIID`/`TG_APIHASH`). braids must register its own at
