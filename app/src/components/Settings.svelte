@@ -6,18 +6,19 @@
   braids is distributed under the GNU AGPL v3 license, see LICENSE for details.
 -->
 <script lang="ts">
-  import { Bell, ChevronLeft, Info, Keyboard, Monitor, Moon, Pencil, Plus, RotateCcw, Settings as SettingsIcon, Sun, Trash2, Users, X } from '@lucide/svelte';
+  import { Bell, Bug, ChevronLeft, Info, Keyboard, Lightbulb, Monitor, Moon, Pencil, Plus, RotateCcw, Settings as SettingsIcon, Sun, Trash2, Users, X } from '@lucide/svelte';
   import * as api from '../lib/api';
   import { ACCOUNT_COLORS, protocolMeta } from '../lib/protocols';
   import {
     ACTIONS, GROUPS, addBinding, bindings, comboKeys, comboLabel, comboOf, isDefault, isMac, isUsableCombo, removeBinding, resetBindings, type Action,
   } from '../lib/keybinds.svelte';
-  import { settings, type Theme } from '../lib/settings.svelte';
+  import { settings, type TextSize, type Theme } from '../lib/settings.svelte';
   import { store } from '../lib/store.svelte';
   import { ui } from '../lib/ui.svelte';
   import Logo from './Logo.svelte';
   import ProtocolBadge from './ProtocolBadge.svelte';
 
+  const ISSUES = 'https://github.com/pebll/braids/issues';
   const SECTIONS = [
     { id: 'general', label: 'General', icon: SettingsIcon },
     { id: 'notifications', label: 'Notifications', icon: Bell },
@@ -103,6 +104,7 @@
   function set<K extends keyof typeof settings>(key: K, value: (typeof settings)[K]) {
     (settings as any)[key] = value;
     settings.save();
+    if (key === 'textSize') ui.showTextSize(value as number);
     if (key === 'closeToTray') api.setCloseToTray(value as boolean);
   }
 
@@ -149,6 +151,12 @@
     { id: 'light', label: 'Light', icon: Sun },
     { id: 'dark', label: 'Dark', icon: Moon },
   ];
+  const textSizes: TextSize[] = [70, 80, 90, 100, 110, 125, 150];
+
+  function setCustomTextSize(value: string) {
+    const size = Math.round(Number(value));
+    if (Number.isFinite(size) && size >= 50 && size <= 200) set('textSize', size);
+  }
 </script>
 
 <svelte:window onkeydown={(e) => e.key === 'Escape' && !ui.confirmRequest && close()} />
@@ -174,6 +182,20 @@
             {#each themes as t}
               <button aria-pressed={settings.theme === t.id} onclick={() => set('theme', t.id)}><t.icon size={14} />{t.label}</button>
             {/each}
+          </div>
+        </div>
+        <div class="row">
+          <div class="row-text"><b>Text size</b><span>Scale the whole interface, including menus and dialogs.</span></div>
+          <div class="text-size-control">
+            <select aria-label="Text size preset" value={textSizes.includes(settings.textSize) ? settings.textSize : ''}
+              onchange={(e) => set('textSize', Number((e.target as HTMLSelectElement).value))}>
+              {#each textSizes as size}<option value={size}>{size} %</option>{/each}
+            </select>
+            <label class="custom-size">
+              <input aria-label="Custom text size" type="number" min="50" max="200" step="1" value={settings.textSize}
+                oninput={(e) => setCustomTextSize((e.target as HTMLInputElement).value)} />
+              <span>%</span>
+            </label>
           </div>
         </div>
         <div class="row">
@@ -318,6 +340,15 @@
             </div>
             <label class="check"><input type="checkbox" checked={settings.checkUpdates} onchange={(e) => set('checkUpdates', e.currentTarget.checked)} />Check for updates automatically</label>
           {/if}
+          <div class="feedback">
+            <b>Feedback</b>
+            <span>Found a bug or have an idea? Tell us on GitHub (needs a GitHub account).</span>
+            <div class="buttons center">
+              <button class="btn" onclick={() => api.openUrl(`${ISSUES}/new?template=bugreport.md`).catch((e) => store.toastError(e))}><Bug size={16} />Report a bug</button>
+              <button class="btn" onclick={() => api.openUrl(`${ISSUES}/new?template=feature_request.md`).catch((e) => store.toastError(e))}><Lightbulb size={16} />Suggest a feature</button>
+              <button class="btn" onclick={() => api.openUrl(ISSUES).catch((e) => store.toastError(e))}>Known issues</button>
+            </div>
+          </div>
           <p>Free software under the GNU Affero General Public License v3.</p>
           <div class="buttons center">
             <button class="btn" onclick={() => api.openUrl('https://github.com/pebll/braids').catch((e) => store.toastError(e))}>Source code</button>
@@ -347,6 +378,13 @@
   .row-text { display: flex; flex-direction: column; min-width: 0; font-size: 14px; }
   .row-text b { font-weight: 500; }
   .row-text span { font-size: 12px; color: var(--text-muted); line-height: 16px; overflow-wrap: anywhere; }
+  .text-size-control { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .text-size-control select, .custom-size input {
+    height: 30px; border: 1px solid var(--border-strong); border-radius: var(--radius-md);
+    background: var(--surface-2); padding: 0 8px; color: var(--text); font-size: 13px;
+  }
+  .custom-size { display: flex; align-items: center; gap: 4px; color: var(--text-2); }
+  .custom-size input { width: 64px; }
   .section { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); margin-top: 16px; }
   .keys { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
   .shortcuts-head { display: flex; align-items: center; justify-content: space-between; }
@@ -375,6 +413,10 @@
   .about { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px; padding-top: 24px; }
   .about h2 { margin: 8px 0 0; }
   .about p { color: var(--text-2); max-width: 340px; }
+  .feedback { display: flex; flex-direction: column; align-items: center; gap: 4px; margin: 16px 0 4px; padding: 14px 16px; border: 1px solid var(--border); border-radius: var(--radius-lg); max-width: 460px; }
+  .feedback b { font-weight: 600; }
+  .feedback > span { font-size: 13px; color: var(--text-2); }
+  .feedback .btn { display: inline-flex; align-items: center; gap: 6px; }
   @media (max-width: 700px) {
     .settings { flex-direction: column; height: calc(100vh - 32px); }
     nav { width: auto; flex-direction: row; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--border); }

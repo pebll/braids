@@ -79,7 +79,7 @@ bool MxChat::HasFeature(ProtocolFeature p_ProtocolFeature) const
     FeatureEditMessagesAnytime |
     FeatureAutoGetContactsOnLogin |
     FeaturePinChat |
-    FeatureAvatars | FeatureDescriptions | FeatureJoinChat | FeatureCreateGroup;
+    FeatureAvatars | FeatureDescriptions | FeatureJoinChat | FeatureCreateGroup | FeaturePolls;
   return (p_ProtocolFeature & customFeatures);
 }
 
@@ -530,7 +530,10 @@ void MxChat::PerformRequest(std::shared_ptr<RequestMessage> p_RequestMessage)
 
         std::string editMsgId;
         std::string mentionsJson = ProtocolUtil::MentionsToJson(chatMessage.mentions);
-        int rv = CMxSendMessage(m_ConnId, const_cast<char*>(sendMessageRequest->chatId.c_str()),
+        int rv = !chatMessage.poll.empty()
+          ? CMxSendPoll(m_ConnId, const_cast<char*>(sendMessageRequest->chatId.c_str()),
+                        const_cast<char*>(chatMessage.poll.c_str()))
+          : CMxSendMessage(m_ConnId, const_cast<char*>(sendMessageRequest->chatId.c_str()),
                                 const_cast<char*>(chatMessage.text.c_str()),
                                 const_cast<char*>(chatMessage.quotedId.c_str()),
                                 const_cast<char*>(filePath.c_str()), const_cast<char*>(fileType.c_str()),
@@ -670,6 +673,15 @@ void MxChat::PerformRequest(std::shared_ptr<RequestMessage> p_RequestMessage)
                         const_cast<char*>(downloadFileRequest->msgId.c_str()),
                         const_cast<char*>(downloadFileRequest->fileId.c_str()),
                         downloadFileRequest->downloadFileAction);
+      }
+      break;
+
+    case VotePollRequestType:
+      {
+        std::shared_ptr<VotePollRequest> votePollRequest = std::static_pointer_cast<VotePollRequest>(p_RequestMessage);
+        const std::string optionIdsJson = ProtocolUtil::StringsToJson(votePollRequest->optionIds);
+        CMxVotePoll(m_ConnId, const_cast<char*>(votePollRequest->chatId.c_str()),
+                    const_cast<char*>(votePollRequest->msgId.c_str()), const_cast<char*>(optionIdsJson.c_str()));
       }
       break;
 
@@ -1045,7 +1057,7 @@ void MxNewChatsNotify(int p_ConnId, char* p_ChatId, int p_IsUnread, int p_IsMute
 
 void MxNewMessagesNotify(int p_ConnId, char* p_ChatId, char* p_MsgId, char* p_SenderId, char* p_Text, int p_FromMe,
                          char* p_QuotedId, char* p_FileId, char* p_FilePath, int p_FileStatus, long long p_TimeSent,
-                         int p_IsRead, int p_IsEdited, int p_Batch)
+                         int p_IsRead, int p_IsEdited, int p_Batch, char* p_Poll)
 {
   MxChat* instance = MxChat::GetInstance(p_ConnId);
   if (instance != nullptr)
@@ -1053,6 +1065,7 @@ void MxNewMessagesNotify(int p_ConnId, char* p_ChatId, char* p_MsgId, char* p_Se
     const std::string chatId(p_ChatId);
     ChatMessage chatMessage;
     chatMessage.id = std::string(p_MsgId);
+    chatMessage.poll = std::string(p_Poll);
     chatMessage.senderId = std::string(p_SenderId);
     chatMessage.text = std::string(p_Text);
     chatMessage.isOutgoing = (p_FromMe == 1);
@@ -1133,8 +1146,38 @@ void MxNewMessagesNotify(int p_ConnId, char* p_ChatId, char* p_MsgId, char* p_Se
   free(p_SenderId);
   free(p_Text);
   free(p_QuotedId);
+  free(p_Poll);
   free(p_FileId);
   free(p_FilePath);
+}
+
+void MxNewPollNotify(int p_ConnId, char* p_ChatId, char* p_MsgId, char* p_VoterId, char* p_OptionIdsJson,
+                     int p_Closed)
+{
+  MxChat* instance = MxChat::GetInstance(p_ConnId);
+  if (instance != nullptr)
+  {
+    std::shared_ptr<NewPollNotify> notify = std::make_shared<NewPollNotify>(instance->GetProfileId());
+    notify->chatId = std::string(p_ChatId);
+    notify->msgId = std::string(p_MsgId);
+    notify->voterId = std::string(p_VoterId);
+    notify->closed = (p_Closed != 0);
+    if (!notify->closed)
+    {
+      notify->optionIds = ProtocolUtil::StringsFromJson(std::string(p_OptionIdsJson));
+    }
+    else
+    {
+      notify->voterId.clear();
+    }
+
+    DeferNotify(instance, notify);
+  }
+
+  free(p_ChatId);
+  free(p_MsgId);
+  free(p_VoterId);
+  free(p_OptionIdsJson);
 }
 
 void MxNewMessagesBatchDone(int p_ConnId, char* p_ChatId, char* p_FromMsgId)

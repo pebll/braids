@@ -65,7 +65,8 @@ std::string SgChat::GetProfileDisplayName() const
 bool SgChat::HasFeature(ProtocolFeature p_ProtocolFeature) const
 {
   // Signal allows editing within ~24 hours
-  int customFeatures = FeatureEditMessagesWithinTwoDays | FeatureAvatars | FeatureDescriptions | FeatureCreateGroup;
+  int customFeatures = FeatureEditMessagesWithinTwoDays | FeatureAvatars | FeatureDescriptions | FeatureCreateGroup |
+    FeaturePolls;
   return (p_ProtocolFeature & customFeatures);
 }
 
@@ -446,8 +447,10 @@ void SgChat::PerformRequest(std::shared_ptr<RequestMessage> p_RequestMessage)
 
         std::string mentionsJson = ProtocolUtil::MentionsToJson(sendMessageRequest->chatMessage.mentions);
 
-        int rv =
-          CSgSendMessage(m_ConnId, const_cast<char*>(chatId.c_str()), const_cast<char*>(text.c_str()),
+        int rv = !sendMessageRequest->chatMessage.poll.empty()
+          ? CSgSendPoll(m_ConnId, const_cast<char*>(chatId.c_str()),
+                        const_cast<char*>(sendMessageRequest->chatMessage.poll.c_str()))
+          : CSgSendMessage(m_ConnId, const_cast<char*>(chatId.c_str()), const_cast<char*>(text.c_str()),
                          const_cast<char*>(quotedId.c_str()), const_cast<char*>(quotedText.c_str()),
                          const_cast<char*>(quotedSender.c_str()), const_cast<char*>(filePath.c_str()),
                          const_cast<char*>(fileType.c_str()), const_cast<char*>(editMsgId.c_str()),
@@ -714,6 +717,16 @@ void SgChat::PerformRequest(std::shared_ptr<RequestMessage> p_RequestMessage)
                                   findMessageRequest->findText,
                                   findMessageRequest->findMsgId,
                                   findMessageRequest->findPinned);
+      }
+      break;
+
+    case VotePollRequestType:
+      {
+        std::shared_ptr<VotePollRequest> votePollRequest = std::static_pointer_cast<VotePollRequest>(p_RequestMessage);
+        const std::string optionIdsJson = ProtocolUtil::StringsToJson(votePollRequest->optionIds);
+        CSgVotePoll(m_ConnId, const_cast<char*>(votePollRequest->chatId.c_str()),
+                    const_cast<char*>(votePollRequest->msgId.c_str()),
+                    const_cast<char*>(votePollRequest->pollSenderId.c_str()), const_cast<char*>(optionIdsJson.c_str()));
       }
       break;
 
@@ -1036,6 +1049,61 @@ void SgNewGroupMembersNotify(int p_ConnId, char* p_ChatId, char* p_MembersJson)
 
   free(p_ChatId);
   free(p_MembersJson);
+}
+
+void SgNewPollMessageNotify(int p_ConnId, char* p_ChatId, char* p_MsgId, char* p_SenderId, int p_FromMe, int p_TimeSent,
+                            int p_IsRead, char* p_Poll)
+{
+  SgChat* instance = SgChat::GetInstance(p_ConnId);
+  if (instance != nullptr)
+  {
+    ChatMessage chatMessage;
+    chatMessage.id = std::string(p_MsgId);
+    chatMessage.senderId = std::string(p_SenderId);
+    chatMessage.isOutgoing = (p_FromMe == 1);
+    chatMessage.timeSent = (((int64_t)p_TimeSent) * 1000) + (std::hash<std::string>{ }(chatMessage.id) % 256);
+    chatMessage.isRead = (p_IsRead == 1);
+    chatMessage.poll = std::string(p_Poll);
+
+    std::shared_ptr<NewMessagesNotify> newMessagesNotify = std::make_shared<NewMessagesNotify>(instance->GetProfileId());
+    newMessagesNotify->success = true;
+    newMessagesNotify->chatId = std::string(p_ChatId);
+    newMessagesNotify->chatMessages = std::vector<ChatMessage>({ chatMessage });
+    newMessagesNotify->cached = false;
+    newMessagesNotify->sequence = true;
+
+    std::shared_ptr<DeferNotifyRequest> deferNotifyRequest = std::make_shared<DeferNotifyRequest>();
+    deferNotifyRequest->serviceMessage = newMessagesNotify;
+    instance->SendRequest(deferNotifyRequest);
+  }
+
+  free(p_ChatId);
+  free(p_MsgId);
+  free(p_SenderId);
+  free(p_Poll);
+}
+
+void SgNewPollNotify(int p_ConnId, char* p_ChatId, char* p_MsgId, char* p_VoterId, char* p_OptionIdsJson, int p_Closed)
+{
+  SgChat* instance = SgChat::GetInstance(p_ConnId);
+  if (instance != nullptr)
+  {
+    std::shared_ptr<NewPollNotify> notify = std::make_shared<NewPollNotify>(instance->GetProfileId());
+    notify->chatId = std::string(p_ChatId);
+    notify->msgId = std::string(p_MsgId);
+    notify->voterId = std::string(p_VoterId);
+    notify->optionIds = ProtocolUtil::StringsFromJson(std::string(p_OptionIdsJson));
+    notify->closed = (p_Closed != 0);
+
+    std::shared_ptr<DeferNotifyRequest> deferNotifyRequest = std::make_shared<DeferNotifyRequest>();
+    deferNotifyRequest->serviceMessage = notify;
+    instance->SendRequest(deferNotifyRequest);
+  }
+
+  free(p_ChatId);
+  free(p_MsgId);
+  free(p_VoterId);
+  free(p_OptionIdsJson);
 }
 
 void SgNewMessagesNotify(int p_ConnId, char* p_ChatId, char* p_MsgId, char* p_SenderId, char* p_Text, int p_FromMe,

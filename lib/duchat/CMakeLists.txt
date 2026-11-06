@@ -22,6 +22,7 @@ target_common_config(duchat)
 # Headers
 target_include_directories(duchat PRIVATE "../common/src")
 target_include_directories(duchat PRIVATE "../ncutil/src")
+target_include_directories(duchat PRIVATE "../../src/braidsd/ext")
 
 # Compiler flags
 set_target_properties(duchat PROPERTIES COMPILE_FLAGS

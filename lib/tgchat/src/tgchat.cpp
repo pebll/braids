@@ -40,6 +40,7 @@
 #include "fileutil.h"
 #include "log.h"
 #include "messagecache.h"
+#include "nlohmann/json.hpp"
 #include "protocolutil.h"
 #include "qrutil.h"
 #include "status.h"
@@ -234,6 +235,7 @@ private:
   void AddMentionEntities(td::td_api::object_ptr<td::td_api::formattedText>& p_FormattedText,
                           const std::vector<MentionInfo>& p_MentionInfos);
   std::string GetText(td::td_api::object_ptr<td::td_api::formattedText>&& p_FormattedText);
+  std::string TdPollToJson(td::td_api::poll& p_Poll);
   void TdMessageContentConvert(td::td_api::MessageContent& p_TdMessageContent, int64_t p_SenderId,
                                std::string& p_Text, std::string& p_FileInfo);
   void TdMessageConvert(td::td_api::message& p_TdMessage, ChatMessage& p_ChatMessage);
@@ -418,7 +420,7 @@ bool TgChat::Impl::HasFeature(ProtocolFeature p_ProtocolFeature) const
     FeaturePinMessage |
     FeatureAvatars |
     FeatureDescriptions |
-    FeatureJoinChat | FeatureCreateGroup;
+    FeatureJoinChat | FeatureCreateGroup | FeaturePolls;
   return (p_ProtocolFeature & customFeatures);
 }
 
@@ -977,6 +979,28 @@ void TgChat::Impl::PerformRequest(std::shared_ptr<RequestMessage> p_RequestMessa
       }
       break;
 
+    case VotePollRequestType:
+      {
+        std::shared_ptr<VotePollRequest> votePollRequest = std::static_pointer_cast<VotePollRequest>(p_RequestMessage);
+        auto set_poll_answer = td::td_api::make_object<td::td_api::setPollAnswer>();
+        set_poll_answer->chat_id_ = StrUtil::NumFromHex<int64_t>(votePollRequest->chatId);
+        set_poll_answer->message_id_ = StrUtil::NumFromHex<int64_t>(votePollRequest->msgId);
+        for (const auto& optionId : votePollRequest->optionIds)
+        {
+          set_poll_answer->option_ids_.push_back(static_cast<int32_t>(StrUtil::ToInteger(optionId)));
+        }
+
+        // the new counts come with updateMessageContent
+        SendQuery(std::move(set_poll_answer), [](Object object)
+        {
+          if (object->get_id() == td::td_api::error::ID)
+          {
+            LOG_WARNING("vote failed");
+          }
+        });
+      }
+      break;
+
     case SendMessageRequestType:
       {
         LOG_DEBUG("Send message");
@@ -1005,7 +1029,31 @@ void TgChat::Impl::PerformRequest(std::shared_ptr<RequestMessage> p_RequestMessa
           processedText = PreprocessMentionText(processedText, mentions, mentionInfos);
         }
 
-        if (sendMessageRequest->chatMessage.fileInfo.empty())
+        if (!sendMessageRequest->chatMessage.poll.empty())
+        {
+          // braids: a poll (anonymous, as Telegram's apps default to)
+          const nlohmann::json poll = nlohmann::json::parse(sendMessageRequest->chatMessage.poll, nullptr, false);
+          auto message_content = td::td_api::make_object<td::td_api::inputMessagePoll>();
+          message_content->question_ = td::td_api::make_object<td::td_api::formattedText>();
+          message_content->question_->text_ = poll.is_object() ? poll.value("question", "") : "";
+          if (poll.is_object() && poll.contains("options") && poll["options"].is_array())
+          {
+            for (const auto& option : poll["options"])
+            {
+              auto input_option = td::td_api::make_object<td::td_api::inputPollOption>();
+              input_option->text_ = td::td_api::make_object<td::td_api::formattedText>();
+              input_option->text_->text_ = option.value("text", "");
+              message_content->options_.push_back(std::move(input_option));
+            }
+          }
+
+          message_content->is_anonymous_ = true;
+          message_content->allows_multiple_answers_ = poll.is_object() && poll.value("multiple", false);
+          message_content->allows_revoting_ = true;
+          message_content->type_ = td::td_api::make_object<td::td_api::inputPollTypeRegular>();
+          send_message->input_message_content_ = std::move(message_content);
+        }
+        else if (sendMessageRequest->chatMessage.fileInfo.empty())
         {
           auto message_content = GetMessageText(processedText);
           if (!mentionInfos.empty())
@@ -3843,10 +3891,39 @@ void TgChat::Impl::TdMessageContentConvert(td::td_api::MessageContent& p_TdMessa
   {
     p_Text = "[UnsupportedByCurrentTdlibVersion]";
   }
+  else if (p_TdMessageContent.get_id() == td::td_api::messagePoll::ID)
+  {
+    p_Text = ""; // braids: the poll itself, see TdPollToJson
+  }
   else
   {
     p_Text = "[UnknownMessage " + std::to_string(p_TdMessageContent.get_id()) + "]";
   }
+}
+
+// braids: a poll as ChatMessage.poll, counted by Telegram (option ids are the
+// indexes setPollAnswer takes)
+std::string TgChat::Impl::TdPollToJson(td::td_api::poll& p_Poll)
+{
+  nlohmann::json options = nlohmann::json::array();
+  nlohmann::json counts = nlohmann::json::object();
+  nlohmann::json own = nlohmann::json::array();
+  for (size_t i = 0; i < p_Poll.options_.size(); ++i)
+  {
+    const auto& option = p_Poll.options_[i];
+    const std::string id = std::to_string(i);
+    options.push_back(nlohmann::json{ { "id", id }, { "text", option->text_ ? option->text_->text_ : "" } });
+    counts[id] = option->voter_count_;
+    if (option->is_chosen_)
+    {
+      own.push_back(id);
+    }
+  }
+
+  return nlohmann::json{ { "question", p_Poll.question_ ? p_Poll.question_->text_ : "" }, { "options", options },
+                         { "multiple", p_Poll.allows_multiple_answers_ }, { "closed", p_Poll.is_closed_ },
+                         { "anonymous", p_Poll.is_anonymous_ }, { "counts", counts }, { "own", own },
+                         { "total", p_Poll.total_voter_count_ } }.dump();
 }
 
 void TgChat::Impl::TdMessageConvert(td::td_api::message& p_TdMessage, ChatMessage& p_ChatMessage)
@@ -3855,6 +3932,14 @@ void TgChat::Impl::TdMessageConvert(td::td_api::message& p_TdMessage, ChatMessag
 
   const int64_t senderId = GetSenderId(td::move_tl_object_as<td::td_api::MessageSender>(p_TdMessage.sender_id_));
   TdMessageContentConvert(*p_TdMessage.content_, senderId, p_ChatMessage.text, p_ChatMessage.fileInfo);
+  if (p_TdMessage.content_->get_id() == td::td_api::messagePoll::ID)
+  {
+    auto& messagePoll = static_cast<td::td_api::messagePoll&>(*p_TdMessage.content_);
+    if (messagePoll.poll_)
+    {
+      p_ChatMessage.poll = TdPollToJson(*messagePoll.poll_);
+    }
+  }
 
   p_ChatMessage.id = StrUtil::NumToHex(p_TdMessage.id_);
   p_ChatMessage.senderId = StrUtil::NumToHex(senderId);

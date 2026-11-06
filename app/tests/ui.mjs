@@ -162,6 +162,32 @@ try {
   await page.locator('.msg.own', { hasText: 'thanks @Andy' }).last().waitFor();
   check(true, 'message with mention sent');
 
+  await composer.fill('nice '); 
+  await composer.pressSequentially(':thu');
+  await page.locator('.emoji-suggest .glyph', { hasText: '👍' }).waitFor({ timeout: 5000 }).catch(() => {});
+  const glyphs = await page.locator('.emoji-suggest .glyph').allTextContents();
+  check(glyphs.includes('👍'), 'emoji suggestions appear after ":" and two letters');
+  await shot('emoji-suggest');
+  await composer.press('Enter');
+  check((await composer.inputValue()) === `nice ${glyphs[0]}`, 'Enter inserts the emoji');
+  // a time or a single letter is not a suggestion
+  await composer.fill('at 12:30 and :t');
+  await page.waitForTimeout(300);
+  check(await page.locator('.emoji-suggest').count() === 0, 'no emoji suggestions for a time or a single letter');
+  // arrows and Tab pick another one, Esc closes
+  await composer.fill(':thu');
+  await page.locator('.emoji-suggest .glyph', { hasText: '👍' }).waitFor({ timeout: 5000 }).catch(() => {});
+  const second = await page.locator('.emoji-suggest .glyph').nth(1).textContent();
+  await composer.press('ArrowDown');
+  await composer.press('Tab');
+  check((await composer.inputValue()) === second, 'arrows and Tab pick another suggestion');
+  await composer.fill(':thu');
+  await page.locator('.emoji-suggest').waitFor();
+  await composer.press('Escape');
+  await page.locator('.emoji-suggest').waitFor({ state: 'detached' });
+  check(true, 'Esc closes the emoji suggestions');
+  await composer.fill('');
+
   // one-line message: react and reply side by side
   const oneLiner = page.locator('.msg.own', { hasText: 'Hello team' }).last();
   await oneLiner.hover();
@@ -249,6 +275,11 @@ try {
   await page.getByRole('option', { name: /Michael/ }).click();
   await page.waitForFunction(() => [...document.querySelectorAll('.msg .image img')].some((img) => img.naturalWidth > 0));
   check(true, 'sent image shown inline');
+  await page.locator('.msg.own', { has: page.locator('.image') }).last().click({ button: 'right' });
+  check(await page.getByRole('menuitem', { name: 'Copy image' }).count() === 1, 'photo menu offers Copy image');
+  await page.getByRole('menuitem', { name: 'Copy image' }).click();
+  await page.locator('.toast', { hasText: 'Copied' }).waitFor();
+  check(true, 'Copy image shows confirmation');
 
   // a pasted photo is previewed as a small tile before sending
   await page.evaluate(async () => {
@@ -414,6 +445,22 @@ try {
   await page.locator('.lightbox').waitFor({ state: 'detached' });
   check(true, 'Esc closes the viewer');
 
+  // viewer actions: copy, Ctrl+C, show in chat
+  await page.locator('.msg .image:not(.video-thumb)').last().click();
+  await page.locator('.lightbox img').waitFor();
+  check(await page.locator('.lightbox').getByRole('button', { name: 'Download' }).count() === 1, 'viewer: download button');
+  await page.evaluate(() => navigator.clipboard.writeText(''));
+  await page.locator('.lightbox').getByRole('button', { name: 'Copy image' }).click();
+  await page.waitForFunction(async () => (await navigator.clipboard.read()).some((i) => i.types.includes('image/png')));
+  check(true, 'viewer: Copy image puts a PNG on the clipboard');
+  await page.evaluate(() => navigator.clipboard.writeText(''));
+  await page.keyboard.press('Control+c');
+  await page.waitForFunction(async () => (await navigator.clipboard.read()).some((i) => i.types.includes('image/png')));
+  check(true, 'viewer: Ctrl+C copies the image');
+  await page.locator('.lightbox').getByRole('button', { name: 'Show in chat' }).click();
+  await page.locator('.lightbox').waitFor({ state: 'detached' });
+  check(true, 'viewer: Show in chat closes the viewer');
+
   // no browser context menu outside text fields
   const prevented = (sel) => page.locator(sel).first().evaluate((el) => {
     const ev = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
@@ -550,11 +597,19 @@ try {
   await pamRow.locator('.flag[title=Muted]').waitFor({ state: 'detached' });
   check(true, 'chat unmuted');
 
+  const archivedBadge = () => page.locator('.sidebar .item', { hasText: 'Archived' }).locator('.count');
+  const archivedBefore = await archivedBadge().count() ? Number(await archivedBadge().textContent()) : 0;
+  await page.getByRole('option', { name: /Jim/ }).click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Mark as unread' }).click();
+  await page.getByRole('option', { name: /Jim/ }).locator('.unread-count').waitFor();
   await page.getByRole('option', { name: /Jim/ }).click({ button: 'right' });
   await page.getByRole('menuitem', { name: 'Archive' }).click();
   check((await page.getByRole('option', { name: /Jim/ }).count()) === 0, 'archived chat leaves the inbox');
+  await page.waitForFunction((n) => Number(document.querySelector('.sidebar .item:has(.label) .count.muted')?.closest('.item')?.textContent?.match(/Archived\s*(\d+)/)?.[1] ?? 0) === n + 1, archivedBefore);
+  check(true, 'Archived shows a grey count of its chats with new messages');
   await page.getByRole('button', { name: /Archived/ }).click();
   check((await page.getByRole('option', { name: /Jim/ }).count()) === 1, 'archived chat in Archived');
+  check(await page.getByRole('option', { name: /Jim/ }).locator('.unread-count.muted').count() === 1, 'archived chat: grey unread count, like a muted chat');
   await page.getByRole('option', { name: /Jim/ }).click({ button: 'right' });
   await page.getByRole('menuitem', { name: 'Unarchive' }).click();
   await page.getByRole('button', { name: 'All chats' }).click();
@@ -727,6 +782,30 @@ try {
     await page.locator('[data-action=searchChats] .combo').count() === 1, 'reset all restores the defaults');
   await shot('settings-keyboard');
   await page.getByRole('button', { name: 'General' }).click();
+  await page.getByLabel('Text size preset').selectOption('110');
+  check(await page.evaluate(() => document.getElementById('app')?.style.zoom) === '1.1',
+    'text size setting scales the interface');
+  check(await page.locator('.text-size-notice', { hasText: 'Text size: 110 %' }).count() === 1,
+    'text size change shows its current value');
+  check(await page.evaluate(() => JSON.parse(localStorage.getItem('braids.settings.v1')).textSize === 110),
+    'text size is remembered');
+  await page.getByLabel('Text size preset').selectOption('100');
+  const zoomShortcut = (key, code = key) => page.evaluate(([k, c]) => {
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: k, code: c, ctrlKey: true, bubbles: true, cancelable: true }));
+  }, [key, code]);
+  await zoomShortcut('+', 'Equal');
+  check(await page.evaluate(() => document.getElementById('app')?.style.zoom) === '1.1',
+    'Ctrl+Plus increases text size');
+  check(await page.locator('.text-size-notice', { hasText: 'Text size: 110 %' }).count() === 1,
+    'Ctrl+Plus shows the current value');
+  await zoomShortcut('-', 'Minus');
+  check(await page.evaluate(() => document.getElementById('app')?.style.zoom) === '1',
+    'Ctrl+Minus decreases text size');
+  await zoomShortcut('0', 'Digit0');
+  check(await page.evaluate(() => document.getElementById('app')?.style.zoom) === '1',
+    'Ctrl+0 resets text size');
+  await page.locator('.text-size-notice').waitFor({ state: 'detached', timeout: 6000 });
+  check(true, 'text size notice disappears after five seconds');
   await page.getByRole('button', { name: 'Dark' }).click();
   check(await page.evaluate(() => document.documentElement.classList.contains('t-dark')), 'dark theme applied');
   await shot('settings-dark');
@@ -936,6 +1015,34 @@ try {
   await page.locator('main.conv header', { hasText: 'Road trip' }).waitFor();
   check(await page.getByRole('option', { name: /Road trip/ }).count() === 1, 'new group created and opened');
   await shot('new-group');
+
+  // polls: made in a dialog, voted on in the message, others' votes shown
+  await page.getByRole('button', { name: 'New poll' }).click();
+  const pollDialog = page.getByRole('dialog', { name: 'New poll' });
+  await pollDialog.getByLabel('Question').fill('Where to?');
+  await pollDialog.getByLabel('Option 1', { exact: true }).fill('Beach');
+  await pollDialog.getByLabel('Option 2', { exact: true }).fill('Mountains');
+  check(await pollDialog.getByLabel('Option 3', { exact: true }).count() === 1, 'poll dialog: a new option appears while typing');
+  await pollDialog.getByRole('button', { name: 'Send poll' }).click();
+  await pollDialog.waitFor({ state: 'detached' });
+  const pollCard = page.locator('.msg.own .poll', { hasText: 'Where to?' });
+  await pollCard.waitFor();
+  check(await pollCard.locator('.option').count() === 2, 'poll sent and shown with its options');
+  await pollCard.locator('.option', { hasText: 'Beach' }).click();
+  await pollCard.locator('.option[aria-pressed=true]', { hasText: 'Beach' }).waitFor();
+  check((await pollCard.locator('.summary').textContent()).includes('1 vote'), 'own vote shown');
+  check((await page.getByRole('option', { name: /Road trip/ }).textContent()).includes('📊 Where to?'), 'poll in the chat list preview');
+  const pollComposer = page.getByRole('textbox', { name: 'Message' });
+  await pollComposer.fill('/poll');
+  await pollComposer.press('Enter');
+  const lunch = page.locator('.msg:not(.own) .poll', { hasText: 'Lunch?' });
+  await lunch.waitFor();
+  check(await lunch.locator('.option', { hasText: 'Sushi' }).locator('.share').textContent() === '100 %', "others' votes shown");
+  await lunch.locator('.option', { hasText: 'Pizza' }).click();
+  await lunch.locator('.option[aria-pressed=true]', { hasText: 'Pizza' }).waitFor();
+  check(true, "voting in someone else's poll");
+  await shot('poll');
+  await page.getByRole('button', { name: 'Settings' }).click();
   await page.locator('[aria-labelledby=newchat-title]').waitFor({ state: 'detached' }).catch(() => {});
   await page.keyboard.press('Control+,');
 

@@ -2,8 +2,8 @@ name: setup-ccache
 
 inputs:
   max_size:
-    description: Max ccache size
-    default: 1G
+    description: Max ccache size (tdlib alone needs more than 1G)
+    default: 3G
 
   cache_key_prefix:
     description: Cache key prefix
@@ -44,12 +44,22 @@ runs:
       uses: actions/cache@v5
       with:
         path: ${{ steps.cache-key.outputs.ccache_dir }}
-        key: ${{ steps.cache-key.outputs.prefix }}-${{ runner.os }}-${{ steps.cache-key.outputs.compiler_hash }}-${{ hashFiles('**/CMakeLists.txt','**/*.cmake') }}
+        # cache entries cannot be overwritten: a key per run saves the grown
+        # cache every time, the restore keys pick the newest one
+        key: ${{ steps.cache-key.outputs.prefix }}-${{ runner.os }}-${{ steps.cache-key.outputs.compiler_hash }}-${{ github.run_id }}-${{ github.run_attempt }}
         restore-keys: |
+          ${{ steps.cache-key.outputs.prefix }}-${{ runner.os }}-${{ steps.cache-key.outputs.compiler_hash }}-
           ${{ steps.cache-key.outputs.prefix }}-${{ runner.os }}-
 
     - name: Configure ccache
       shell: bash
       run: |
-        ccache --set-config=cache_dir=${{ steps.cache-key.outputs.ccache_dir }}
+        # the directory the cache step saves; with CCACHE_DIR set, ccache keeps
+        # its config there too (so the settings below travel with the cache)
+        export CCACHE_DIR="${{ steps.cache-key.outputs.ccache_dir }}"
+        mkdir -p "${CCACHE_DIR}"
+        echo "CCACHE_DIR=${CCACHE_DIR}" >> "$GITHUB_ENV"
         ccache --set-config=max_size=${{ inputs.max_size }}
+        # hits across checkouts in different directories
+        ccache --set-config=base_dir=${{ github.workspace }}
+        ccache --zero-stats

@@ -21,6 +21,8 @@ export interface Capabilities {
   joinChat: boolean;
   createGroup: boolean;
   muteChat: boolean;
+  polls: boolean;
+  pollsInGroupsOnly: boolean; // Telegram
 }
 
 export interface Account {
@@ -43,6 +45,23 @@ export interface FileRef {
   status: 'none' | 'notDownloaded' | 'downloading' | 'downloaded' | 'failed';
 }
 
+export interface PollOption {
+  id: string;
+  text: string;
+  votes: number;
+  voters: string[]; // user ids, where the messenger tells (not the own vote)
+}
+
+export interface Poll {
+  question: string;
+  options: PollOption[];
+  multiple: boolean;
+  closed: boolean;
+  anonymous: boolean;
+  own: string[]; // option ids of the own vote
+  total: number; // people who voted
+}
+
 export interface Message {
   accountId: string;
   chatId: string;
@@ -63,6 +82,7 @@ export interface Message {
   mentions: Record<string, string>;
   link: string;
   system: string; // group event ("joined", "added Pam"), shown as a line; '' for messages
+  poll: Poll | null;
   // own message not yet with the messenger (braids' outbox, id "braids-out-…")
   pending?: 'waiting' | 'sending' | 'failed';
 }

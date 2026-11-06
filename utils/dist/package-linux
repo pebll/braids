@@ -20,7 +20,7 @@
 # from any directory: braidsd finds its libraries through $ORIGIN, the app
 # finds braidsd next to itself.
 #
-# Usage: utils/dist/package-linux [--appimage] [--no-telegram] [--no-whatsapp] [--no-signal] [--no-matrix]
+# Usage: utils/dist/package-linux [--appimage] [--no-deb] [--no-telegram] [--no-whatsapp] [--no-signal] [--no-matrix]
 #
 # Needs the build dependencies (./make.sh deps), Node 22, Rust and the Tauri
 # Linux dependencies (app/README.md). Telegram: set TG_API_ID / TG_API_HASH
@@ -33,14 +33,16 @@ cd "${ROOT}"
 
 CMAKEARGS=()
 APPIMAGE=0
+DEB=1
 for arg in "$@"; do
   case "${arg}" in
     --appimage) APPIMAGE=1 ;;
+    --no-deb) DEB=0 ;; # test builds: only the tarball is published
     --no-telegram) CMAKEARGS+=("-DHAS_TELEGRAM=OFF") ;;
     --no-whatsapp) CMAKEARGS+=("-DHAS_WHATSAPP=OFF") ;;
     --no-signal) CMAKEARGS+=("-DHAS_SIGNAL=OFF") ;;
     --no-matrix) CMAKEARGS+=("-DHAS_MATRIX=OFF") ;;
-    *) echo "usage: $0 [--appimage] [--no-telegram] [--no-whatsapp] [--no-signal] [--no-matrix]" >&2; exit 2 ;;
+    *) echo "usage: $0 [--appimage] [--no-deb] [--no-telegram] [--no-whatsapp] [--no-signal] [--no-matrix]" >&2; exit 2 ;;
   esac
 done
 
@@ -98,6 +100,7 @@ TARBALL="${ROOT}/dist/braids-linux-${ARCH}.tar.gz"
 tar -C "${STAGE}" --owner=0 --group=0 -czf "${TARBALL}" braids
 (cd "${ROOT}/dist" && sha256sum "$(basename "${TARBALL}")" > "$(basename "${TARBALL}").sha256")
 
+if [[ "${DEB}" == "1" ]]; then
 echo "== deb"
 DEBROOT="${STAGE}/deb"
 install -d "${DEBROOT}/opt" "${DEBROOT}/usr/bin" "${DEBROOT}/usr/share/applications" \
@@ -125,9 +128,10 @@ Description: Telegram, WhatsApp, Signal and Matrix in one desktop app
  and Matrix with a unified inbox. WhatsApp support is unofficial; WhatsApp
  may restrict accounts using it.
 EOF
-DEB="${ROOT}/dist/braids_${VERSION}_${DEBARCH}.deb"
-dpkg-deb --root-owner-group --build "${DEBROOT}" "${DEB}"
-(cd "${ROOT}/dist" && sha256sum "$(basename "${DEB}")" > "$(basename "${DEB}").sha256")
+DEBFILE="${ROOT}/dist/braids_${VERSION}_${DEBARCH}.deb"
+dpkg-deb --root-owner-group --build "${DEBROOT}" "${DEBFILE}"
+(cd "${ROOT}/dist" && sha256sum "$(basename "${DEBFILE}")" > "$(basename "${DEBFILE}").sha256")
+fi
 
 if [[ "${APPIMAGE}" == "1" ]]; then
   echo "== AppImage"

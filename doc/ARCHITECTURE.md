@@ -7,7 +7,7 @@ scope and [API.md](API.md) for the daemon API.
 Overview
 --------
 
-```
+```text
 ┌──────────────────────────────────────────────┐
 │ braids (Tauri app)                           │
 │  web UI (TypeScript)  ◄──►  Rust shell       │
@@ -53,7 +53,7 @@ Process model
 Core daemon (M1)
 ----------------
 
-```
+```text
  Unix socket clients / stdin+stdout
         │ JSON-RPC (server.cpp: poll loop, per-connection output buffers)
  ApiServer ── Core::Call ──► EventLoop thread ◄── protocol notifications (Post)
@@ -87,7 +87,7 @@ The chat model came from nchat's ncurses UI
 its non-UI parts:
 
 | From UiModel::Impl | braidsd component |
-|---|---|
+| --- | --- |
 | `m_Protocols`, profile loading in `main.cpp` | AccountManager: load/add/remove accounts, start/stop protocols |
 | `MessageHandler()` (all `*NotifyType` cases) | ChatModel: applies notifications to state, emits API events |
 | `m_ChatInfos`, `m_ChatVec`, sorting | chat list with unread, muted, pinned, archived, last activity |
@@ -138,7 +138,7 @@ nchat's setup was interactive on the terminal (stdin prompts, QR code printed
 or opened in an image viewer, `ProtocolUiControlNotify` to take over the
 terminal). In braids, `SetupProfile`/`Login` are event driven:
 
-```
+```text
 app → accounts.add {protocol}
 core → account.auth {step: "qr", data: "<qr payload>"}          (WhatsApp, Signal, Telegram)
 core → account.auth {step: "input", field: "phone"|"code"|"password"|"userId"|"homeserver"|"recoveryKey", secret: bool}
@@ -181,7 +181,7 @@ Milestones
 ----------
 
 | | Scope | Done when |
-|---|---|---|
+| --- | --- | --- |
 | **M0** | Repo, rename, licence, nchat UI moved to `reference/`, braidsd skeleton, CI, these docs | CI green; `braidsd --list-protocols` loads all protocols |
 | **M1** | braidsd core: AccountManager, ChatModel ported from `UiModel::Impl`, event-based login flows | all four protocols can be added and used through an internal test harness (`braidsd --stdio`, `utils/braids-console`; automated: Dummy and Matrix) |
 | **M2** | JSON-RPC API, API docs, `braids-cli` test client, integration tests (local Synapse + `lib/mxchat/test/peer`) | API covers all requests/events; tests run in CI |

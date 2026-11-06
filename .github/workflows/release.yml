@@ -52,7 +52,8 @@ jobs:
       uses: actions/setup-go@v5
       with:
         go-version-file: lib/wmchat/go/go.mod
-        cache: false
+        cache: true
+        cache-dependency-path: lib/*/go/go.sum
     - name: System dependencies
       run: |
         ./make.sh deps -y
@@ -82,6 +83,7 @@ jobs:
           ~/.cargo/git
           app/src-tauri/target
         key: cargo-release-${{ matrix.arch }}-${{ hashFiles('app/src-tauri/Cargo.lock') }}
+        restore-keys: cargo-release-${{ matrix.arch }}-
     - name: appimagetool
       run: |
         # the continuous build is the maintained one (no tagged releases)

@@ -8,6 +8,7 @@
 #include "protocolutil.h"
 
 #include "log.h"
+#include "nlohmann/json.hpp"
 #include "protocol.h"
 #include "strutil.h"
 
@@ -115,6 +116,26 @@ std::string ProtocolUtil::MentionsToJson(const std::map<std::string, std::string
   }
   json += "}";
   return json;
+}
+
+std::string ProtocolUtil::StringsToJson(const std::vector<std::string>& p_Strings)
+{
+  return nlohmann::json(p_Strings).dump();
+}
+
+std::vector<std::string> ProtocolUtil::StringsFromJson(const std::string& p_Json)
+{
+  std::vector<std::string> strings;
+  const nlohmann::json json = nlohmann::json::parse(p_Json, nullptr, false);
+  if (json.is_array())
+  {
+    for (const auto& item : json)
+    {
+      if (item.is_string()) strings.push_back(item.get<std::string>());
+    }
+  }
+
+  return strings;
 }
 
 FileInfo ProtocolUtil::FileInfoFromHex(const std::string& p_Str)

@@ -39,6 +39,7 @@ enum ProtocolFeature
   FeatureDescriptions = (1 << 13), // braids extension: handles GetDescriptionRequest
   FeatureJoinChat = (1 << 14), // braids extension: handles JoinChatRequest
   FeatureCreateGroup = (1 << 15), // braids extension: handles CreateGroupRequest
+  FeaturePolls = (1 << 16), // braids extension: sends polls (ChatMessage.poll), handles VotePollRequest
 };
 
 // Interactive authentication (account setup and re-login), braids extension.
@@ -182,6 +183,7 @@ enum MessageType
   JoinChatRequestType, // braids extension
   CreateGroupRequestType, // braids extension
   ReconnectRequestType, // braids extension
+  VotePollRequestType, // braids extension
   // Service messages
   ServiceMessageType,
   NewContactsNotifyType,
@@ -214,6 +216,7 @@ enum MessageType
   NewDescriptionNotifyType, // braids extension
   JoinChatNotifyType, // braids extension
   CreateGroupNotifyType, // braids extension
+  NewPollNotifyType, // braids extension
 };
 
 struct ContactInfo
@@ -297,6 +300,13 @@ struct ChatMessage
   bool isDeleted = false;
   bool isPinned = false;
   bool hasMention = false; // only required for tgchat, not db cached
+  // braids extension: a poll, as JSON (empty: not a poll). Received:
+  //   {"question", "options": [{"id", "text"}], "multiple", "closed", "anonymous"}
+  //   plus, where the server counts the votes, "counts": {optionId: n},
+  //   "own": [optionId], "total": n; else the votes come as NewPollNotify.
+  // Sent (SendMessageRequest): {"question", "options": [{"text"}], "multiple"}
+  std::string poll;
+  std::string pollVotes; // set by braidsd only: {voterId: [optionId]}, db cached
 };
 
 enum DownloadFileAction
@@ -540,6 +550,21 @@ class ReconnectRequest : public RequestMessage
 {
 public:
   virtual MessageType GetMessageType() const { return ReconnectRequestType; }
+};
+
+// braids extension: vote in a poll (msgId); optionIds empty retracts the
+// vote. The texts and the poll's sender are given for protocols that need them
+// (WhatsApp).
+class VotePollRequest : public RequestMessage
+{
+public:
+  virtual MessageType GetMessageType() const { return VotePollRequestType; }
+  std::string chatId;
+  std::string msgId;
+  std::string pollSenderId;
+  bool pollIsOutgoing = false;
+  std::vector<std::string> optionIds;
+  std::vector<std::string> optionTexts; // of optionIds
 };
 
 class FindMessageRequest : public RequestMessage
@@ -842,6 +867,23 @@ public:
   bool success = false;
   std::string chatId; // the new group
   std::string error; // why not, for the user
+};
+
+// braids extension: a poll changed. With poll set, it replaces the message's
+// poll (counted by the server); else a vote: voterId chose optionIds (empty:
+// retracted), applied to the poll's "votes". closed: the poll was ended.
+class NewPollNotify : public ServiceMessage
+{
+public:
+  explicit NewPollNotify(const std::string& p_ProfileId)
+    : ServiceMessage(p_ProfileId) { }
+  virtual MessageType GetMessageType() const { return NewPollNotifyType; }
+  std::string chatId;
+  std::string msgId;
+  std::string poll;
+  std::string voterId;
+  std::vector<std::string> optionIds;
+  bool closed = false;
 };
 
 // Group description or user bio, empty if there is none. Sent for

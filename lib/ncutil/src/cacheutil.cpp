@@ -5,6 +5,7 @@
 //
 // nchat is distributed under the MIT license, see LICENSE for details.
 
+#include "nlohmann/json.hpp"
 #include "cacheutil.h"
 
 #include <string>
@@ -15,6 +16,23 @@
 // #define DEBUG_UPDATE_REACTIONS
 
 // Determines whether a Reactions instance needs serialization
+std::string CacheUtil::MergePoll(const std::string& p_Old, const std::string& p_New)
+{
+  if (p_Old.empty() || p_New.empty() || (p_Old == p_New)) return p_New;
+
+  const nlohmann::json oldPoll = nlohmann::json::parse(p_Old, nullptr, false);
+  nlohmann::json newPoll = nlohmann::json::parse(p_New, nullptr, false);
+  if (!oldPoll.is_object() || !newPoll.is_object()) return p_New;
+
+  if (oldPoll.value("closed", false) && !newPoll.value("closed", false))
+  {
+    newPoll["closed"] = true;
+    return newPoll.dump();
+  }
+
+  return p_New;
+}
+
 bool CacheUtil::IsDefaultReactions(const Reactions& p_Reactions)
 {
   return p_Reactions.senderEmojis.empty() && p_Reactions.emojiCounts.empty() &&

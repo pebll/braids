@@ -22,7 +22,8 @@
   const collapsed = $derived(settings.sidebarCollapsed && !drawer);
 
   const syncing = $derived(store.accountList.filter((a) => a.state === 'connecting').length);
-  const archivedCount = $derived(Object.values(store.chats).filter((c) => store.accounts[c.accountId] && store.category(c) === 'archived').length);
+  // archived chats with new messages (archived chats are quiet, like muted ones)
+  const archivedCount = $derived(store.unreadCount({ kind: 'archived' }));
 
   function select(f: Filter) {
     store.filter = f;
@@ -159,7 +160,7 @@
     <button class="item" class:active={isActive({ kind: 'archived' })} onclick={() => select({ kind: 'archived' })} title={collapsed ? 'Archived' : undefined}>
       <span class="ico"><Archive size={18} strokeWidth={1.75} /></span>
       {#if !collapsed}<span class="label">Archived</span>{/if}
-      {#if archivedCount > 0 && !collapsed}<span class="count muted">{archivedCount}</span>{/if}
+      {#if archivedCount > 0 && !collapsed}<span class="count muted" title={`${archivedCount} archived ${archivedCount === 1 ? 'chat' : 'chats'} with new messages`}>{archivedCount}</span>{/if}
     </button>
     <button class="item" onclick={() => { ui.media = { chatKey: '' }; ui.drawerOpen = false; }} title={collapsed ? 'Shared media' : undefined}>
       <span class="ico"><Images size={18} strokeWidth={1.75} /></span>
@@ -234,6 +235,8 @@
   .dot.online { background: var(--success); }
   .dot.fetching, .dot.connecting { background: var(--warning); }
   .dot.error { background: var(--danger); }
+  /* not online: bigger, so a problem stands out */
+  .dot:not(.online) { right: -4px; bottom: -4px; width: 12px; height: 12px; }
   .state.warn { color: var(--warning); }
   .count.corner { position: absolute; top: 1px; right: 4px; min-width: 16px; height: 16px; font-size: 10px; line-height: 16px; padding: 0 4px; }
   .section { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); padding: 14px 10px 6px; }

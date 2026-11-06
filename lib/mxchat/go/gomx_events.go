@@ -45,6 +45,7 @@ type OutMsg struct {
 	FromMe     bool
 	IsRead     bool
 	IsEdited   bool
+	Poll       string // braids: ChatMessage.poll
 }
 
 type queuedReaction struct {
@@ -154,6 +155,13 @@ func (conn *MxConn) handleTimelineEvent(ctx context.Context, evt *event.Event, m
 
 	case event.EventReaction:
 		conn.reactionEvent(evt)
+		return nil
+
+	case event.EventUnstablePollStart:
+		return conn.pollStartEvent(evt)
+
+	case event.EventUnstablePollResponse, event.EventUnstablePollEnd:
+		conn.pollRelationEvent(evt, evt.Type == event.EventUnstablePollEnd)
 		return nil
 
 	case event.EventRedaction:
@@ -585,7 +593,7 @@ func (conn *MxConn) emitBatch(roomID id.RoomID, msgs []*OutMsg, fromMsgId string
 
 func (conn *MxConn) emitMessage(m *OutMsg, batch int) {
 	CMxNewMessagesNotify(conn.connId, m.ChatID, m.MsgID, m.SenderID, m.Text, BoolToInt(m.FromMe), m.QuotedID,
-		m.FileID, m.FilePath, m.FileStatus, m.TimeSent, BoolToInt(m.IsRead), BoolToInt(m.IsEdited), batch)
+		m.FileID, m.FilePath, m.FileStatus, m.TimeSent, BoolToInt(m.IsRead), BoolToInt(m.IsEdited), batch, m.Poll)
 }
 
 // MxGetMessages backfills history older than fromMsgId (or latest if empty)

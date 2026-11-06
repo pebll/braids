@@ -286,6 +286,37 @@ fn build_tray(app: &AppHandle) -> tauri::Result<TrayIcon> {
         .build(app)
 }
 
+// The app's own pages: the bundled frontend (tauri://localhost,
+// http(s)://tauri.localhost), the dev server in debug builds.
+fn is_app_url(url: &tauri::Url) -> bool {
+    match url.scheme() {
+        "tauri" | "about" | "data" | "blob" => true,
+        "http" | "https" => match url.host_str() {
+            Some("tauri.localhost") => true,
+            Some("localhost") => cfg!(debug_assertions),
+            _ => false,
+        },
+        _ => false,
+    }
+}
+
+// The window never navigates away from braids (#20: a link could replace
+// the whole app with no way back): web pages and other links go to the
+// system's default app instead.
+fn navigation_guard<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
+    tauri::plugin::Builder::new("navigation-guard")
+        .on_navigation(|_webview, url| {
+            if is_app_url(url) {
+                return true;
+            }
+            if matches!(url.scheme(), "http" | "https" | "mailto" | "tel") {
+                let _ = tauri_plugin_opener::open_url(url.as_str(), None::<&str>);
+            }
+            false
+        })
+        .build()
+}
+
 pub fn run() {
     let mut builder = tauri::Builder::default();
     // one braids per profile: starting it again shows the running window
@@ -300,6 +331,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(navigation_guard())
         .manage(AppState {
             daemon: Daemon::new(),
             close_to_tray: AtomicBool::new(true),
@@ -338,4 +370,17 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![api_call, daemon_connected, set_close_to_tray, set_badge, save_temp_file, save_file_as, licenses_path, voice_start, voice_stop, link_preview, check_update, install_kind])
         .run(tauri::generate_context!())
         .expect("error while running braids");
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn app_urls() {
+        let ok = |u: &str| super::is_app_url(&tauri::Url::parse(u).unwrap());
+        assert!(ok("tauri://localhost/index.html"));
+        assert!(ok("http://tauri.localhost/"));
+        assert!(!ok("https://grigio.org/vibe-coding"));
+        assert!(!ok("https://tauri.localhost.evil.example/"));
+        assert!(!ok("file:///etc/passwd"));
+    }
 }

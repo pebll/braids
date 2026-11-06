@@ -9,7 +9,7 @@
   groups, quote, attachment, reactions, hover actions.
 -->
 <script lang="ts">
-  import { Check, CheckCheck, Clock, Copy, Download, FileText, Forward, LoaderCircle, Pencil, Pin, PinOff, Play, Reply, RotateCw, SmilePlus, Trash2, TriangleAlert } from '@lucide/svelte';
+  import { Check, CheckCheck, Clock, Copy, Download, FileText, Forward, Image, LoaderCircle, Pencil, Pin, PinOff, Play, Reply, RotateCw, SmilePlus, Trash2, TriangleAlert } from '@lucide/svelte';
   import { copyText, openLink, personMenu } from '../lib/actions';
   import * as api from '../lib/api';
   import { mediaSrc } from '../lib/media';
@@ -19,6 +19,7 @@
   import type { Account, Chat, Message } from '../lib/types';
   import { openLightbox, ui, type MenuItem } from '../lib/ui.svelte';
   import Avatar from './Avatar.svelte';
+  import PollCard from './PollCard.svelte';
   import LinkPreview from './LinkPreview.svelte';
   import Sticker from './Sticker.svelte';
   import VoicePlayer from './VoicePlayer.svelte';
@@ -177,6 +178,7 @@
   function extraItems(): MenuItem[] {
     const items: MenuItem[] = [];
     if (m.text) items.push({ label: 'Copy text', icon: Copy, run: () => copyText(m.text, 'Copied') });
+    if (m.file && isImage && !isSticker && ready) items.push({ label: 'Copy image', icon: Image, run: () => api.copyImage(m.file!.path).then(() => store.toast('Copied')).catch((e) => store.toastError(e)) });
     if (m.file) items.push({ label: 'Download file', icon: Download, run: saveFile });
     items.push({ label: 'Forward…', icon: Forward, run: () => (ui.forward = m) });
     if (account.capabilities.pinMessage) items.push(pinItem());
@@ -204,6 +206,7 @@
     const items: MenuItem[] = [{ label: 'Reply', icon: Reply, run: reply }];
     if (editState.show) items.push({ label: 'Edit', icon: Pencil, run: edit, disabled: !editState.ok, hint: editState.reason });
     if (m.text) items.push({ label: 'Copy text', icon: Copy, run: () => copyText(m.text, 'Copied') });
+    if (m.file && isImage && !isSticker && ready) items.push({ label: 'Copy image', icon: Image, run: () => api.copyImage(m.file!.path).then(() => store.toast('Copied')).catch((e) => store.toastError(e)) });
     if (m.file) items.push({ label: 'Download file', icon: Download, run: saveFile });
     items.push({ label: 'Forward…', icon: Forward, run: () => (ui.forward = m) });
     if (account.capabilities.pinMessage) items.push(pinItem());
@@ -330,6 +333,8 @@
 
       {#if m.isDeleted}
         <span class="text deleted-text">Message deleted</span>
+      {:else if m.poll}
+        <PollCard {m} />
       {:else if showText}
         <!-- eslint-disable-next-line svelte/no-at-html-tags: renderText escapes all input -->
         <span class="text msg-text" onclick={onTextClick} role="presentation">{@html html}</span>

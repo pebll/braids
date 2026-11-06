@@ -104,7 +104,9 @@ void MxNewChatsNotify(int p_ConnId, char* p_ChatId, int p_IsUnread, int p_IsMute
                       long long p_LastMessageTime);
 void MxNewMessagesNotify(int p_ConnId, char* p_ChatId, char* p_MsgId, char* p_SenderId, char* p_Text, int p_FromMe,
                          char* p_QuotedId, char* p_FileId, char* p_FilePath, int p_FileStatus, long long p_TimeSent,
-                         int p_IsRead, int p_IsEdited, int p_Batch);
+                         int p_IsRead, int p_IsEdited, int p_Batch, char* p_Poll);
+void MxNewPollNotify(int p_ConnId, char* p_ChatId, char* p_MsgId, char* p_VoterId, char* p_OptionIdsJson,
+                     int p_Closed);
 void MxNewMessagesBatchDone(int p_ConnId, char* p_ChatId, char* p_FromMsgId);
 void MxNewMessageStatusNotify(int p_ConnId, char* p_ChatId, char* p_MsgId, int p_IsRead);
 void MxNewMessageFileNotify(int p_ConnId, char* p_ChatId, char* p_MsgId, char* p_FileId, char* p_FilePath,

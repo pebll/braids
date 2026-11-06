@@ -12,8 +12,16 @@ name: Preview
 # when this workflow is run by hand on it ("branch-<name>", / and other
 # characters as -). Pre-releases are never "latest": the normal install,
 # the website and the app's update notice keep using the real releases.
+#
+# A push to main runs the build only (nothing published): GitHub shares
+# caches saved on main with every pull request and tag, while a pull
+# request's or tag's own caches are visible to it alone. So main keeps the
+# compiler (ccache), Rust and Go caches warm for test builds and releases.
 
 on:
+  push:
+    branches:
+      - main
   pull_request:
     branches:
       - main
@@ -30,7 +38,7 @@ concurrency:
 jobs:
   build:
     if: >-
-      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'workflow_dispatch' || github.event_name == 'push' ||
       (github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository)
     strategy:
       fail-fast: false
@@ -63,7 +71,9 @@ jobs:
       uses: actions/setup-go@v5
       with:
         go-version-file: lib/wmchat/go/go.mod
-        cache: false
+        # modules and build cache (whatsmeow, signalmeow, mautrix)
+        cache: true
+        cache-dependency-path: lib/*/go/go.sum
     - name: System dependencies
       run: |
         ./make.sh deps -y
@@ -77,6 +87,8 @@ jobs:
           ~/.cargo/git
           app/src-tauri/target
         key: cargo-release-${{ matrix.arch }}-${{ hashFiles('app/src-tauri/Cargo.lock') }}
+        # Cargo.lock changes with every version bump: start from the last one
+        restore-keys: cargo-release-${{ matrix.arch }}-
     - name: Package
       env:
         TG_API_ID: ${{ secrets.TG_API_ID }}
@@ -86,7 +98,9 @@ jobs:
           at ${{ github.event.pull_request.head.sha || github.sha }}
       run: |
         export BRAIDS_BUILD="$(echo "${BRAIDS_BUILD}" | tr -s ' \n' ' ' | sed 's/ $//')"
-        utils/dist/package-linux
+        utils/dist/package-linux --no-deb
+    - name: Compiler cache statistics
+      run: ccache --show-stats
     - name: Install script works with the package
       run: |
         HOME="$(mktemp -d)" BRAIDS_TARBALL="$PWD/dist/braids-linux-${{ matrix.arch }}.tar.gz" sh utils/dist/install.sh
@@ -100,6 +114,7 @@ jobs:
 
   publish:
     needs: build
+    if: github.event_name != 'push'
     runs-on: ubuntu-24.04
     steps:
     - name: Packages

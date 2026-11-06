@@ -10,10 +10,10 @@
   j k, also while zoomed), Esc closes.
 -->
 <script lang="ts">
-  import { ChevronLeft, ChevronRight, ExternalLink, X, ZoomIn, ZoomOut } from '@lucide/svelte';
+  import { ChevronLeft, ChevronRight, Copy, Download, ExternalLink, MessageSquareText, X, ZoomIn, ZoomOut } from '@lucide/svelte';
   import * as api from '../lib/api';
   import { mediaSrc } from '../lib/media';
-  import { store } from '../lib/store.svelte';
+  import { chatKey, store } from '../lib/store.svelte';
   import { ui } from '../lib/ui.svelte';
 
   const MIN = 1;
@@ -106,7 +106,41 @@
     if (d && !d.moved && scale === 1 && e.target === stage) close();
   }
 
+  async function save() {
+    try {
+      const saved = await api.saveFileAs(path, item.name);
+      if (saved) store.toast(`Saved to ${saved}`, 'info', { label: 'Open', run: () => api.openPath(saved).catch((e) => store.toastError(e)) });
+    } catch (e) {
+      store.toastError(e);
+    }
+  }
+
+  function copy() {
+    api.copyImage(path).then(() => store.toast('Image copied')).catch((e) => store.toastError(e));
+  }
+
+  // closes the viewer (and the media dialog) and scrolls the chat to the message
+  function showInChat() {
+    const msg = item.msg;
+    if (!msg) return;
+    const key = chatKey(msg.accountId, msg.chatId);
+    close();
+    ui.media = null;
+    store.openChat(key).then(() => {
+      ui.jumpRequest = { chatKey: key, msgId: msg.id };
+    }).catch((e) => store.toastError(e));
+  }
+
   function onKey(e: KeyboardEvent) {
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key === 'c' || e.key === 's')) {
+      // Ctrl+C copies the picture (unless text is selected), Ctrl+S saves it
+      if (e.key === 'c' && (isVideo || window.getSelection()?.toString())) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.key === 'c') copy();
+      else save();
+      return;
+    }
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     const k = e.key;
     let handled = true;
@@ -136,6 +170,14 @@
         <button class="icon-btn" aria-label="Zoom out" title="Zoom out (-)" onclick={() => zoomTo(scale / 1.5)} disabled={scale <= MIN}><ZoomOut size={19} /></button>
         <button class="icon-btn" aria-label="Zoom in" title="Zoom in (+)" onclick={() => zoomTo(scale * 1.5)} disabled={scale >= MAX}><ZoomIn size={19} /></button>
       {/if}
+      <span class="lb-sep"></span>
+      {#if item.msg}
+        <button class="icon-btn" aria-label="Show in chat" title="Show in chat" onclick={showInChat}><MessageSquareText size={19} /></button>
+      {/if}
+      {#if !isVideo}
+        <button class="icon-btn" aria-label="Copy image" title="Copy image (Ctrl+C)" onclick={copy}><Copy size={19} /></button>
+      {/if}
+      <button class="icon-btn" aria-label="Download" title="Save as… (Ctrl+S)" onclick={save}><Download size={19} /></button>
       <button class="icon-btn" aria-label="Open with default app" title="Open with default app" onclick={() => api.openPath(path).catch((e) => store.toastError(e))}><ExternalLink size={19} /></button>
       <button class="icon-btn" aria-label="Close" title="Close (Esc)" onclick={close}><X size={20} /></button>
     </div>
@@ -180,6 +222,7 @@
 
 <style>
   .lightbox { position: fixed; inset: 0; z-index: 70; background: rgba(15, 14, 13, 0.94); display: flex; flex-direction: column; animation: fade var(--duration-fast) var(--ease); }
+  .lb-sep { width: 1px; height: 20px; margin: 0 4px; background: rgba(255, 255, 255, 0.18); }
   .lb-bar { display: flex; align-items: center; gap: 4px; padding: 10px 12px 10px 20px; color: #f2efeb; }
   .lb-bar .icon-btn { color: #f2efeb; }
   .lb-bar .icon-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.1); }

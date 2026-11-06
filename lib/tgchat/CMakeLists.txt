@@ -76,6 +76,7 @@ endif()
 # Headers
 target_include_directories(tgchat PRIVATE "../common/src")
 target_include_directories(tgchat PRIVATE "../ncutil/src")
+target_include_directories(tgchat PRIVATE "../../src/braidsd/ext")
 target_include_directories(tgchat PRIVATE "ext/td")
 
 # Dependency tdlib

@@ -1214,6 +1214,11 @@ func (handler *SgEventHandler) handleDataMessage(chatId string, senderId string,
 		return
 	}
 
+	// braids: polls
+	if handler.handlePoll(chatId, senderId, fromMe, timeSent, msg) {
+		return
+	}
+
 	// Group change messages
 	if msg.GetGroupV2() != nil && len(msg.GetGroupV2().GetGroupChange()) > 0 && msg.GetBody() == "" {
 		handler.handleGroupChange(chatId, senderId, fromMe, timeSent, msg)
