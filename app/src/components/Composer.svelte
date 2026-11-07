@@ -9,7 +9,7 @@
   emoji, Enter to send. Drafts are kept per chat.
 -->
 <script lang="ts">
-  import { File as FileIcon, LoaderCircle, Mic, Paperclip, Pencil, Play, Reply, SendHorizontal, Smile, Trash2, X } from '@lucide/svelte';
+  import { ChartColumnBig, File as FileIcon, LoaderCircle, Mic, Paperclip, Pencil, Play, Reply, SendHorizontal, Smile, Trash2, X } from '@lucide/svelte';
   import { onDestroy, tick } from 'svelte';
   import * as api from '../lib/api';
   import { mediaSrc } from '../lib/media';
@@ -20,6 +20,7 @@
   import { ui } from '../lib/ui.svelte';
   import Avatar from './Avatar.svelte';
   import EmojiPicker from './EmojiPicker.svelte';
+  import { loadEmoji, searchEmoji, type Emoji } from '../lib/emoji';
 
   let { chatKey }: { chatKey: string } = $props();
 
@@ -44,6 +45,10 @@
   let loadedKey = '';
 
   const [accountId, chatId] = $derived(splitKey(chatKey));
+  const canPoll = $derived.by(() => {
+    const caps = store.accounts[accountId]?.capabilities;
+    return !!caps?.polls && (!caps.pollsInGroupsOnly || !!store.chats[chatKey]?.isGroup);
+  });
   const account = $derived(store.accounts[accountId]);
 
   // @-mentions: while typing "@na" after a space or at the start, the group's
@@ -62,8 +67,9 @@
 
   function updateMention() {
     if (!textarea) return;
-    const caret = textarea.selectionStart ?? text.length;
-    const m = /(^|\s)@([^\s@[\]]*)$/.exec(text.slice(0, caret));
+    const val = textarea.value;
+    const caret = textarea.selectionStart ?? val.length;
+    const m = /(^|\s)@([^\s@[\]]*)$/.exec(val.slice(0, caret));
     mention = m ? { start: caret - m[2].length - 1, query: m[2] } : null;
     mentionIndex = 0;
   }
@@ -81,6 +87,35 @@
       resize();
     });
   }
+  let emojiQuery = $state<{ start: number; query: string } | null>(null);
+  let emojiIndex = $state(0);
+  let emojiAll = $state<Emoji[]>([]);
+  const emojiSuggestions = $derived.by(() => (emojiQuery ? searchEmoji(emojiAll, emojiQuery.query, 8) : []));
+
+  function updateEmoji() {
+    if (!textarea) return;
+    const val = textarea.value;
+    const caret = textarea.selectionStart ?? val.length;
+    const m = /(^|\s):([a-z][a-z0-9_+-]+)$/i.exec(val.slice(0, caret));
+    emojiQuery = m ? { start: caret - m[2].length - 1, query: m[2] } : null;
+    emojiIndex = 0;
+    if (emojiQuery && !emojiAll.length) {
+      loadEmoji().then((list) => (emojiAll = list));
+    }
+  }
+
+  function insertSuggestedEmoji(unicode: string) {
+    if (!emojiQuery || !textarea) return;
+    const caret = textarea.selectionStart ?? text.length;
+    text = text.slice(0, emojiQuery.start) + unicode + text.slice(caret);
+    const pos = emojiQuery.start + unicode.length;
+    emojiQuery = null;
+    tick().then(() => {
+      textarea?.focus();
+      textarea?.setSelectionRange(pos, pos);
+      resize();
+    });
+  }
 
   // load / save the draft when the chat changes
   $effect(() => {
@@ -90,6 +125,7 @@
       loadedKey = key;
       text = store.drafts[key] ?? '';
       attachments = [];
+      emojiQuery = null;
       ui.reply = null;
       ui.edit = null;
       tick().then(resize);
@@ -132,6 +168,7 @@
   function onInput() {
     resize();
     updateMention();
+    updateEmoji();
     if (ui.edit) return;
     const now = Date.now();
     if (text && now - lastTypingSent > 4000) {
@@ -256,6 +293,23 @@
   }
 
   function onKeydown(e: KeyboardEvent) {
+    if (emojiSuggestions.length) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        emojiIndex = (emojiIndex + (e.key === 'ArrowDown' ? 1 : emojiSuggestions.length - 1)) % emojiSuggestions.length;
+        return;
+      }
+      if ((e.key === 'Enter' && !e.shiftKey) || e.key === 'Tab') {
+        e.preventDefault();
+        insertSuggestedEmoji(emojiSuggestions[emojiIndex].unicode);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        emojiQuery = null;
+        return;
+      }
+    }
     if (suggestions.length) {
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         e.preventDefault();
@@ -395,6 +449,9 @@
   {:else}
   <div class="row">
     <button class="icon-btn lg" aria-label="Attach file" title="Attach file" onclick={pick} disabled={!!ui.edit}><Paperclip size={20} strokeWidth={1.75} /></button>
+    {#if canPoll}
+      <button class="icon-btn lg" aria-label="New poll" title="New poll" onclick={() => (ui.pollFor = chatKey)} disabled={!!ui.edit}><ChartColumnBig size={20} strokeWidth={1.75} /></button>
+    {/if}
     <div class="box">
       <textarea
         bind:this={textarea}
@@ -404,8 +461,8 @@
         aria-label="Message"
         oninput={onInput}
         onkeydown={onKeydown}
-        onclick={updateMention}
-        onblur={() => setTimeout(() => { if (document.activeElement !== textarea) mention = null; }, 150)}
+        onclick={() => { updateMention(); updateEmoji(); }}
+        onblur={() => setTimeout(() => { if (document.activeElement !== textarea) { mention = null; emojiQuery = null; } }, 150)}
         onpaste={onPaste}
       ></textarea>
       {#if suggestions.length}
@@ -414,6 +471,16 @@
             <button role="option" aria-selected={i === mentionIndex} onmousedown={(e) => { e.preventDefault(); insertMention(c.name); }}>
               <Avatar name={c.name} id={c.id} size={24} owner={accountId} />
               <span>{c.name}</span>
+            </button>
+          {/each}
+        </div>
+      {/if}
+      {#if emojiSuggestions.length}
+        <div class="mentions emoji-suggest" role="listbox" aria-label="Emoji suggestions">
+          {#each emojiSuggestions as e, i (e.unicode)}
+            <button role="option" aria-selected={i === emojiIndex} onmousedown={(ev) => { ev.preventDefault(); insertSuggestedEmoji(e.unicode); }}>
+              <span class="glyph">{e.unicode}</span>
+              <span class="lbl">{e.label}</span>
             </button>
           {/each}
         </div>
@@ -493,4 +560,6 @@
   }
   .mentions button { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 8px; border: 0; border-radius: 8px; background: none; text-align: left; font-size: 14px; color: var(--text); }
   .mentions button[aria-selected='true'], .mentions button:hover { background: var(--hover); }
+  .emoji-suggest .glyph { width: 24px; text-align: center; font-size: 18px; line-height: 1; flex-shrink: 0; }
+  .emoji-suggest .lbl { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 </style>

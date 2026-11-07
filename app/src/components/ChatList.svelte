@@ -292,7 +292,7 @@
         class:selected
         class:cursor={key === ui.listCursor}
         class:unread={c.isUnread && !store.eventsOnly(c)}
-        class:muted={c.isMuted}
+        class:muted={store.isQuiet(c)}
         class:fav-end={favEnd}
         role="option"
         aria-selected={selected}
@@ -323,7 +323,7 @@
             {#if c.isUnreadMention}<span class="mention-dot" title="Mentioned"><AtSign size={12} strokeWidth={2.5} /></span>{/if}
             {#if c.isUnread}
               {@const n = store.chatUnread(c)}
-              <span class="unread-count" class:muted={c.isMuted || store.eventsOnly(c)}
+              <span class="unread-count" class:muted={store.isQuiet(c) || store.eventsOnly(c)}
                 title={store.eventsOnly(c) ? `${n} new group ${n === 1 ? 'event' : 'events'}` : `${n} unread`}>{n > 999 ? '999+' : n}</span>
             {/if}
           </div>

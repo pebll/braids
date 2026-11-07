@@ -56,7 +56,11 @@ public:
   // queued in the account's outbox and shown at once (pending); sent now or
   // when the account is online; returns the message's local id
   std::string SendMessage(const std::string& p_AccountId, const std::string& p_ChatId, const std::string& p_Text,
-                          const std::string& p_QuotedId, const std::string& p_FilePath, bool p_IsVoice = false);
+                          const std::string& p_QuotedId, const std::string& p_FilePath, bool p_IsVoice = false,
+                          const json& p_Poll = json());
+  // vote in a poll (optionIds empty: retract)
+  void VotePoll(const std::string& p_AccountId, const std::string& p_ChatId, const std::string& p_MsgId,
+                const std::vector<std::string>& p_OptionIds);
   // a failed outbox message sent again
   void ResendMessage(const std::string& p_AccountId, const std::string& p_ChatId, const std::string& p_MsgId);
   // the account came online / went offline (sends the waiting messages)
@@ -118,6 +122,7 @@ private:
     std::string quotedId;
     std::string filePath;
     bool isVoice = false;
+    std::string poll; // a poll to send, ChatMessage.poll format
     int64_t time = 0;
     std::string state;
     int64_t sentAt = 0;
@@ -148,6 +153,8 @@ private:
     std::map<std::string, int> cachedUnread;
     int64_t connectTime = 0;
     std::vector<OutboxEntry> outbox; // oldest first (kept in <profile>/braids-outbox.json)
+    // poll votes that arrived before their poll (chat id \x01 msg id -> votes)
+    std::map<std::string, std::vector<std::shared_ptr<NewPollNotify>>> pendingPollVotes;
     bool online = false;
   };
 
@@ -215,6 +222,10 @@ private:
   std::string GetContactName(const std::string& p_AccountId, const std::string& p_ContactId);
   json ChatToJson(const std::string& p_AccountId, const ChatInfo& p_ChatInfo);
   json MessageToJson(const std::string& p_AccountId, const std::string& p_ChatId, const ChatMessage& p_ChatMessage);
+  json PollToJson(const std::string& p_AccountId, const ChatMessage& p_ChatMessage);
+  void OnPoll(const std::string& p_AccountId, std::shared_ptr<NewPollNotify> p_Notify);
+  static void ApplyPollNotify(ChatMessage& p_ChatMessage, const NewPollNotify& p_Notify);
+  std::string SelfId(const std::string& p_AccountId);
   const ChatMessage* FindMessage(const std::string& p_AccountId, const std::string& p_ChatId, const std::string& p_MsgId);
   void RequestQuotedMessage(const std::string& p_AccountId, const std::string& p_ChatId, const std::string& p_MsgId);
   void UpdateQuotingMessages(const std::string& p_AccountId, const std::string& p_ChatId, const std::string& p_MsgId);

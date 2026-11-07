@@ -22,6 +22,7 @@
   import NewChat from './components/NewChat.svelte';
   import Overlays from './components/Overlays.svelte';
   import Settings from './components/Settings.svelte';
+  import PollDialog from './components/PollDialog.svelte';
   import ShortcutsDialog from './components/ShortcutsDialog.svelte';
   import Sidebar from './components/Sidebar.svelte';
   import Welcome from './components/Welcome.svelte';
@@ -48,9 +49,32 @@
     api.setBadge(store.badgeCount);
   });
 
+  $effect(() => {
+    const scale = settings.textSize / 100;
+    const app = document.getElementById('app');
+    if (api.isTauri) {
+      app?.style.removeProperty('zoom');
+      api.setWebviewZoom(scale).catch((e) => store.toastError(e));
+    } else {
+      app?.style.setProperty('zoom', String(scale));
+    }
+  });
+
   onMount(() => {
-    const onResize = () => (ui.width = window.innerWidth);
+    let frame = 0;
+    const syncWidth = () => {
+      frame = 0;
+      const width = window.visualViewport?.width ?? window.innerWidth;
+      if (ui.width !== width) ui.width = width;
+    };
+    const onResize = () => {
+      if (!frame) frame = requestAnimationFrame(syncWidth);
+    };
+    syncWidth();
     window.addEventListener('resize', onResize);
+    window.visualViewport?.addEventListener('resize', onResize);
+    const observer = new ResizeObserver(onResize);
+    observer.observe(document.documentElement);
     api.setCloseToTray(settings.closeToTray);
     if (settings.checkUpdates) setTimeout(() => store.checkUpdates(), 20000);
     api.onFileDrop(
@@ -59,7 +83,12 @@
       },
       (hover) => (ui.dropHover = hover && !!store.current),
     );
-    return () => window.removeEventListener('resize', onResize);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      window.visualViewport?.removeEventListener('resize', onResize);
+      observer.disconnect();
+      if (frame) cancelAnimationFrame(frame);
+    };
   });
 
   // chat list width
@@ -169,6 +198,15 @@
         if (!store.current) return false;
         ui.infoOpen = !ui.infoOpen;
         return true;
+      case 'textSizeIncrease':
+        setTextSize(1);
+        return true;
+      case 'textSizeDecrease':
+        setTextSize(-1);
+        return true;
+      case 'textSizeReset':
+        setTextSize(0, 100);
+        return true;
       case 'goAll':
         store.filter = { kind: 'all' };
         goTo();
@@ -199,18 +237,33 @@
     }
   }
 
+  const TEXT_SIZES: number[] = [70, 80, 90, 100, 110, 125, 150];
+  function setTextSize(delta: number, exact?: number) {
+    const current = TEXT_SIZES.indexOf(settings.textSize);
+    const next = exact ?? TEXT_SIZES[Math.max(0, Math.min(TEXT_SIZES.length - 1, current < 0 ? 3 + delta : current + delta))];
+    if (next !== settings.textSize) {
+      settings.textSize = next;
+      settings.save();
+    }
+    ui.showTextSize(settings.textSize);
+  }
+
   function onKey(e: KeyboardEvent) {
     if (copyShortcut(e)) {
       e.preventDefault();
       return;
     }
-    const modal = ui.settingsOpen || ui.newChatOpen || !!ui.forward || !!ui.media || ui.shortcuts || !!store.wizardSetupId || !!ui.confirmRequest || !!ui.lightbox || ui.recordingKeys;
+    const action = actionFor(e);
+    if (action === 'textSizeIncrease' || action === 'textSizeDecrease' || action === 'textSizeReset') {
+      if (run(action)) e.preventDefault();
+      return;
+    }
+    const modal = ui.settingsOpen || ui.newChatOpen || !!ui.forward || !!ui.pollFor || !!ui.media || ui.shortcuts || !!store.wizardSetupId || !!ui.confirmRequest || !!ui.lightbox || ui.recordingKeys;
     if (modal) {
       // no browser actions (print, new window, ...) behind a dialog either
       if (!ui.recordingKeys && actionFor(e)) e.preventDefault();
       return;
     }
-    const action = actionFor(e);
     if (action && run(action)) {
       e.preventDefault();
     } else if (e.key === 'Escape' && ui.infoOpen && !ui.wide) {
@@ -282,9 +335,13 @@
 {#if ui.newChatOpen}<NewChat />{/if}
 {#if ui.forward}<ForwardDialog m={ui.forward} />{/if}
 {#if ui.shortcuts}<ShortcutsDialog />{/if}
+{#if ui.pollFor}<PollDialog chatKey={ui.pollFor} />{/if}
 {#if ui.media}<MediaDialog scope={ui.media.chatKey} />{/if}
 {#if prompt && !store.wizardSetupId}<AccountPrompt {prompt} />{/if}
 <Overlays />
+{#if ui.textSizeNotice}
+  <div class="text-size-notice" role="status" aria-live="polite">Text size: {ui.textSizeNotice} %</div>
+{/if}
 
 <style>
   .frame { height: 100%; display: flex; flex-direction: column; }
@@ -304,6 +361,12 @@
   .fatal { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: var(--danger); padding: 24px; text-align: center; }
   .fatal h1 { color: var(--text); font-size: 20px; margin: 0; }
   .fatal p { color: var(--text-2); margin: 0; max-width: 480px; }
+  .text-size-notice {
+    position: fixed; top: 72px; right: 20px; z-index: 100; padding: 10px 14px;
+    border-radius: var(--radius-lg); background: var(--text); color: var(--bg-1);
+    box-shadow: var(--shadow-2); font-size: 13px; font-weight: 600;
+    animation: pop var(--duration-base) var(--ease);
+  }
   /* narrow layout: chat list and conversation take the full width */
   @media (max-width: 899px) {
     .main :global(.chatlist) { width: 100%; border-right: 0; }

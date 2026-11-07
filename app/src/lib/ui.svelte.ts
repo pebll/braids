@@ -28,6 +28,7 @@ export interface LightboxItem {
   name: string;
   video?: boolean; // played in the viewer instead of shown
   fullAvatar?: string; // profile picture (chat key): shown in full size once fetched
+  msg?: { accountId: string; chatId: string; id: string }; // the message it is in ("Show in chat")
 }
 
 class Ui {
@@ -48,6 +49,7 @@ class Ui {
   reply = $state<Message | null>(null);
   edit = $state<Message | null>(null);
   forward = $state<Message | null>(null); // message being forwarded (dialog open)
+  pollFor = $state(''); // chat key a new poll is being made for (dialog open)
   shortcuts = $state(false); // keyboard shortcuts overview open
   media = $state<{ chatKey: string } | null>(null); // shared media dialog: of a chat, or all ('')
   jumpRequest = $state<{ chatKey: string; msgId: string } | null>(null); // scroll the conversation to a message
@@ -56,6 +58,8 @@ class Ui {
   focusComposer = $state(0); // bump to focus
   recordingKeys = $state(false); // a shortcut is being recorded in Settings
   focusSearch = $state(0);
+  textSizeNotice = $state(0);
+  private textSizeNoticeTimer: ReturnType<typeof setTimeout> | undefined;
   // the chat list's keyboard highlight (Alt+J/K, arrows): a chat key, or a
   // message search result ("m\u0002" + chat key + "\u0001" + id); opened with
   // Enter. Shown while the chat list or its search has the focus.
@@ -83,6 +87,12 @@ class Ui {
     const x = 'clientX' in e ? e.clientX : e.x;
     const y = 'clientY' in e ? e.clientY : e.y;
     this.menu = { x, y, items, leftOf };
+  }
+
+  showTextSize(size: number) {
+    this.textSizeNotice = size;
+    clearTimeout(this.textSizeNoticeTimer);
+    this.textSizeNoticeTimer = setTimeout(() => (this.textSizeNotice = 0), 5000);
   }
 
   highlight(id: string) {

@@ -16,4 +16,7 @@ public:
   static std::string FileInfoToHex(const FileInfo& p_FileInfo);
   static std::vector<ContactInfo> ContactInfosFromJson(const std::string& p_Json);
   static std::string MentionsToJson(const std::map<std::string, std::string>& p_Mentions);
+  // braids: a JSON array of strings (poll option ids)
+  static std::string StringsToJson(const std::vector<std::string>& p_Strings);
+  static std::vector<std::string> StringsFromJson(const std::string& p_Json);
 };

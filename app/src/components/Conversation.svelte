@@ -17,6 +17,7 @@
   import * as api from '../lib/api';
   import { dayLabel, isSameDay, lastSeen, startOfDay } from '../lib/format';
   import { hint } from '../lib/keybinds.svelte';
+  import { settings } from '../lib/settings.svelte';
   import { splitKey, store } from '../lib/store.svelte';
   import type { Message } from '../lib/types';
   import { ui } from '../lib/ui.svelte';
@@ -479,7 +480,9 @@
 
     {#if reactFor}
       <div class="react-scrim" role="presentation" onclick={() => (reactFor = null)}></div>
-      <div class="react-pop" role="dialog" aria-label="Reactions" style:left="{Math.min(reactFor.x, ui.width - 300)}px" style:top="{reactFor.y}px" class:above={reactFor.above}>
+      <div class="react-pop" role="dialog" aria-label="Reactions"
+        style:left="{Math.min(reactFor.x, ui.width - 300) / (api.isTauri ? 1 : settings.textSize / 100)}px"
+        style:top="{reactFor.y / (api.isTauri ? 1 : settings.textSize / 100)}px" class:above={reactFor.above}>
         {#each reactFor.emojis as e}
           <button class:mine={reactFor.m.reactions.own === e} onclick={() => sendReaction(e)}>{e}</button>
         {/each}

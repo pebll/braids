@@ -543,7 +543,19 @@ void MessageCache::AddProfile(const std::string& p_ProfileId, bool p_CheckSequen
         "SET schema = ?;" << schemaVersion;
     }
 
-    static const int64_t s_SchemaVersion = 12;
+    if (schemaVersion == 12)
+    {
+      LOG_INFO("update db schema 12 to 13");
+
+      *m_Dbs[p_ProfileId] << "ALTER TABLE messages ADD COLUMN poll TEXT DEFAULT '';";
+      *m_Dbs[p_ProfileId] << "ALTER TABLE messages ADD COLUMN pollVotes TEXT DEFAULT '';";
+
+      schemaVersion = 13;
+      *m_Dbs[p_ProfileId] << "UPDATE version "
+        "SET schema = ?;" << schemaVersion;
+    }
+
+    static const int64_t s_SchemaVersion = 13;
     if (schemaVersion > s_SchemaVersion)
     {
       LOG_WARNING("cache db schema %d from newer braids version detected, if cache issues are encountered "
@@ -1025,6 +1037,20 @@ void MessageCache::UpdateMessageReactions(const std::string& p_ProfileId, const 
   EnqueueRequest(updateMessageReactionsRequest);
 }
 
+void MessageCache::UpdateMessagePoll(const std::string& p_ProfileId, const std::string& p_ChatId,
+                                     const std::string& p_MsgId, const std::string& p_Poll, const std::string& p_PollVotes)
+{
+  if (!m_CacheEnabled) return;
+
+  std::shared_ptr<UpdateMessagePollRequest> updateMessagePollRequest = std::make_shared<UpdateMessagePollRequest>();
+  updateMessagePollRequest->profileId = p_ProfileId;
+  updateMessagePollRequest->chatId = p_ChatId;
+  updateMessagePollRequest->msgId = p_MsgId;
+  updateMessagePollRequest->poll = p_Poll;
+  updateMessagePollRequest->pollVotes = p_PollVotes;
+  EnqueueRequest(updateMessagePollRequest);
+}
+
 void MessageCache::UpdateMute(const std::string& p_ProfileId, const std::string& p_ChatId, bool p_IsMuted)
 {
   if (!m_CacheEnabled) return;
@@ -1401,19 +1427,24 @@ void MessageCache::PerformRequest(std::shared_ptr<Request> p_Request)
 
         for (const auto& msg : addMessagesRequest->chatMessages)
         {
-          // Fetch already cached message reactions
+          // Fetch already cached message reactions (and the poll votes counted by braidsd)
           Reactions oldReactions;
+          std::string pollVotes = msg.pollVotes;
+          std::string poll = msg.poll;
           try
           {
             // *INDENT-OFF*
-            *m_Dbs[profileId] << "SELECT reactions FROM " + s_TableMessages + " WHERE chatId = ? AND id = ?;" <<
+            *m_Dbs[profileId] << "SELECT reactions, COALESCE(pollVotes, ''), COALESCE(poll, '') FROM " + s_TableMessages + " WHERE chatId = ? AND id = ?;" <<
               chatId << msg.id >>
-              [&](const std::vector<char>& reactionsBytes)
+              [&](const std::vector<char>& reactionsBytes, const std::string& oldPollVotes, const std::string& oldPoll)
               {
                 if (!reactionsBytes.empty())
                 {
                   oldReactions = Serialization::FromBytes<Reactions>(reactionsBytes);
                 }
+
+                if (pollVotes.empty()) pollVotes = oldPollVotes;
+                poll = CacheUtil::MergePoll(oldPoll, poll);
               };
             // *INDENT-ON*
           }
@@ -1438,10 +1469,11 @@ void MessageCache::PerformRequest(std::shared_ptr<Request> p_Request)
             try
             {
               *m_Dbs[profileId] << "INSERT INTO " + s_TableMessages + " "
-                "(chatId, id, senderId, text, quotedId, quotedText, quotedSender, fileInfo, timeSent, isOutgoing, isRead, isEdited, isDeleted, isPinned, reactions) VALUES "
-                "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);" <<
+                "(chatId, id, senderId, text, quotedId, quotedText, quotedSender, fileInfo, timeSent, isOutgoing, isRead, isEdited, isDeleted, isPinned, reactions, poll, pollVotes) VALUES "
+                "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);" <<
                 chatId << msg.id << msg.senderId << msg.text << msg.quotedId << msg.quotedText << msg.quotedSender <<
-                msg.fileInfo << msg.timeSent << msg.isOutgoing << msg.isRead << msg.isEdited << msg.isDeleted << msg.isPinned << reactionsBytes;
+                msg.fileInfo << msg.timeSent << msg.isOutgoing << msg.isRead << msg.isEdited << msg.isDeleted << msg.isPinned << reactionsBytes <<
+                poll << pollVotes;
             }
             catch (const sqlite::sqlite_exception& ex)
             {
@@ -1463,10 +1495,11 @@ void MessageCache::PerformRequest(std::shared_ptr<Request> p_Request)
             try
             {
               *m_Dbs[profileId] << "INSERT INTO " + s_TableMessages + " "
-                "(chatId, id, senderId, text, quotedId, quotedText, quotedSender, fileInfo, timeSent, isOutgoing, isRead, isEdited, isDeleted, isPinned, reactions) VALUES "
-                "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);" <<
+                "(chatId, id, senderId, text, quotedId, quotedText, quotedSender, fileInfo, timeSent, isOutgoing, isRead, isEdited, isDeleted, isPinned, reactions, poll, pollVotes) VALUES "
+                "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);" <<
                 chatId << msg.id << msg.senderId << msg.text << msg.quotedId << msg.quotedText << msg.quotedSender <<
-                msg.fileInfo << msg.timeSent << msg.isOutgoing << msg.isRead << msg.isEdited << msg.isDeleted << msg.isPinned << reactionsBytes;
+                msg.fileInfo << msg.timeSent << msg.isOutgoing << msg.isRead << msg.isEdited << msg.isDeleted << msg.isPinned << reactionsBytes <<
+                poll << pollVotes;
             }
             catch (const sqlite::sqlite_exception& ex)
             {
@@ -2094,6 +2127,36 @@ void MessageCache::PerformRequest(std::shared_ptr<Request> p_Request)
       }
       break;
 
+    case UpdateMessagePollRequestType:
+      {
+        std::unique_lock<std::mutex> lock(m_DbMutex);
+        std::shared_ptr<UpdateMessagePollRequest> request = std::static_pointer_cast<UpdateMessagePollRequest>(p_Request);
+        const std::string& profileId = request->profileId;
+        if (!m_Dbs[profileId]) return;
+
+        try
+        {
+          if (!request->poll.empty())
+          {
+            *m_Dbs[profileId] << "UPDATE " + s_TableMessages + " SET poll = ? WHERE chatId = ? AND id = ?;" <<
+              request->poll << request->chatId << request->msgId;
+          }
+
+          if (!request->pollVotes.empty())
+          {
+            *m_Dbs[profileId] << "UPDATE " + s_TableMessages + " SET pollVotes = ? WHERE chatId = ? AND id = ?;" <<
+              request->pollVotes << request->chatId << request->msgId;
+          }
+        }
+        catch (const sqlite::sqlite_exception& ex)
+        {
+          HANDLE_SQLITE_EXCEPTION(ex);
+        }
+
+        LOG_DEBUG("cache update poll %s %s", request->chatId.c_str(), request->msgId.c_str());
+      }
+      break;
+
     case UpdateMessageReactionsRequestType:
       {
         std::unique_lock<std::mutex> lock(m_DbMutex);
@@ -2352,14 +2415,14 @@ void MessageCache::PerformFetchMessagesFrom(const std::string& p_ProfileId, cons
     // *INDENT-OFF*
     *m_Dbs[p_ProfileId] <<
       "SELECT id, senderId, text, quotedId, quotedText, quotedSender, fileInfo, reactions, timeSent, "
-      "isOutgoing, isRead, isEdited, isDeleted, isPinned FROM " + s_TableMessages + " WHERE chatId = ? AND timeSent < ? "
+      "isOutgoing, isRead, isEdited, isDeleted, isPinned, COALESCE(poll, ''), COALESCE(pollVotes, '') FROM " + s_TableMessages + " WHERE chatId = ? AND timeSent < ? "
       "ORDER BY timeSent DESC LIMIT ?;" << p_ChatId << p_FromMsgIdTimeSent << p_Limit >>
       [&](const std::string& id, const std::string& senderId, const std::string& text,
           const std::string& quotedId, const std::string& quotedText,
           const std::string& quotedSender, const std::string& fileInfo,
           std::vector<char> reactionsBytes,
           int64_t timeSent, int32_t isOutgoing, int32_t isRead, int32_t isEdited, int32_t isDeleted,
-          int32_t isPinned)
+          int32_t isPinned, const std::string& poll, const std::string& pollVotes)
       {
         ChatMessage chatMessage;
         chatMessage.id = id;
@@ -2375,6 +2438,8 @@ void MessageCache::PerformFetchMessagesFrom(const std::string& p_ProfileId, cons
         chatMessage.isEdited = isEdited;
         chatMessage.isDeleted = isDeleted;
         chatMessage.isPinned = isPinned;
+        chatMessage.poll = poll;
+        chatMessage.pollVotes = pollVotes;
 
         if (!reactionsBytes.empty())
         {
@@ -2400,13 +2465,13 @@ void MessageCache::PerformFetchOneMessage(const std::string& p_ProfileId, const 
     // *INDENT-OFF*
     *m_Dbs[p_ProfileId] <<
       "SELECT id, senderId, text, quotedId, quotedText, quotedSender, fileInfo, reactions, timeSent, "
-      "isOutgoing, isRead, isEdited, isDeleted, isPinned FROM " + s_TableMessages + " WHERE chatId = ? AND id = ?;" << p_ChatId << p_MsgId >>
+      "isOutgoing, isRead, isEdited, isDeleted, isPinned, COALESCE(poll, ''), COALESCE(pollVotes, '') FROM " + s_TableMessages + " WHERE chatId = ? AND id = ?;" << p_ChatId << p_MsgId >>
       [&](const std::string& id, const std::string& senderId, const std::string& text,
           const std::string& quotedId, const std::string& quotedText,
           const std::string& quotedSender, const std::string& fileInfo,
           std::vector<char> reactionsBytes,
           int64_t timeSent, int32_t isOutgoing, int32_t isRead, int32_t isEdited, int32_t isDeleted,
-          int32_t isPinned)
+          int32_t isPinned, const std::string& poll, const std::string& pollVotes)
       {
         ChatMessage chatMessage;
         chatMessage.id = id;
@@ -2422,6 +2487,8 @@ void MessageCache::PerformFetchOneMessage(const std::string& p_ProfileId, const 
         chatMessage.isEdited = isEdited;
         chatMessage.isDeleted = isDeleted;
         chatMessage.isPinned = isPinned;
+        chatMessage.poll = poll;
+        chatMessage.pollVotes = pollVotes;
 
         if (!reactionsBytes.empty())
         {

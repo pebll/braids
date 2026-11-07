@@ -18,10 +18,13 @@
 #include "authutil.h"
 #include "fileutil.h"
 #include "log.h"
+#include "nlohmann/json.hpp"
 #include "status.h"
 #include "strutil.h"
 #include "timeutil.h"
 #include "timeutil.h"
+
+using json = nlohmann::json;
 
 static const std::string s_GroupId = "The Office_0";
 // a second group whose only unread item is a group event (Angela joined)
@@ -50,7 +53,7 @@ bool DuChat::HasFeature(ProtocolFeature p_ProtocolFeature) const
 {
   static int customFeatures =
     FeatureAutoGetContactsOnLogin | FeatureEditMessagesAnytime | FeatureAvatars | FeatureDescriptions | FeatureJoinChat |
-    FeatureCreateGroup | FeaturePinMessage;
+    FeatureCreateGroup | FeaturePinMessage | FeaturePolls;
   return (p_ProtocolFeature & customFeatures);
 }
 
@@ -563,6 +566,18 @@ void DuChat::PerformRequest(std::shared_ptr<RequestMessage> p_RequestMessage)
         s_LastSent = now;
         chatMessage.id = GetSelfId() + "_" + std::to_string(now);
         chatMessage.senderId = GetSelfId();
+        if (!chatMessage.poll.empty())
+        {
+          // options numbered, as the messengers do
+          json poll = json::parse(chatMessage.poll);
+          for (size_t i = 0; i < poll["options"].size(); ++i)
+          {
+            poll["options"][i]["id"] = std::to_string(i);
+          }
+
+          chatMessage.poll = poll.dump();
+        }
+
         chatMessage.timeSent = now;
         chatMessage.isOutgoing = true;
         chatMessage.isRead = false;
@@ -591,7 +606,66 @@ void DuChat::PerformRequest(std::shared_ptr<RequestMessage> p_RequestMessage)
         newMessagesNotify->chatId = chatId;
         newMessagesNotify->chatMessages = { chatMessage };
         m_MessageHandler(newMessagesNotify);
+
+        // braids tests: "/poll" - Jim asks, then votes (the vote first, as in
+        // a history sync); "/vote <option>" - Pam votes in the last poll;
+        // "/endpoll" - the last poll ends
+        auto lastPoll = [&]() -> std::string
+        {
+          for (const auto& message : s_Messages[chatId])
+          {
+            if (!message.poll.empty()) return message.id;
+          }
+
+          return "";
+        };
+        auto pollNotify = [&](const std::string& p_MsgId)
+        {
+          std::shared_ptr<NewPollNotify> notify = std::make_shared<NewPollNotify>(m_ProfileId);
+          notify->chatId = chatId;
+          notify->msgId = p_MsgId;
+          return notify;
+        };
+        if (chatMessage.text == "/poll")
+        {
+          ChatMessage poll;
+          poll.id = "poll_" + std::to_string(now);
+          poll.senderId = "Jim_0";
+          poll.timeSent = now + 1;
+          poll.isOutgoing = false;
+          poll.poll = json{ { "question", "Lunch?" }, { "multiple", false },
+                            { "options", json::array({ json{ { "id", "0" }, { "text", "Pizza" } },
+                                                       json{ { "id", "1" }, { "text", "Sushi" } },
+                                                       json{ { "id", "2" }, { "text", "Salad" } } }) } }.dump();
+          std::shared_ptr<NewPollNotify> vote = pollNotify(poll.id);
+          vote->voterId = "Jim_0";
+          vote->optionIds = { "1" };
+          m_MessageHandler(vote);
+          s_Messages[chatId].insert(s_Messages[chatId].begin(), poll);
+          std::shared_ptr<NewMessagesNotify> pollMessages = std::make_shared<NewMessagesNotify>(m_ProfileId);
+          pollMessages->success = true;
+          pollMessages->chatId = chatId;
+          pollMessages->chatMessages = { poll };
+          m_MessageHandler(pollMessages);
+        }
+        else if (StrUtil::StartsWith(chatMessage.text, "/vote ") && !lastPoll().empty())
+        {
+          std::shared_ptr<NewPollNotify> vote = pollNotify(lastPoll());
+          vote->voterId = "Pam_0";
+          vote->optionIds = { chatMessage.text.substr(6) };
+          m_MessageHandler(vote);
+        }
+        else if ((chatMessage.text == "/endpoll") && !lastPoll().empty())
+        {
+          std::shared_ptr<NewPollNotify> end = pollNotify(lastPoll());
+          end->closed = true;
+          m_MessageHandler(end);
+        }
       }
+      break;
+
+    case VotePollRequestType:
+      // counted by braidsd, nothing to send
       break;
 
     case EditMessageRequestType:

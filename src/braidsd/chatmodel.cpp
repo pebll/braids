@@ -7,6 +7,8 @@
 
 #include "chatmodel.h"
 
+#include "cacheutil.h"
+
 #include <algorithm>
 #include <limits>
 #include <map>
@@ -31,7 +33,14 @@ static bool IsSameMessage(const ChatMessage& p_Lhs, const ChatMessage& p_Rhs)
          (p_Lhs.reactions == p_Rhs.reactions) && (p_Lhs.timeSent == p_Rhs.timeSent) &&
          (p_Lhs.isOutgoing == p_Rhs.isOutgoing) && (p_Lhs.isRead == p_Rhs.isRead) &&
          (p_Lhs.isEdited == p_Rhs.isEdited) && (p_Lhs.isDeleted == p_Rhs.isDeleted) &&
-         (p_Lhs.isPinned == p_Rhs.isPinned) && (p_Lhs.hasMention == p_Rhs.hasMention);
+         (p_Lhs.isPinned == p_Rhs.isPinned) && (p_Lhs.hasMention == p_Rhs.hasMention) &&
+         (p_Lhs.poll == p_Rhs.poll) && (p_Lhs.pollVotes == p_Rhs.pollVotes);
+}
+
+static std::string PollQuestion(const std::string& p_Poll)
+{
+  const json poll = json::parse(p_Poll, nullptr, false);
+  return poll.is_object() ? poll.value("question", "") : "";
 }
 
 // Mime type of a file the protocol did not type (e.g. WhatsApp sets only the
@@ -763,6 +772,10 @@ void ChatModel::OnServiceMessage(std::shared_ptr<ServiceMessage> p_ServiceMessag
       }
       break;
 
+    case NewPollNotifyType:
+      OnPoll(accountId, std::static_pointer_cast<NewPollNotify>(p_ServiceMessage));
+      break;
+
     case NewMessageReactionsNotifyType:
       {
         std::shared_ptr<NewMessageReactionsNotify> newMessageReactionsNotify =
@@ -1145,9 +1158,43 @@ void ChatModel::OnNewMessages(const std::string& p_AccountId, std::shared_ptr<Ne
   LOG_TRACE("new messages %s count %d from %s cached %d", chatId.c_str(), (int)p_Notify->chatMessages.size(),
             p_Notify->fromMsgId.c_str(), p_Notify->cached);
 
-  for (const auto& chatMessage : p_Notify->chatMessages)
+  for (auto chatMessage : p_Notify->chatMessages)
   {
     auto mit = chat.messages.find(chatMessage.id);
+    if (!chatMessage.poll.empty() && chatMessage.pollVotes.empty())
+    {
+      // votes are counted here: kept (with the end) when the protocol sends
+      // the poll again
+      std::vector<ChatMessage> cached;
+      const ChatMessage* known = (mit != chat.messages.end()) ? &mit->second : nullptr;
+      if ((known == nullptr) && MessageCache::GetOneMessage(p_AccountId, chatId, chatMessage.id, cached))
+      {
+        known = &cached.front();
+      }
+
+      if (known != nullptr)
+      {
+        chatMessage.pollVotes = known->pollVotes;
+        chatMessage.poll = CacheUtil::MergePoll(known->poll, chatMessage.poll);
+      }
+    }
+
+    if (!chatMessage.poll.empty())
+    {
+      auto pit = account.pendingPollVotes.find(chatId + "\x01" + chatMessage.id);
+      if (pit != account.pendingPollVotes.end())
+      {
+        for (const auto& vote : pit->second)
+        {
+          ApplyPollNotify(chatMessage, *vote);
+        }
+
+        account.pendingPollVotes.erase(pit);
+        MessageCache::UpdateMessagePoll(p_AccountId, chatId, chatMessage.id, chatMessage.poll,
+                                        chatMessage.pollVotes.empty() ? "{}" : chatMessage.pollVotes);
+      }
+    }
+
     if (mit == chat.messages.end())
     {
       chat.messages[chatMessage.id] = chatMessage;
@@ -1287,7 +1334,8 @@ void ChatModel::MaybeNotify(const std::string& p_AccountId, const std::string& p
     { "senderName", GetContactName(p_AccountId, p_ChatMessage.senderId) },
     { "isGroup", isGroup },
     { "hasMention", p_ChatMessage.hasMention },
-    { "text", p_ChatMessage.text },
+    { "text", p_ChatMessage.poll.empty() ? p_ChatMessage.text
+                                         : "📊 " + PollQuestion(p_ChatMessage.poll) },
     { "hasFile", !p_ChatMessage.fileInfo.empty() },
   });
 }
@@ -1711,12 +1759,51 @@ void ChatModel::GetMessages(const std::string& p_AccountId, const std::string& p
 
 std::string ChatModel::SendMessage(const std::string& p_AccountId, const std::string& p_ChatId,
                                    const std::string& p_Text, const std::string& p_QuotedId,
-                                   const std::string& p_FilePath, bool p_IsVoice)
+                                   const std::string& p_FilePath, bool p_IsVoice, const json& p_Poll)
 {
   AccountState& account = GetAccountOrThrow(p_AccountId);
-  if (p_Text.empty() && p_FilePath.empty())
+  std::string poll;
+  if (!p_Poll.is_null())
+  {
+    if (!HasFeature(p_AccountId, FeaturePolls))
+    {
+      throw ApiException(ApiErrorUnsupported, "polls are not supported by this account");
+    }
+
+    auto trimmed = [](std::string p_Str)
+    {
+      StrUtil::Trim(p_Str);
+      return p_Str;
+    };
+    const std::string question = trimmed(p_Poll.is_object() ? p_Poll.value("question", "") : "");
+    json options = json::array();
+    if (p_Poll.is_object() && p_Poll.contains("options") && p_Poll["options"].is_array())
+    {
+      for (const auto& option : p_Poll["options"])
+      {
+        const std::string text = trimmed(option.is_string() ? option.get<std::string>()
+                                         : (option.is_object() ? option.value("text", "") : ""));
+        if (!text.empty()) options.push_back(json{ { "text", text } });
+      }
+    }
+
+    if (question.empty() || (options.size() < 2) || (options.size() > 12))
+    {
+      throw ApiException(ApiErrorInvalidParams, "a poll needs a question and 2 to 12 options");
+    }
+
+    poll = json{ { "question", question }, { "options", options },
+                 { "multiple", p_Poll.value("multiple", false) } }.dump();
+  }
+
+  if (p_Text.empty() && p_FilePath.empty() && poll.empty())
   {
     throw ApiException(ApiErrorInvalidParams, "text or filePath required");
+  }
+
+  if (!poll.empty() && (!p_Text.empty() || !p_FilePath.empty()))
+  {
+    throw ApiException(ApiErrorInvalidParams, "a poll is sent without text or file");
   }
 
   if (!p_QuotedId.empty())
@@ -1746,6 +1833,7 @@ std::string ChatModel::SendMessage(const std::string& p_AccountId, const std::st
   entry.quotedId = p_QuotedId;
   entry.filePath = p_FilePath;
   entry.isVoice = p_IsVoice;
+  entry.poll = poll;
   entry.time = now;
   entry.state = "waiting";
   account.outbox.push_back(entry);
@@ -1829,6 +1917,7 @@ void ChatModel::DispatchOutbox(const std::string& p_AccountId, OutboxEntry& p_En
   sendMessageRequest->chatMessage.id = p_Entry.id;
   sendMessageRequest->chatMessage.text = p_Entry.text;
   sendMessageRequest->chatMessage.mentions = ParseMentions(p_AccountId, p_Entry.chatId, p_Entry.text);
+  sendMessageRequest->chatMessage.poll = p_Entry.poll;
 
   if (!p_Entry.quotedId.empty())
   {
@@ -1912,7 +2001,9 @@ void ChatModel::MatchOutboxEcho(const std::string& p_AccountId, const std::strin
 
     const bool sameText = !entry.text.empty() && (entry.text == p_ChatMessage.text);
     const bool sameFile = !entry.filePath.empty() && !fileName.empty() && (FileUtil::BaseName(entry.filePath) == fileName);
-    if (sameText || (entry.text.empty() && sameFile))
+    const bool samePoll = !entry.poll.empty() && !p_ChatMessage.poll.empty() &&
+                          (PollQuestion(entry.poll) == PollQuestion(p_ChatMessage.poll));
+    if (sameText || (entry.text.empty() && sameFile) || samePoll)
     {
       match = &entry;
       break;
@@ -1957,6 +2048,7 @@ json ChatModel::OutboxEntryToJson(const std::string& p_AccountId, const OutboxEn
   chatMessage.id = p_Entry.id;
   chatMessage.text = p_Entry.text;
   chatMessage.quotedId = p_Entry.quotedId;
+  chatMessage.poll = p_Entry.poll;
   chatMessage.timeSent = p_Entry.time;
   chatMessage.isOutgoing = true;
   chatMessage.isRead = false;
@@ -1997,6 +2089,7 @@ void ChatModel::LoadOutbox(const std::string& p_AccountId)
     entry.quotedId = item.value("quotedId", "");
     entry.filePath = item.value("filePath", "");
     entry.isVoice = item.value("isVoice", false);
+    entry.poll = item.value("poll", "");
     entry.time = item.value("time", (int64_t)0);
     entry.state = item.value("state", "failed");
     // a message that was on its way when braids stopped may have arrived:
@@ -2028,7 +2121,8 @@ void ChatModel::SaveOutbox(const std::string& p_AccountId)
 
     outbox.push_back(json{ { "id", entry.id }, { "chatId", entry.chatId }, { "text", entry.text },
                            { "quotedId", entry.quotedId }, { "filePath", entry.filePath },
-                           { "isVoice", entry.isVoice }, { "time", entry.time }, { "state", entry.state } });
+                           { "isVoice", entry.isVoice }, { "poll", entry.poll }, { "time", entry.time },
+                           { "state", entry.state } });
   }
 
   const std::string path = dir + "/braids-outbox.json";
@@ -2548,6 +2642,221 @@ void ChatModel::FindMessage(const std::string& p_AccountId, const std::string& p
 
 // Events and serialization
 
+std::string ChatModel::SelfId(const std::string& p_AccountId)
+{
+  std::shared_ptr<Protocol> protocol = m_ProtocolGetter(p_AccountId);
+  return protocol ? protocol->GetSelfId() : "";
+}
+
+// A vote (voterId: optionIds, none = retracted) or, with poll set, the poll
+// as counted by the server; closed ends the poll.
+void ChatModel::ApplyPollNotify(ChatMessage& p_ChatMessage, const NewPollNotify& p_Notify)
+{
+  json poll = json::parse(p_ChatMessage.poll, nullptr, false);
+  if (!p_Notify.poll.empty())
+  {
+    json newPoll = json::parse(p_Notify.poll, nullptr, false);
+    if (newPoll.is_object())
+    {
+      if (poll.is_object() && poll.value("closed", false)) newPoll["closed"] = true;
+      poll = newPoll;
+    }
+  }
+  else if (!p_Notify.voterId.empty())
+  {
+    json votes = json::parse(p_ChatMessage.pollVotes.empty() ? "{}" : p_ChatMessage.pollVotes, nullptr, false);
+    if (!votes.is_object()) votes = json::object();
+    if (p_Notify.optionIds.empty())
+    {
+      votes.erase(p_Notify.voterId);
+    }
+    else
+    {
+      votes[p_Notify.voterId] = p_Notify.optionIds;
+    }
+
+    p_ChatMessage.pollVotes = votes.dump();
+  }
+
+  if (p_Notify.closed && poll.is_object())
+  {
+    poll["closed"] = true;
+  }
+
+  if (poll.is_object())
+  {
+    p_ChatMessage.poll = poll.dump();
+  }
+}
+
+void ChatModel::OnPoll(const std::string& p_AccountId, std::shared_ptr<NewPollNotify> p_Notify)
+{
+  AccountState& account = m_Accounts[p_AccountId];
+  const std::string& chatId = p_Notify->chatId;
+  ChatMessage* chatMessage = nullptr;
+  try
+  {
+    chatMessage = &GetMessageOrThrow(p_AccountId, chatId, p_Notify->msgId);
+  }
+  catch (const ApiException&)
+  {
+  }
+
+  if ((chatMessage == nullptr) || chatMessage->poll.empty())
+  {
+    // the vote came before its poll (history sync): applied when the poll arrives
+    auto& pending = account.pendingPollVotes[chatId + "\x01" + p_Notify->msgId];
+    if ((account.pendingPollVotes.size() < 2000) && (pending.size() < 500))
+    {
+      pending.push_back(p_Notify);
+    }
+
+    return;
+  }
+
+  ApplyPollNotify(*chatMessage, *p_Notify);
+  MessageCache::UpdateMessagePoll(p_AccountId, chatId, p_Notify->msgId, chatMessage->poll,
+                                  chatMessage->pollVotes.empty() ? "" : chatMessage->pollVotes);
+  Emit("message.updated", MessageToJson(p_AccountId, chatId, *chatMessage));
+}
+
+void ChatModel::VotePoll(const std::string& p_AccountId, const std::string& p_ChatId, const std::string& p_MsgId,
+                         const std::vector<std::string>& p_OptionIds)
+{
+  GetAccountOrThrow(p_AccountId);
+  ChatMessage& chatMessage = GetMessageOrThrow(p_AccountId, p_ChatId, p_MsgId);
+  json poll = json::parse(chatMessage.poll, nullptr, false);
+  if (!poll.is_object())
+  {
+    throw ApiException(ApiErrorInvalidParams, "not a poll");
+  }
+
+  if (poll.value("closed", false))
+  {
+    throw ApiException(ApiErrorInvalidParams, "the poll has ended");
+  }
+
+  if (!poll.value("multiple", false) && (p_OptionIds.size() > 1))
+  {
+    throw ApiException(ApiErrorInvalidParams, "only one option can be chosen");
+  }
+
+  std::vector<std::string> optionTexts;
+  const json options = poll.value("options", json::array());
+  for (const auto& optionId : p_OptionIds)
+  {
+    bool found = false;
+    for (size_t i = 0; i < options.size(); ++i)
+    {
+      const std::string id = options[i].value("id", std::to_string(i));
+      if (id == optionId)
+      {
+        optionTexts.push_back(options[i].value("text", ""));
+        found = true;
+        break;
+      }
+    }
+
+    if (!found)
+    {
+      throw ApiException(ApiErrorInvalidParams, "unknown option " + optionId);
+    }
+  }
+
+  std::shared_ptr<VotePollRequest> votePollRequest = std::make_shared<VotePollRequest>();
+  votePollRequest->chatId = p_ChatId;
+  votePollRequest->msgId = p_MsgId;
+  votePollRequest->pollSenderId = chatMessage.senderId;
+  votePollRequest->pollIsOutgoing = chatMessage.isOutgoing;
+  votePollRequest->optionIds = p_OptionIds;
+  votePollRequest->optionTexts = optionTexts;
+  SendProtocolRequest(p_AccountId, votePollRequest);
+
+  // votes counted here: the own one at once (most messengers do not echo it);
+  // where the server counts, its update follows
+  if (!poll.contains("counts"))
+  {
+    NewPollNotify vote(p_AccountId);
+    vote.chatId = p_ChatId;
+    vote.msgId = p_MsgId;
+    vote.voterId = SelfId(p_AccountId);
+    vote.optionIds = p_OptionIds;
+    if (vote.voterId.empty()) vote.voterId = s_ReactionsSelfId;
+    ApplyPollNotify(chatMessage, vote);
+    MessageCache::UpdateMessagePoll(p_AccountId, p_ChatId, p_MsgId, "", chatMessage.pollVotes);
+    Emit("message.updated", MessageToJson(p_AccountId, p_ChatId, chatMessage));
+  }
+}
+
+// The poll for the API: options with their votes (voters where the
+// messenger reports them), the own choice, closed.
+json ChatModel::PollToJson(const std::string& p_AccountId, const ChatMessage& p_ChatMessage)
+{
+  if (p_ChatMessage.poll.empty()) return json();
+
+  const json poll = json::parse(p_ChatMessage.poll, nullptr, false);
+  if (!poll.is_object()) return json();
+
+  const json votes = json::parse(p_ChatMessage.pollVotes.empty() ? "{}" : p_ChatMessage.pollVotes, nullptr, false);
+  const bool counted = poll.contains("counts");
+  const std::string selfId = SelfId(p_AccountId);
+  json options = json::array();
+  json own = counted ? poll.value("own", json::array()) : json::array();
+  int total = counted ? poll.value("total", 0) : 0;
+  const json pollOptions = poll.value("options", json::array());
+  for (size_t i = 0; i < pollOptions.size(); ++i)
+  {
+    const json& option = pollOptions[i];
+    const std::string id = option.is_object() ? option.value("id", std::to_string(i)) : std::to_string(i);
+    json voters = json::array();
+    int count = 0;
+    if (counted)
+    {
+      const json counts = poll["counts"];
+      count = (counts.is_object() && counts.contains(id) && counts[id].is_number()) ? counts[id].get<int>() : 0;
+    }
+    else if (votes.is_object())
+    {
+      for (const auto& vote : votes.items())
+      {
+        if (!vote.value().is_array()) continue;
+
+        for (const auto& chosen : vote.value())
+        {
+          if (chosen.is_string() && (chosen.get<std::string>() == id))
+          {
+            ++count;
+            const bool isSelf = (vote.key() == selfId) || (vote.key() == s_ReactionsSelfId);
+            if (isSelf)
+            {
+              own.push_back(id);
+            }
+            else
+            {
+              voters.push_back(vote.key());
+            }
+          }
+        }
+      }
+    }
+
+    options.push_back(json{ { "id", id }, { "text", option.is_object() ? option.value("text", "") : "" },
+                            { "votes", count }, { "voters", voters } });
+  }
+
+  if (!counted && votes.is_object())
+  {
+    for (const auto& vote : votes.items())
+    {
+      if (vote.value().is_array() && !vote.value().empty()) ++total;
+    }
+  }
+
+  return json{ { "question", poll.value("question", "") }, { "options", options },
+               { "multiple", poll.value("multiple", false) }, { "closed", poll.value("closed", false) },
+               { "anonymous", poll.value("anonymous", false) }, { "own", own }, { "total", total } };
+}
+
 void ChatModel::MarkChatDirty(const std::string& p_AccountId, const std::string& p_ChatId)
 {
   m_DirtyChats.insert(std::make_pair(p_AccountId, p_ChatId));
@@ -2827,6 +3136,7 @@ json ChatModel::MessageToJson(const std::string& p_AccountId, const std::string&
     { "mentions", mentions },
     { "system", SystemText(p_ChatMessage) },
     { "link", p_ChatMessage.link },
+    { "poll", PollToJson(p_AccountId, p_ChatMessage) },
   };
 }
 
@@ -2866,6 +3176,8 @@ json ChatModel::CapabilitiesToJson(std::shared_ptr<Protocol> p_Protocol, const s
     { "descriptions", p_Protocol->HasFeature(FeatureDescriptions) },
     { "joinChat", p_Protocol->HasFeature(FeatureJoinChat) },
     { "createGroup", p_Protocol->HasFeature(FeatureCreateGroup) },
+    { "polls", p_Protocol->HasFeature(FeaturePolls) },
+    { "pollsInGroupsOnly", p_ProtocolName == "Telegram" }, // Telegram: polls only in groups
     { "limitedReactions", p_Protocol->HasFeature(FeatureLimitedReactions) },
     { "readReceiptsPerMessage", HasPerMessageReadReceipts(p_ProtocolName) },
   };

@@ -12,6 +12,13 @@ import { ApiError, type ApiEvent } from './types';
 
 export const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
+export async function setWebviewZoom(scale: number): Promise<boolean> {
+  if (!isTauri) return false;
+  const { getCurrentWebview } = await import('@tauri-apps/api/webview');
+  await getCurrentWebview().setZoom(scale);
+  return true;
+}
+
 type EventHandler = (event: ApiEvent) => void;
 type ConnectionHandler = (connected: boolean) => void;
 
@@ -65,6 +72,31 @@ export async function copyText(text: string): Promise<void> {
     return;
   }
   await navigator.clipboard.writeText(text);
+}
+
+// Copies a picture to the clipboard as PNG (Tauri decodes only PNG, and
+// browsers accept only PNG on the clipboard; photos are mostly JPEG).
+export async function copyImage(path: string): Promise<void> {
+  const response = await fetch(fileUrl(path));
+  if (!response.ok) throw new Error(`Could not read image (${response.status})`);
+  const image = await createImageBitmap(await response.blob());
+  const canvas = document.createElement('canvas');
+  canvas.width = image.width;
+  canvas.height = image.height;
+  canvas.getContext('2d')!.drawImage(image, 0, 0);
+  image.close();
+  const png = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((value) => (value ? resolve(value) : reject(new Error('Could not encode image'))), 'image/png');
+  });
+  if (isTauri) {
+    const { writeImage } = await import('@tauri-apps/plugin-clipboard-manager');
+    await writeImage(new Uint8Array(await png.arrayBuffer()));
+    return;
+  }
+  if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') {
+    throw new Error('Image clipboard is not supported by this browser');
+  }
+  await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]);
 }
 
 // ---- updates and start at login (desktop app only) ----
