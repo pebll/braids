@@ -9,8 +9,8 @@
   groups, quote, attachment, reactions, hover actions.
 -->
 <script lang="ts">
-  import { Check, CheckCheck, Clock, Copy, Download, FileText, Forward, Image, LoaderCircle, Pencil, Pin, PinOff, Play, Reply, RotateCw, SmilePlus, Trash2, TriangleAlert } from '@lucide/svelte';
-  import { copyText, openLink, personMenu } from '../lib/actions';
+  import { Check, CheckCheck, CircleCheck, Clock, Copy, Download, FileText, Forward, Image, LoaderCircle, Pencil, Pin, PinOff, Play, Reply, RotateCw, SmilePlus, Trash2, TriangleAlert } from '@lucide/svelte';
+  import { copyText, openLink, personMenu, toggleSelect } from '../lib/actions';
   import * as api from '../lib/api';
   import { mediaSrc } from '../lib/media';
   import { firstLink, isOnlyEmoji, renderText, senderColor, timeOfDay } from '../lib/format';
@@ -43,6 +43,19 @@
   } = $props();
 
   const own = $derived(m.isOutgoing);
+  // multi-select: while messages of this chat are selected, a click selects
+  const selecting = $derived(ui.selection?.chatKey === chatKey(m.accountId, m.chatId));
+  const selected = $derived(selecting && ui.selection!.ids.includes(m.id));
+
+  function onClickCapture(e: MouseEvent) {
+    if (m.pending || m.isDeleted) return;
+    if (!selecting && !e.ctrlKey && !e.metaKey) return;
+    // Ctrl+click starts a selection; while selecting, a click toggles and
+    // Shift+click adds the range
+    e.preventDefault();
+    e.stopPropagation();
+    toggleSelect(m, selecting && e.shiftKey);
+  }
   const showName = $derived(chat.isGroup && !own && first);
   const showAvatar = $derived(chat.isGroup && !own);
   const mime = $derived(fileMime(m.file));
@@ -180,7 +193,7 @@
     if (m.text) items.push({ label: 'Copy text', icon: Copy, run: () => copyText(m.text, 'Copied') });
     if (m.file && isImage && !isSticker && ready) items.push({ label: 'Copy image', icon: Image, run: () => api.copyImage(m.file!.path).then(() => store.toast('Copied')).catch((e) => store.toastError(e)) });
     if (m.file) items.push({ label: 'Download file', icon: Download, run: saveFile });
-    items.push({ label: 'Forward…', icon: Forward, run: () => (ui.forward = m) });
+    items.push({ label: 'Forward…', icon: Forward, run: () => { ui.forward = [m]; } });
     if (account.capabilities.pinMessage) items.push(pinItem());
     if (editState.ok) items.push({ label: 'Edit', icon: Pencil, run: edit });
     if (own) items.push({ label: 'Delete for everyone', icon: Trash2, danger: true, run: remove });
@@ -208,7 +221,8 @@
     if (m.text) items.push({ label: 'Copy text', icon: Copy, run: () => copyText(m.text, 'Copied') });
     if (m.file && isImage && !isSticker && ready) items.push({ label: 'Copy image', icon: Image, run: () => api.copyImage(m.file!.path).then(() => store.toast('Copied')).catch((e) => store.toastError(e)) });
     if (m.file) items.push({ label: 'Download file', icon: Download, run: saveFile });
-    items.push({ label: 'Forward…', icon: Forward, run: () => (ui.forward = m) });
+    items.push({ label: 'Forward…', icon: Forward, run: () => { ui.forward = [m]; } });
+    items.push({ label: 'Select', icon: CircleCheck, run: () => toggleSelect(m) });
     if (account.capabilities.pinMessage) items.push(pinItem());
     if (own) items.push({ label: 'Delete for everyone', icon: Trash2, danger: true, run: remove });
     return items;
@@ -223,6 +237,7 @@
 
   function showMenu(e: MouseEvent) {
     e.preventDefault();
+    if (selecting) return; // the selection bar has the actions
     ui.openMenu(e, menuItems());
   }
 
@@ -251,13 +266,20 @@
   class:highlight={ui.highlightId === m.id}
   class:pending={!!pending}
   class:failed={pending === 'failed'}
+  class:selecting
+  class:selected
   data-msg-id={m.id}
+  data-selected={selecting ? selected : undefined}
+  onclickcapture={onClickCapture}
   oncontextmenu={showMenu}
   onmouseenter={() => (ui.hoverMessage = m)}
   onmouseleave={() => ui.hoverMessage === m && (ui.hoverMessage = null)}
   role="article"
   aria-label={`${store.senderName(m)}, ${timeOfDay(m.time)}`}
 >
+  {#if selecting && !m.pending && !m.isDeleted}
+    <span class="select-mark" class:on={selected} aria-hidden="true">{#if selected}<Check size={12} strokeWidth={3} />{/if}</span>
+  {/if}
   {#if showAvatar}
     {#if last}
       <button class="who" aria-label={`${store.senderName(m)}: options`} onclick={(e) => openPerson(e)}>
@@ -377,7 +399,7 @@
       </div>
     {/if}
 
-    {#if !m.isDeleted && !pending}
+    {#if !m.isDeleted && !pending && !selecting}
       <div class="actions" class:row={lines <= 1} role="toolbar" aria-label="Message actions" aria-orientation={lines <= 1 ? 'horizontal' : 'vertical'}>
         <button class="icon-btn sm" bind:this={reactBtn} onclick={() => onReact(m, reactBtn!)} title="React" aria-label="React"><SmilePlus size={17} /></button>
         <button class="icon-btn sm" onclick={reply} title="Reply" aria-label="Reply"><Reply size={17} /></button>
@@ -394,6 +416,14 @@
   .msg.first { margin-top: 10px; }
   .msg.own { justify-content: flex-end; }
   .msg.highlight { background: var(--cursor); transition: background var(--duration-slow) var(--ease); }
+  .msg.selecting { padding-left: 32px; cursor: pointer; }
+  .msg.selecting :global(*) { cursor: pointer; }
+  .msg.selected { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+  .select-mark {
+    position: absolute; left: 8px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; border-radius: 50%;
+    border: 1.5px solid var(--border-strong); display: flex; align-items: center; justify-content: center; background: var(--bg-1);
+  }
+  .select-mark.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
   .avatar-space { width: 30px; flex-shrink: 0; }
   .col { max-width: min(440px, 78%); min-width: 0; display: flex; flex-direction: column; align-items: flex-start; position: relative; }
   .own .col { align-items: flex-end; }

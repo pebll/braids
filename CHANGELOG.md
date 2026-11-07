@@ -22,8 +22,16 @@ release workflow publishes the section of a version as its release notes.
 - Settings → About: Report a bug, Suggest a feature, Known issues (GitHub).
 - Image viewer: Show in chat, Copy image (also Ctrl+C) and Save as (also
   Ctrl+S) next to "Open with default app".
+- Select several messages ("Select" in the message menu, or Ctrl+click;
+  Shift+click adds a range) to forward, copy or delete them together. (#25)
 
 ### Fixed
+- WhatsApp photos sent together (an album) are shown; they were dropped.
+  Older WhatsApp photos and files, removed from WhatsApp's servers, are asked
+  from the sender's phone again, as WhatsApp's apps do. (#24)
+- Forwarding WhatsApp photos to Signal: the photo is downloaded (also older
+  ones), and a Signal message whose picture cannot be uploaded is marked
+  "Not sent" instead of going out without it. (#26)
 - Links no longer open inside braids, with no way back (when no browser was
   running): the window never leaves braids, web pages go to the default
   browser. (#20)

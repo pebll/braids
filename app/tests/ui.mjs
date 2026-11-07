@@ -859,6 +859,52 @@ try {
   await page.locator('.toast', { hasText: 'Message copied' }).waitFor();
   check(await page.evaluate(() => navigator.clipboard.readText()) === 'copy me please', 'Ctrl+C without a selection copies the hovered message');
 
+  // multi-select: Select from the menu, click to add, copy, forward, delete
+  for (const t of ['pick one', 'pick two']) {
+    await composer.fill(t);
+    await page.keyboard.press('Enter');
+    await page.locator('.msg.own:not(.pending)', { hasText: t }).last().waitFor();
+  }
+  const pickOne = page.locator('.msg.own', { hasText: 'pick one' }).last();
+  const pickTwo = page.locator('.msg.own', { hasText: 'pick two' }).last();
+  await pickOne.click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Select' }).click();
+  const selBar = page.getByRole('toolbar', { name: 'Selected messages' });
+  await selBar.waitFor();
+  check((await selBar.textContent()).includes('1 selected') && await page.locator('textarea[aria-label=Message]').count() === 0,
+    'Select: the selection bar replaces the composer');
+  await pickTwo.locator('.msg-text').click();
+  check((await selBar.textContent()).includes('2 selected') && await pickTwo.evaluate((el) => el.classList.contains('selected')),
+    'a click adds a message to the selection');
+  await page.evaluate(() => navigator.clipboard.writeText(''));
+  await selBar.getByRole('button', { name: 'Copy' }).click();
+  await page.waitForFunction(async () => (await navigator.clipboard.readText()) === 'pick one\npick two');
+  check(true, 'Copy copies the selected messages in order');
+  await selBar.getByRole('button', { name: 'Forward' }).click();
+  const fwd = page.getByRole('dialog', { name: 'Forward 2 messages' });
+  await fwd.waitFor();
+  await fwd.getByPlaceholder('Search chats').fill('Michael');
+  await fwd.locator('.target').first().click();
+  await page.locator('.toast', { hasText: 'Forwarded 2 messages' }).waitFor();
+  check(await selBar.count() === 0, 'Forward sends the selected messages and ends the selection');
+  await pickOne.click({ modifiers: ['Control'] });
+  await selBar.waitFor();
+  check(true, 'Ctrl+click starts a selection');
+  await page.keyboard.press('Escape');
+  await selBar.waitFor({ state: 'detached' });
+  check(await page.locator('.msg.selected').count() === 0, 'Esc ends the selection');
+  await pickOne.click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Select' }).click();
+  await pickTwo.locator('.msg-text').click({ modifiers: ['Shift'] });
+  const twoBefore = await page.locator('.msg', { hasText: 'pick two' }).count();
+  const oneBefore = await page.locator('.msg', { hasText: 'pick one' }).count();
+  await selBar.getByRole('button', { name: 'Delete' }).click();
+  await page.getByRole('button', { name: 'Delete for everyone' }).click();
+  // (the forwarded copies are in this chat too: Michael is the open chat)
+  await page.waitForFunction(([one, two]) => [...document.querySelectorAll('.msg')].filter((el) => el.textContent.includes('pick one')).length === one - 1
+    && [...document.querySelectorAll('.msg')].filter((el) => el.textContent.includes('pick two')).length === two - 1, [oneBefore, twoBefore]);
+  check(true, 'Delete removes the selected own messages');
+
   // drag and drop a file into the chat
   await page.evaluate(() => {
     const dt = new DataTransfer();

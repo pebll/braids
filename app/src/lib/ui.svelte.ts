@@ -48,7 +48,10 @@ class Ui {
   menu = $state<{ x: number; y: number; items: MenuItem[]; leftOf?: boolean } | null>(null); // leftOf: x is the right edge
   reply = $state<Message | null>(null);
   edit = $state<Message | null>(null);
-  forward = $state<Message | null>(null); // message being forwarded (dialog open)
+  forward = $state<Message[] | null>(null); // messages being forwarded (dialog open)
+  // messages selected in a chat (multi-select): ids, and the last one clicked
+  // (Shift+click selects the range from it)
+  selection = $state<{ chatKey: string; ids: string[]; anchor: string } | null>(null);
   pollFor = $state(''); // chat key a new poll is being made for (dialog open)
   shortcuts = $state(false); // keyboard shortcuts overview open
   media = $state<{ chatKey: string } | null>(null); // shared media dialog: of a chat, or all ('')

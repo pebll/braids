@@ -333,7 +333,7 @@
 {#if store.wizardSetupId}<Wizard />{/if}
 {#if ui.settingsOpen}<Settings />{/if}
 {#if ui.newChatOpen}<NewChat />{/if}
-{#if ui.forward}<ForwardDialog m={ui.forward} />{/if}
+{#if ui.forward}<ForwardDialog messages={ui.forward} />{/if}
 {#if ui.shortcuts}<ShortcutsDialog />{/if}
 {#if ui.pollFor}<PollDialog chatKey={ui.pollFor} />{/if}
 {#if ui.media}<MediaDialog scope={ui.media.chatKey} />{/if}

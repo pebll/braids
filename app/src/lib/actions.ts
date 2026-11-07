@@ -10,7 +10,7 @@ import { Archive, ArchiveRestore, Bell, BellOff, Image, Mail, MailCheck, Message
 import * as api from './api';
 import { inviteLinkProtocol } from './protocols';
 import { chatKey, splitKey, store } from './store.svelte';
-import type { Chat } from './types';
+import type { Chat, Message } from './types';
 import { openLightbox, ui, type MenuItem } from './ui.svelte';
 
 export function chatMenu(c: Chat): MenuItem[] {
@@ -99,6 +99,10 @@ export function copyShortcut(e: KeyboardEvent): boolean {
     copyText(selected);
     return true;
   }
+  if (ui.selection) {
+    copySelection();
+    return true;
+  }
   const m = ui.hoverMessage;
   if (m?.text && !m.isDeleted) {
     copyText(m.text, 'Message copied');
@@ -145,4 +149,68 @@ export function personMenu(accountId: string, userId: string, name: string): Men
   if (store.avatar(accountId, userId)) items.push({ label: 'View profile picture', icon: Image, run: () => viewPicture(accountId, userId, name) });
   if (userId !== store.accounts[accountId]?.selfId) items.push({ label: `Message ${name.split(' ')[0]} privately`, icon: MessageCircle, run: () => messagePrivately(accountId, userId) });
   return items;
+}
+
+// ---- multi-select ----
+
+function canSelect(m: Message): boolean {
+  return !m.system && !m.pending && !m.isDeleted;
+}
+
+// The selected messages, in their order in the chat.
+export function selectedMessages(): Message[] {
+  const sel = ui.selection;
+  if (!sel) return [];
+  const ids = new Set(sel.ids);
+  return (store.messages[sel.chatKey]?.items ?? []).filter((m) => ids.has(m.id));
+}
+
+// Adds a message to the selection or takes it out (starting a selection);
+// range: also the messages between it and the last one clicked.
+export function toggleSelect(m: Message, range = false) {
+  if (!canSelect(m)) return;
+  const key = chatKey(m.accountId, m.chatId);
+  const sel = ui.selection?.chatKey === key ? ui.selection : null;
+  if (!sel) {
+    ui.selection = { chatKey: key, ids: [m.id], anchor: m.id };
+    return;
+  }
+  if (range && sel.anchor) {
+    const ids = (store.messages[key]?.items ?? []).filter(canSelect).map((x) => x.id);
+    const a = ids.indexOf(sel.anchor);
+    const b = ids.indexOf(m.id);
+    if (a >= 0 && b >= 0) {
+      const [lo, hi] = a < b ? [a, b] : [b, a];
+      ui.selection = { chatKey: key, ids: [...new Set([...sel.ids, ...ids.slice(lo, hi + 1)])], anchor: m.id };
+      return;
+    }
+  }
+  const ids = sel.ids.includes(m.id) ? sel.ids.filter((x) => x !== m.id) : [...sel.ids, m.id];
+  ui.selection = ids.length ? { chatKey: key, ids, anchor: m.id } : null;
+}
+
+// Copies the selected messages as text: "Name: text" lines when more than one
+// person wrote them.
+export function copySelection() {
+  const list = selectedMessages();
+  if (!list.length) return;
+  const many = new Set(list.map((m) => m.senderId)).size > 1;
+  const lines = list.map((m) => {
+    const body = m.text || (m.poll ? `📊 ${m.poll.question}` : m.file?.name ?? '');
+    return many ? `${store.senderName(m)}: ${body}` : body;
+  });
+  copyText(lines.join('\n'), list.length === 1 ? 'Message copied' : `${list.length} messages copied`);
+}
+
+// Deletes the selected messages for everyone (own messages only).
+export async function deleteSelection() {
+  const list = selectedMessages();
+  if (!list.length || list.some((m) => !m.isOutgoing)) return;
+  const ok = await ui.confirm(list.length === 1 ? 'Delete message?' : `Delete ${list.length} messages?`,
+    'They are deleted for everyone in this chat.', 'Delete for everyone', true);
+  if (!ok) return;
+  ui.selection = null;
+  for (const m of list) {
+    await api.call('messages.delete', { accountId: m.accountId, chatId: m.chatId, msgId: m.id }).catch((e) => store.toastError(e));
+  }
 }
