@@ -720,10 +720,7 @@ class Store {
     // the "new messages" separator marks what is unread now, not at an
     // earlier opening
     const list = this.messages[key];
-    if (list) {
-      const firstUnread = list.items.find((m) => !m.isOutgoing && !m.isRead && !m.system);
-      list.firstUnreadId = this.chats[key]?.isUnread && firstUnread ? firstUnread.id : '';
-    }
+    if (list) list.firstUnreadId = this.chats[key]?.isUnread ? firstUnreadId(list.items, this.chats[key].unreadCount) : '';
     this.markCurrentRead();
   }
 
@@ -948,6 +945,30 @@ export function galleryItems(messages: Message[]): LightboxItem[] {
     .filter((x) => fileReady(x.file) && x.file!.kind !== 'sticker' && /^(image|video)\//.test(fileMime(x.file)))
     .map((x) => ({ path: x.file!.path, name: x.file!.name, video: fileMime(x.file).startsWith('video/'),
                    msg: { accountId: x.accountId, chatId: x.chatId, id: x.id } }));
+}
+
+// Where the "new messages" separator goes: the first received unread message
+// after the last own or read one (as braidsd counts), and not above the
+// chat's unread count (the newest that many received messages).
+export function firstUnreadId(items: Message[], unreadCount: number): string {
+  let lastRead = -1;
+  items.forEach((m, i) => {
+    if (m.isOutgoing || m.isRead) lastRead = i;
+  });
+  let first = items.findIndex((m, i) => i > lastRead && !m.isOutgoing && !m.isRead && !m.system);
+  if (first < 0) return '';
+  if (unreadCount > 0) {
+    let seen = 0;
+    for (let i = items.length - 1; i >= 0; i--) {
+      const m = items[i];
+      if (m.isOutgoing || m.system) continue;
+      if (++seen === unreadCount) {
+        if (i > first) first = i;
+        break;
+      }
+    }
+  }
+  return items[first].id;
 }
 
 export function fileLabel(m: Message): string {

@@ -32,6 +32,11 @@ release workflow publishes the section of a version as its release notes.
 - Forwarding WhatsApp photos to Signal: the photo is downloaded (also older
   ones), and a Signal message whose picture cannot be uploaded is marked
   "Not sent" instead of going out without it. (#26)
+- WhatsApp unread counts were too high after connecting: of the chat history
+  WhatsApp sends, every received message counted as new when the chat had
+  any unread. Now only as many as WhatsApp counts; the "New messages" line
+  sits accordingly (after your last own or read message, not above the
+  unread count).
 - Links no longer open inside braids, with no way back (when no browser was
   running): the window never leaves braids, web pages go to the default
   browser. (#20)

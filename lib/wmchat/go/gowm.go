@@ -36,6 +36,7 @@ import (
 
 	"go.mau.fi/whatsmeow/proto/waCompanionReg"
 	"go.mau.fi/whatsmeow/proto/waE2E"
+	"go.mau.fi/whatsmeow/proto/waHistorySync"
 	"go.mau.fi/whatsmeow/proto/waWeb"
 	"go.mau.fi/whatsmeow/store"
 
@@ -1044,6 +1045,50 @@ func (handler *WmEventHandler) HandleChatPresence(chatPresence *events.ChatPrese
 	CWmNewTypingNotify(connId, chatId, userId, BoolToInt(isTyping))
 }
 
+// countsAsUnread: a message WhatsApp counts in a chat's unread number (not
+// reactions, edits, deletions, poll votes, album headers and the like).
+func countsAsUnread(msg *waE2E.Message) bool {
+	if child := msg.GetAssociatedChildMessage().GetMessage(); child != nil {
+		msg = child
+	}
+	return msg.ReactionMessage == nil && msg.ProtocolMessage == nil && msg.PollUpdateMessage == nil &&
+		msg.AlbumMessage == nil && msg.KeepInChatMessage == nil && msg.PinInChatMessage == nil &&
+		msg.EncReactionMessage == nil && msg.GetEditedMessage() == nil &&
+		(msg.SenderKeyDistributionMessage == nil || msg.Conversation != nil || msg.ExtendedTextMessage != nil ||
+			msg.ImageMessage != nil || msg.VideoMessage != nil || msg.AudioMessage != nil || msg.DocumentMessage != nil)
+}
+
+// syncUnreadIds: the ids of the newest unreadCount received messages of a
+// history sync batch.
+func syncUnreadIds(selfJid types.JID, chatJid types.JID, syncMessages []*waHistorySync.HistorySyncMsg, unreadCount int) map[string]bool {
+	unread := map[string]bool{}
+	if unreadCount <= 0 {
+		return unread
+	}
+
+	type received struct {
+		id   string
+		time time.Time
+	}
+	var list []received
+	for _, syncMessage := range syncMessages {
+		webMessageInfo := syncMessage.GetMessage()
+		messageInfo := ParseWebMessageInfo(selfJid, chatJid, webMessageInfo)
+		message := webMessageInfo.GetMessage()
+		if messageInfo == nil || message == nil || messageInfo.IsFromMe || !countsAsUnread(message) {
+			continue
+		}
+		list = append(list, received{messageInfo.ID, messageInfo.Timestamp})
+	}
+
+	sort.Slice(list, func(i, j int) bool { return list[i].time.After(list[j].time) })
+	for i := 0; i < len(list) && i < unreadCount; i++ {
+		unread[list[i].id] = true
+	}
+
+	return unread
+}
+
 func (handler *WmEventHandler) HandleHistorySync(historySync *events.HistorySync) {
 	var client *whatsmeow.Client = GetClient(handler.connId)
 	if client == nil || client.Store.ID == nil {
@@ -1069,9 +1114,12 @@ func (handler *WmEventHandler) HandleHistorySync(historySync *events.HistorySync
 		isUnread := 0
 		lastMessageTime := 0
 
-		isSyncRead := (conversation.GetUnreadCount() == 0)
 		hasMessages := false
 		syncMessages := conversation.GetMessages()
+		// braids: WhatsApp gives the chat's unread count; only that many of the
+		// newest received messages are unread, the older ones were read (else
+		// every received message of the batch counted as new)
+		unreadIds := syncUnreadIds(selfJid, chatJid, syncMessages, int(conversation.GetUnreadCount()))
 		for _, syncMessage := range syncMessages {
 			webMessageInfo := syncMessage.Message
 			messageInfo := ParseWebMessageInfo(selfJid, chatJid, webMessageInfo)
@@ -1081,6 +1129,7 @@ func (handler *WmEventHandler) HandleHistorySync(historySync *events.HistorySync
 				continue
 			}
 
+			isSyncRead := !unreadIds[messageInfo.ID]
 			handler.HandleMessage(*messageInfo, message, isSyncRead)
 			hasMessages = true
 
