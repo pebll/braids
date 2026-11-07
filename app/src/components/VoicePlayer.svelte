@@ -20,8 +20,9 @@
   import { mediaSrc } from '../lib/media';
   import { store } from '../lib/store.svelte';
 
-  let { path, id, status, onDownload }: {
+  let { path, id, status, onDownload, mimeType = '' }: {
     path: string; // local file, '' while not downloaded
+    mimeType?: string; // the file's type
     id: string; // seeds the bar pattern
     status: string; // file status
     onDownload: () => void;
@@ -36,8 +37,9 @@
   let duration = $state(0);
   let speed = $state(1);
   let failed = $state(false);
-  // the file comes as a blob typed by its name (lib/media.ts); Opus voice
-  // notes are typed audio/ogg, which WebKitGTK plays
+  // the file comes as a blob typed for WebKitGTK: Opus voice notes as
+  // audio/ogg, AAC ones (Signal, iPhones) as audio/aac or audio/mp4
+  const type = $derived(/aac/i.test(mimeType) ? 'audio/aac' : /mp4|m4a/i.test(mimeType) ? 'audio/mp4' : 'audio/ogg');
   function onError() {
     failed = true;
   }
@@ -149,7 +151,7 @@
   {#if path}
     <audio
       bind:this={audio}
-      use:mediaSrc={{ path, type: 'audio/ogg' }}
+      use:mediaSrc={{ path, type }}
       preload="metadata"
       onloadedmetadata={onMeta}
       ontimeupdate={() => audio && (current = audio.currentTime)}

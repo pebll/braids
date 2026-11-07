@@ -375,6 +375,19 @@ export async function voiceStart(): Promise<void> {
   };
 }
 
+/** The recording as AAC (Signal voice messages); null where it cannot be
+ * converted (no AAC encoder, or the browser dev bridge). */
+export async function voiceToAac(path: string): Promise<string | null> {
+  if (!isTauri) return null;
+  const { invoke } = await import('@tauri-apps/api/core');
+  try {
+    return await invoke<string | null>('voice_to_aac', { path });
+  } catch (e) {
+    console.warn('voice message not converted to AAC', e);
+    return null;
+  }
+}
+
 export async function voiceStop(cancel: boolean): Promise<VoiceClip | null> {
   if (isTauri) {
     const { invoke } = await import('@tauri-apps/api/core');

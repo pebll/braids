@@ -327,7 +327,7 @@
             {#if isGif}<span class="gif-badge">GIF</span>{/if}
           </button>
         {:else if isAudio}
-          <VoicePlayer path={ready ? m.file.path : ''} id={m.id} status={m.file.status} onDownload={download} />
+          <VoicePlayer path={ready ? m.file.path : ''} mimeType={m.file.mimeType} id={m.id} status={m.file.status} onDownload={download} />
         {:else if isVideo && ready && !videoFailed}
           <!-- the first frame; plays in the viewer -->
           <button class="image video-thumb" onclick={openFile} aria-label="Play video {m.file.name}">

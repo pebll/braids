@@ -268,6 +268,18 @@ void ChatModel::LoadAccountState(const std::string& p_AccountId)
       account.muted[item.key()] = item.value().get<bool>();
     }
   }
+
+  account.showJoined = state.value("showJoined", false);
+  if (state.contains("hidden") && state["hidden"].is_array())
+  {
+    for (const auto& chatId : state["hidden"])
+    {
+      if (chatId.is_string())
+      {
+        account.hiddenChats.insert(chatId.get<std::string>());
+      }
+    }
+  }
 }
 
 void ChatModel::SaveAccountState(const std::string& p_AccountId)
@@ -291,7 +303,15 @@ void ChatModel::SaveAccountState(const std::string& p_AccountId)
     unread.push_back(chatId);
   }
 
-  FileUtil::WriteFile(path + ".tmp", json{ { "muted", muted }, { "unread", unread } }.dump(2));
+  json hidden = json::array();
+  for (const std::string& chatId : m_Accounts[p_AccountId].hiddenChats)
+  {
+    hidden.push_back(chatId);
+  }
+
+  const json state = json{ { "muted", muted }, { "unread", unread }, { "showJoined", m_Accounts[p_AccountId].showJoined },
+                           { "hidden", hidden } };
+  FileUtil::WriteFile(path + ".tmp", state.dump(2));
   FileUtil::Move(path + ".tmp", path);
 }
 
@@ -348,6 +368,12 @@ void ChatModel::UnreadCount(AccountState& p_Account, const ChatInfo& p_ChatInfo,
 static bool HasLink(const std::string& p_Text)
 {
   return (p_Text.find("://") != std::string::npos) || (p_Text.find("www.") != std::string::npos);
+}
+
+// Telegram's "<contact> joined Telegram" message
+static bool IsJoinedMessage(const ChatMessage& p_ChatMessage)
+{
+  return p_ChatMessage.fileInfo.empty() && (p_ChatMessage.text == "[Joined Telegram]");
 }
 
 json ChatModel::GetMedia(const std::string& p_AccountId, const std::string& p_ChatId, const std::string& p_Kind,
@@ -1158,9 +1184,47 @@ void ChatModel::OnNewMessages(const std::string& p_AccountId, std::shared_ptr<Ne
   LOG_TRACE("new messages %s count %d from %s cached %d", chatId.c_str(), (int)p_Notify->chatMessages.size(),
             p_Notify->fromMsgId.c_str(), p_Notify->cached);
 
+  bool hiddenChanged = false;
   for (auto chatMessage : p_Notify->chatMessages)
   {
     auto mit = chat.messages.find(chatMessage.id);
+    if (!account.showJoined && IsJoinedMessage(chatMessage))
+    {
+      // left out when it arrives; a new chat with nothing else stays out of
+      // the list until someone writes (history pages keep it as a group event)
+      if (!p_Notify->cached && !isPage)
+      {
+        const bool hasOther = std::any_of(chat.messages.begin(), chat.messages.end(),
+                                          [](const std::pair<const std::string, ChatMessage>& p_Item)
+        {
+          return !IsJoinedMessage(p_Item.second);
+        });
+        if (!hasOther && account.hiddenChats.insert(chatId).second)
+        {
+          LOG_DEBUG("joined message, chat %s left out of the list", chatId.c_str());
+          hiddenChanged = true;
+          // listed already (the chat list came first)
+          if (account.chatInfos.count(chatId))
+          {
+            m_EmittedChats.erase(std::make_pair(p_AccountId, chatId));
+            Emit("chat.removed", json{ { "accountId", p_AccountId }, { "chatId", chatId } });
+          }
+        }
+
+        continue;
+      }
+
+      // nor in the preview of a chat left out
+      if (account.hiddenChats.count(chatId)) continue;
+    }
+    else if (account.hiddenChats.count(chatId) && !IsJoinedMessage(chatMessage))
+    {
+      // a conversation started: the chat is listed
+      account.hiddenChats.erase(chatId);
+      hiddenChanged = true;
+      MarkChatDirty(p_AccountId, chatId);
+    }
+
     if (!chatMessage.poll.empty() && chatMessage.pollVotes.empty())
     {
       // votes are counted here: kept (with the end) when the protocol sends
@@ -1218,6 +1282,11 @@ void ChatModel::OnNewMessages(const std::string& p_AccountId, std::shared_ptr<Ne
       mit->second = chatMessage;
       Emit("message.updated", MessageToJson(p_AccountId, chatId, chatMessage));
     }
+  }
+
+  if (hiddenChanged)
+  {
+    SaveAccountState(p_AccountId);
   }
 
   if (!account.chatInfos.count(chatId))
@@ -1676,6 +1745,8 @@ json ChatModel::GetChats(const std::string& p_AccountId, bool p_IncludeArchived)
     for (const auto& chatInfo : account.second.chatInfos)
     {
       if (chatInfo.second.isArchived && !p_IncludeArchived) continue;
+
+      if (account.second.hiddenChats.count(chatInfo.first)) continue;
 
       chats.push_back(std::make_pair(account.first, &chatInfo.second));
     }
@@ -2592,6 +2663,31 @@ void ChatModel::MarkUnread(const std::string& p_AccountId, const std::string& p_
   FlushDirtyChats();
 }
 
+void ChatModel::SetShowJoined(const std::string& p_AccountId, bool p_Show)
+{
+  AccountState& account = GetAccountOrThrow(p_AccountId);
+  account.showJoined = p_Show;
+  if (p_Show)
+  {
+    // the chats left out come back
+    for (const std::string& chatId : account.hiddenChats)
+    {
+      MarkChatDirty(p_AccountId, chatId);
+    }
+
+    account.hiddenChats.clear();
+  }
+
+  SaveAccountState(p_AccountId);
+  FlushDirtyChats();
+}
+
+bool ChatModel::GetShowJoined(const std::string& p_AccountId)
+{
+  auto ait = m_Accounts.find(p_AccountId);
+  return (ait != m_Accounts.end()) && ait->second.showJoined;
+}
+
 void ChatModel::DeleteChat(const std::string& p_AccountId, const std::string& p_ChatId)
 {
   GetAccountOrThrow(p_AccountId);
@@ -2875,6 +2971,8 @@ void ChatModel::FlushDirtyChats()
 
     auto cit = ait->second.chatInfos.find(dirtyChat.second);
     if (cit == ait->second.chatInfos.end()) continue;
+
+    if (ait->second.hiddenChats.count(dirtyChat.second)) continue;
 
     // skip if nothing visible changed since the last event for this chat
     const json chat = ChatToJson(dirtyChat.first, cit->second);

@@ -28,8 +28,15 @@ release workflow publishes the section of a version as its release notes.
   "[Invite]").
 - Select several messages ("Select" in the message menu, or Ctrl+click;
   Shift+click adds a range) to forward, copy or delete them together. (#25)
+- Telegram: "<contact> joined Telegram" messages are left out, and the new
+  chat they open stays out of the list until someone writes in it. Turn
+  them back on per account in Settings → Accounts.
 
 ### Fixed
+- Signal voice messages play on iPhones: they are sent as AAC, as Signal's
+  own apps record them (Signal on iPhone plays no Ogg). Needs an AAC encoder
+  (gstreamer1.0-libav, recommended by the .deb); without one the Ogg file
+  is sent as before.
 - WhatsApp photos sent together (an album) are shown; they were dropped.
   Older WhatsApp photos and files, removed from WhatsApp's servers, are asked
   from the sender's phone again, as WhatsApp's apps do. (#24)

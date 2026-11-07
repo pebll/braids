@@ -223,7 +223,9 @@
       // a tap on the mic is not a message
       if (send && clip && clip.durationMs >= 700) {
         const quotedId = ui.reply?.id;
-        await api.call('messages.send', { accountId, chatId, filePath: clip.path, isVoice: true, ...(quotedId ? { quotedId } : {}) });
+        // Signal voice messages are AAC: its iPhone app plays no Ogg/Opus
+        const filePath = (store.accounts[accountId]?.protocol === 'Signal' && (await api.voiceToAac(clip.path))) || clip.path;
+        await api.call('messages.send', { accountId, chatId, filePath, isVoice: true, ...(quotedId ? { quotedId } : {}) });
         ui.reply = null;
       } else if (send && clip) {
         store.toast('Hold on a bit longer: the recording was too short.');
