@@ -33,6 +33,9 @@ release workflow publishes the section of a version as its release notes.
   them back on per account in Settings → Accounts.
 
 ### Fixed
+- Signal: photos, files and voice messages could not be sent at all ("Not
+  sent", also when forwarding): Signal's server now wants the upload's size
+  when asked for an upload slot. (#26)
 - Signal voice messages play on iPhones: they are sent as AAC, as Signal's
   own apps record them (Signal on iPhone plays no Ogg). Needs an AAC encoder
   (gstreamer1.0-libav, recommended by the .deb); without one the Ogg file
