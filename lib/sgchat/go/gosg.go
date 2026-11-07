@@ -2617,7 +2617,9 @@ func SgSendMessage(connId int, chatId string, text string, quotedId string, quot
 			if readErr == nil {
 				attachment, uploadErr := client.UploadAttachment(ctx, fileData)
 				if uploadErr != nil {
+					// braids: not sent without its attachment (shown as failed, "Send again")
 					LOG_WARNING(fmt.Sprintf("upload attachment error %#v", uploadErr))
+					return -1
 				} else {
 					if fileType != "" {
 						attachment.ContentType = proto.String(fileType)
@@ -2660,6 +2662,7 @@ func SgSendMessage(connId int, chatId string, text string, quotedId string, quot
 				}
 			} else {
 				LOG_WARNING(fmt.Sprintf("file not found: %s", filePath))
+				return -1
 			}
 		}
 
