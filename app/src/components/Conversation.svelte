@@ -22,6 +22,7 @@
   import type { Message } from '../lib/types';
   import { ui } from '../lib/ui.svelte';
   import Avatar from './Avatar.svelte';
+  import InviteBar from './InviteBar.svelte';
   import SelectionBar from './SelectionBar.svelte';
   import Composer from './Composer.svelte';
   import MessageItem from './MessageItem.svelte';
@@ -474,7 +475,9 @@
       <button class="to-bottom" aria-label="Scroll to latest" onclick={scrollToBottom}><ArrowDown size={18} /></button>
     {/if}
 
-    {#if ui.selection?.chatKey === chatKey}
+    {#if store.isInvite(chat)}
+      <InviteBar {chat} />
+    {:else if ui.selection?.chatKey === chatKey}
       <SelectionBar />
     {:else}
       <Composer bind:this={composer} {chatKey} />

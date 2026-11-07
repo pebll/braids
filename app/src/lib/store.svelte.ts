@@ -127,6 +127,12 @@ class Store {
       .sort((a, b) => fav(b) - fav(a) || b.lastActivity - a.lastActivity);
   }
 
+  // a room the account is invited to and has not joined (Matrix): its only
+  // message is the local invite note ("invite:<room id>")
+  isInvite(c: Chat | undefined): boolean {
+    return !!c?.lastMessage?.id.startsWith('invite:');
+  }
+
   // only group events (joined, left, ...) are new: shown grey, not counted
   // in folders or the tray, like a muted chat
   eventsOnly(c: Chat): boolean {

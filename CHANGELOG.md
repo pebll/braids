@@ -22,6 +22,10 @@ release workflow publishes the section of a version as its release notes.
 - Settings → About: Report a bug, Suggest a feature, Known issues (GitHub).
 - Image viewer: Show in chat, Copy image (also Ctrl+C) and Save as (also
   Ctrl+S) next to "Open with default app".
+- Matrix invites can be accepted or declined in braids: an invited room
+  shows "<name> invited you" and Join / Decline instead of the message box
+  (it said to use another Matrix client, and its name started with
+  "[Invite]").
 - Select several messages ("Select" in the message menu, or Ctrl+click;
   Shift+click adds a range) to forward, copy or delete them together. (#25)
 

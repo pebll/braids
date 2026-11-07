@@ -2618,7 +2618,7 @@ func SgSendMessage(connId int, chatId string, text string, quotedId string, quot
 				attachment, uploadErr := client.UploadAttachment(ctx, fileData)
 				if uploadErr != nil {
 					// braids: not sent without its attachment (shown as failed, "Send again")
-					LOG_WARNING(fmt.Sprintf("upload attachment error %#v", uploadErr))
+					LOG_WARNING(fmt.Sprintf("upload attachment error (%d bytes, %s): %v", len(fileData), fileType, uploadErr))
 					return -1
 				} else {
 					if fileType != "" {
@@ -2661,7 +2661,7 @@ func SgSendMessage(connId int, chatId string, text string, quotedId string, quot
 					}
 				}
 			} else {
-				LOG_WARNING(fmt.Sprintf("file not found: %s", filePath))
+				LOG_WARNING(fmt.Sprintf("attachment not readable: %s: %v", filePath, readErr))
 				return -1
 			}
 		}

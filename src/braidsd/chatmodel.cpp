@@ -1906,6 +1906,7 @@ void ChatModel::DispatchOutbox(const std::string& p_AccountId, OutboxEntry& p_En
   if (!p_Entry.filePath.empty() && !FileUtil::Exists(p_Entry.filePath))
   {
     // a temporary file (recording, pasted image) gone since, e.g. after a restart
+    LOG_WARNING("outbox %s: attachment file missing", p_Entry.id.c_str());
     p_Entry.state = "failed";
     Emit("message.updated", OutboxEntryToJson(p_AccountId, p_Entry));
     return;

@@ -20,8 +20,6 @@ import (
 	"maunium.net/go/mautrix/pushrules"
 )
 
-const invitePrefix = "[Invite] "
-
 // handleSync processes one /sync response after mautrix (crypto, state store)
 // has handled it.
 func (conn *MxConn) handleSync(ctx context.Context, res *mautrix.RespSync, since string) {
@@ -241,10 +239,6 @@ func (conn *MxConn) roomName(ctx context.Context, roomID id.RoomID) string {
 		default:
 			result = strings.Join(names, ", ")
 		}
-	}
-
-	if isInvite {
-		result = invitePrefix + result
 	}
 
 	return result
@@ -543,8 +537,10 @@ func (conn *MxConn) handleInvitedRoom(roomID id.RoomID, room *mautrix.SyncInvite
 	conn.updateContact(string(roomID), name)
 	CMxNewChatsNotify(conn.connId, string(roomID), 1, 0, 0, lastTs)
 
-	// synthetic, local-only message describing the invite
-	text := "Invitation to join this room. Invites are not auto-accepted; accept or decline it from another Matrix client."
+	// synthetic, local-only message for the invite: "<inviter> invited you"
+	// (a system line); the app offers Join / Decline for it (chats.join with
+	// the room id, chats.delete)
+	text := "[Invited you]"
 	if inviter != "" {
 		conn.updateContact(string(inviter), conn.userName(ctx, roomID, inviter))
 	}

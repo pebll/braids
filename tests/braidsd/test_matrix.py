@@ -323,6 +323,26 @@ def main():
         d.wait_event("message.updated", lambda p: p["id"] == poll_id and p["poll"]["closed"], timeout=60)
         check(True, "poll ended")
 
+        # invites: shown with a system line, joined from braids, or declined
+        element.cmd("autojoin off")
+        inv_room = bob_peer.cmd(f"create {alice_id} plain invite test")["room"]
+        wait_until(lambda: [c for c in d.call("chats.list") if c["id"] == inv_room], "invited room listed", timeout=60)
+        inv = d.call("chats.get", {"accountId": account_id, "chatId": inv_room})
+        check(inv["lastMessage"]["id"] == f"invite:{inv_room}" and inv["lastMessage"]["system"] == "invited you"
+              and not inv["name"].startswith("["), "invite: a system line, the plain room name")
+        d.call("chats.join", {"accountId": account_id, "link": inv_room})
+        joined = d.wait_event("chat.joined", lambda p: p["link"] == inv_room, timeout=60)
+        check(joined["success"] and joined["chatId"] == inv_room, "invite accepted from braids")
+        wait_until(lambda: (lambda c: c["lastMessage"] is None or not c["lastMessage"]["id"].startswith("invite:"))(
+            d.call("chats.get", {"accountId": account_id, "chatId": inv_room})), "invite note gone after joining", timeout=60)
+        check(True, "invite note gone after joining")
+        dec_room = bob_peer.cmd(f"create {alice_id} plain declined")["room"]
+        wait_until(lambda: [c for c in d.call("chats.list") if c["id"] == dec_room], "second invite listed", timeout=60)
+        d.call("chats.delete", {"accountId": account_id, "chatId": dec_room})
+        wait_until(lambda: not [c for c in d.call("chats.list") if c["id"] == dec_room], "declined invite removed", timeout=60)
+        check(True, "invite declined")
+        element.cmd("autojoin on")
+
         # room topic as description
         bob_peer.cmd(f"topic {room} all about braids")
         d.call("descriptions.get", {"accountId": account_id, "ids": [room]})
