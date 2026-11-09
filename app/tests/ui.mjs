@@ -1094,6 +1094,8 @@ try {
   await lunch.locator('.option', { hasText: 'Pizza' }).click();
   await lunch.locator('.option[aria-pressed=true]', { hasText: 'Pizza' }).waitFor();
   check(true, "voting in someone else's poll");
+  check(await lunch.locator('.option', { hasText: 'Pizza' }).locator('.face').first().getAttribute('title') === 'Stanley',
+    'own vote shown with your name and picture, not "You"');
   check(await lunch.locator('.option', { hasText: 'Salad' }).locator('.bar').evaluate((e) => e.style.width) === '0%',
     'an option without votes has no bar');
   await shot('poll');

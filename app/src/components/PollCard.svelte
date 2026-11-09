@@ -32,14 +32,33 @@
     return most ? Math.round((votes / most) * 100) : 0;
   }
 
+  // the own vote: your name and picture from this account, else from another
+  // of your accounts that has them (not every messenger tells or has one)
+  const me = $derived.by(() => {
+    const accounts = [store.accounts[m.accountId], ...store.accountList.filter((a) => a.accountId !== m.accountId)]
+      .filter((a) => a?.selfId);
+    const named = (a: (typeof accounts)[number]) => {
+      const n = store.contacts[a.accountId]?.[a.selfId]?.name;
+      return n && n !== 'You' ? n : '';
+    };
+    const pictured = accounts.find((a) => store.avatar(a.accountId, a.selfId));
+    const withName = accounts.find((a) => named(a));
+    const face = pictured ?? accounts[0];
+    return {
+      owner: face?.accountId ?? m.accountId,
+      id: face?.selfId ?? selfId,
+      name: (withName && named(withName)) || 'You',
+    };
+  });
+
   function name(id: string): string {
-    return id === selfId ? 'You' : store.contacts[m.accountId]?.[id]?.name || id;
+    return id === selfId ? me.name : store.contacts[m.accountId]?.[id]?.name || id;
   }
 
   // the voters known by name (Telegram only counts), own vote first
   function voters(ids: string[], own: boolean): string[] {
     const list = ids.filter((id) => id !== selfId);
-    return own ? [selfId || 'self', ...list] : list;
+    return own ? [selfId, ...list] : list;
   }
 
   function title(ids: string[], votes: number): string {
@@ -84,7 +103,11 @@
         {#if who.length}
           <span class="faces" aria-hidden="true">
             {#each who.slice(0, MAX_FACES) as id, i (i)}
-              <span class="face"><Avatar name={name(id)} {id} size={18} owner={m.accountId} /></span>
+              {#if id === selfId}
+                <span class="face" title={me.name}><Avatar name={me.name} id={me.id} size={18} owner={me.owner} /></span>
+              {:else}
+                <span class="face" title={name(id)}><Avatar name={name(id)} {id} size={18} owner={m.accountId} /></span>
+              {/if}
             {/each}
             {#if who.length > MAX_FACES}<span class="more">+{who.length - MAX_FACES}</span>{/if}
           </span>
