@@ -29,6 +29,14 @@ release workflow publishes the section of a version as its release notes.
   `flatpak uninstall org.braids.app`. Its software center page has
   screenshots and the release notes.
 
+### Fixed
+- WhatsApp: votes in polls reach the other phones. In chats where WhatsApp
+  uses its new account ids (LIDs) instead of phone numbers, braids encrypted
+  the vote for the phone number and the others could not read it.
+- After a start or an update, names and profile pictures show at once from
+  braids' own cache instead of loading again one by one (WhatsApp, Signal,
+  Matrix); WhatsApp pictures are then checked for changes in the background.
+
 ## [0.3.2] - 2026-11-09
 
 ### New

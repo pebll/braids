@@ -64,6 +64,14 @@ func saveAvatarIndex(connId int, index map[string]avatarEntry) {
 // picture (with full the full-size one, cached apart), or an empty path when
 // there is none or it is hidden from us.
 func WmGetAvatar(connId int, avatarId string, full bool) int {
+	// braids: the saved picture at once (after a restart all pictures are
+	// asked for again, one WhatsApp query at a time), then checked with
+	// WhatsApp and sent again only when it changed
+	cached := cachedAvatarFile(connId, avatarId, full)
+	if cached != "" {
+		CWmNewAvatarNotify(connId, avatarId, cached, full)
+	}
+
 	go func() {
 		// requests can arrive before the connection is up
 		for i := 0; (i < 240) && (GetState(connId) != Connected); i++ {
@@ -80,10 +88,33 @@ func WmGetAvatar(connId int, avatarId string, full bool) int {
 		time.Sleep(150 * time.Millisecond)
 		<-avatarQueue
 
-		CWmNewAvatarNotify(connId, avatarId, path, full)
+		if (path != cached) || (cached == "") {
+			CWmNewAvatarNotify(connId, avatarId, path, full)
+		}
 	}()
 
 	return 0
+}
+
+// cachedAvatarFile: the saved picture of avatarId, "" if none
+func cachedAvatarFile(connId int, avatarId string, full bool) string {
+	key := avatarId
+	if full {
+		key += "#full"
+	}
+
+	avatarMutex.Lock()
+	entry, known := loadAvatarIndex(connId)[key]
+	avatarMutex.Unlock()
+	if !known {
+		return ""
+	}
+
+	if _, err := os.Stat(entry.File); err != nil {
+		return ""
+	}
+
+	return entry.File
 }
 
 func getAvatar(connId int, client *whatsmeow.Client, avatarId string, full bool) string {

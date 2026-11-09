@@ -344,6 +344,9 @@ void WmChat::PerformRequest(std::shared_ptr<RequestMessage> p_RequestMessage)
         LOG_DEBUG("get contacts");
         std::shared_ptr<GetContactsRequest> getContactsRequest = std::static_pointer_cast<GetContactsRequest>(
           p_RequestMessage);
+        // braids: the names known from the cache at once (the messenger's
+        // contact sync can take a while after a start)
+        MessageCache::FetchContacts(m_ProfileId);
         CWmGetContacts(m_ConnId);
       }
       break;

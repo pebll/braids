@@ -451,6 +451,9 @@ void MxChat::PerformRequest(std::shared_ptr<RequestMessage> p_RequestMessage)
     case GetContactsRequestType:
       {
         LOG_DEBUG("get contacts");
+        // braids: the names known from the cache at once (the messenger's
+        // contact sync can take a while after a start)
+        MessageCache::FetchContacts(m_ProfileId);
         CMxGetContacts(m_ConnId);
       }
       break;
