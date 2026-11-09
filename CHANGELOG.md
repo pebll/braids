@@ -9,6 +9,10 @@ release workflow publishes the section of a version as its release notes.
 ### New
 - Nix and NixOS: `nix run github:pebll/braids` runs the latest release
   (or `nix profile install github:pebll/braids`).
+- A new braids version is also announced as a desktop notification (once
+  per version, with desktop notifications on), and is checked for while
+  braids keeps running, not only at start. "Get it" opens the website's
+  download section instead of the GitHub release page.
 
 ### Changed
 - Poll results: the leading option's bar is full and the others relative

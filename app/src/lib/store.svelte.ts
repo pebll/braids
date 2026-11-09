@@ -902,7 +902,12 @@ class Store {
         // tell again next time
       }
       if (told !== u.version) {
-        this.toast(`braids ${u.version} is available.`, 'info', { label: 'Get it', run: () => api.openUrl(u.url).catch((e) => this.toastError(e)) });
+        const getIt = () => api.openUrl(u.url).catch((e) => this.toastError(e));
+        this.toast(`braids ${u.version} is available.`, 'info', { label: 'Get it', run: getIt });
+        // also as a desktop notification: the window is often hidden in the tray
+        if (settings.notifications) {
+          api.notify(`braids ${u.version} is available`, 'Update from the website: pebll.github.io/braids', getIt).catch(() => {});
+        }
       }
     }
     return u;
