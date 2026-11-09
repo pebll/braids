@@ -63,6 +63,22 @@ modules:
         tag: FILE5_46
         commit: b310a0c2d3e4a1c12d579ad5c0266f1092a91340
 
+  # protoc, for libsignal's build (not in the SDK); only used while building
+  - name: protobuf
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -Dprotobuf_BUILD_TESTS=OFF
+      - -Dprotobuf_ABSL_PROVIDER=module
+      - -DCMAKE_INSTALL_PREFIX=/app/braids-build/protobuf
+    cleanup:
+      - '*'
+    sources:
+      - type: git
+        url: https://github.com/protocolbuffers/protobuf.git
+        tag: v29.3
+        commit: b407e8416e3893036aee5af9a12bd9b6a0e2b2e6
+
   # Signal's library (Rust), linked into the Signal protocol; the version
   # braids' signalmeow needs (lib/sgchat/go/ext/signal/pkg/libsignalgo/signalversion)
   - name: libsignal
@@ -72,6 +88,7 @@ modules:
       env:
         CARGO_HOME: /run/build/libsignal/cargo
         LIBCLANG_PATH: /usr/lib/sdk/llvm22/lib
+        PROTOC: /app/braids-build/protobuf/bin/protoc
         CARGO_NET_OFFLINE: 'true'
         RUSTFLAGS: -Ctarget-feature=-crt-static
     build-commands:
