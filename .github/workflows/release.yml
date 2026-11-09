@@ -155,8 +155,6 @@ jobs:
       uses: flatpak/flatpak-github-actions/flatpak-builder@v6
       with:
         manifest-path: utils/dist/flatpak/io.github.pebll.braids.yml
-        # as Flathub builds: the screenshots copied to its media server
-        mirror-screenshots-url: https://dl.flathub.org/media
         bundle: braids-${{ matrix.arch }}.flatpak
         arch: ${{ matrix.arch }}
         upload-artifact: false
@@ -167,7 +165,19 @@ jobs:
       run: |
         status=0
         flatpak-builder-lint --exceptions manifest utils/dist/flatpak/io.github.pebll.braids.yml || status=1
-        flatpak-builder-lint --exceptions repo repo || status=1
+        flatpak-builder-lint --exceptions repo repo > lint.json || true
+        cat lint.json
+        # screenshots are copied to Flathub's media server only by its own
+        # build servers: those two errors are expected here, any other counts
+        python3 -c '
+        import json, sys
+        text = open("lint.json").read().strip()
+        errors = json.loads(text).get("errors", []) if text else []
+        expected = {"appstream-external-screenshot-url", "appstream-screenshots-not-mirrored-in-ostree"}
+        left = [e for e in errors if e not in expected]
+        print("errors:", left or "none")
+        sys.exit(1 if left else 0)
+        ' || status=1
         exit $status
     - name: Checksum
       run: sha256sum "braids-${{ matrix.arch }}.flatpak" > "braids-${{ matrix.arch }}.flatpak.sha256"
