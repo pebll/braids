@@ -236,7 +236,56 @@ void ChatModel::AddAccount(const std::string& p_AccountId)
   {
     LoadAccountState(p_AccountId);
     LoadOutbox(p_AccountId);
+    LoadAvatars(p_AccountId);
   }
+}
+
+void ChatModel::LoadAvatars(const std::string& p_AccountId)
+{
+  if (m_ProfilesDir.empty()) return;
+
+  const std::string path = m_ProfilesDir + "/" + p_AccountId + "/braids-avatars.json";
+  if (!FileUtil::Exists(path)) return;
+
+  json saved = json::parse(FileUtil::ReadFile(path), nullptr, false);
+  if (!saved.is_object()) return;
+
+  AccountState& account = m_Accounts[p_AccountId];
+  for (auto& item : saved.items())
+  {
+    if (!item.value().is_string()) continue;
+
+    // a picture file removed since (cache cleared) is fetched again
+    const std::string file = item.value().get<std::string>();
+    if (!file.empty() && !FileUtil::Exists(file)) continue;
+
+    account.savedAvatars[item.key()] = file;
+  }
+}
+
+void ChatModel::SaveAvatars(const std::string& p_AccountId)
+{
+  AccountState& account = m_Accounts[p_AccountId];
+  account.avatarsDirty = false;
+  if (m_ProfilesDir.empty()) return;
+
+  const std::string dir = m_ProfilesDir + "/" + p_AccountId;
+  if (!FileUtil::IsDir(dir)) return;
+
+  json saved = json::object();
+  for (const auto& item : account.savedAvatars)
+  {
+    saved[item.first] = item.second;
+  }
+
+  for (const auto& item : account.avatars)
+  {
+    saved[item.first] = item.second;
+  }
+
+  const std::string path = dir + "/braids-avatars.json";
+  FileUtil::WriteFile(path + ".tmp", saved.dump());
+  FileUtil::Move(path + ".tmp", path);
 }
 
 void ChatModel::LoadAccountState(const std::string& p_AccountId)
@@ -641,6 +690,13 @@ void ChatModel::OnServiceMessage(std::shared_ptr<ServiceMessage> p_ServiceMessag
         if (!HasFeature(accountId, FeatureAutoGetChatsOnLogin))
         {
           SendProtocolRequest(accountId, std::make_shared<GetChatsRequest>());
+        }
+
+        if (account.connectTime == 0)
+        {
+          // the names known from the cache at once: the messenger's contact
+          // sync can take a while after a start
+          MessageCache::FetchContacts(accountId);
         }
 
         if (!HasFeature(accountId, FeatureAutoGetContactsOnLogin))
@@ -1095,6 +1151,11 @@ void ChatModel::OnServiceMessage(std::shared_ptr<ServiceMessage> p_ServiceMessag
 
         account.avatars[notify->id] = notify->filePath;
         account.fullAvatars.erase(notify->id); // the picture changed
+        auto sit = account.savedAvatars.find(notify->id);
+        if ((sit == account.savedAvatars.end()) || (sit->second != notify->filePath))
+        {
+          account.avatarsDirty = true; // saved with the next timer tick
+        }
         Emit("avatar.updated", json{ { "accountId", accountId }, { "id", notify->id }, { "path", notify->filePath } });
       }
       break;
@@ -1500,6 +1561,16 @@ void ChatModel::ResolvePending(PendingType p_Type, const std::string& p_AccountI
 
 void ChatModel::ProcessTimers(int64_t p_NowMs)
 {
+  for (auto& account : m_Accounts)
+  {
+    // at most every 2 s: many pictures arrive one by one after a start
+    if (account.second.avatarsDirty && (p_NowMs - account.second.avatarsSavedAt >= 2000))
+    {
+      account.second.avatarsSavedAt = p_NowMs;
+      SaveAvatars(account.first);
+    }
+  }
+
   // confirmed messages whose copy did not come back (or not recognisably):
   // the messenger has them, so no longer shown as pending
   static const int64_t s_SentEchoTimeoutMs = 10000;
@@ -2519,8 +2590,17 @@ json ChatModel::GetAvatars(const std::string& p_AccountId, const std::vector<std
     if (ait != account.avatars.end())
     {
       avatars[id] = ait->second;
+      continue;
     }
-    else if (hasAvatars && account.avatarsRequested.insert(id).second)
+
+    // the picture of the last run at once; the protocol checks it again
+    auto sit = account.savedAvatars.find(id);
+    if (sit != account.savedAvatars.end())
+    {
+      avatars[id] = sit->second;
+    }
+
+    if (hasAvatars && account.avatarsRequested.insert(id).second)
     {
       std::shared_ptr<GetAvatarRequest> getAvatarRequest = std::make_shared<GetAvatarRequest>();
       getAvatarRequest->id = id;

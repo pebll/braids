@@ -344,9 +344,6 @@ void WmChat::PerformRequest(std::shared_ptr<RequestMessage> p_RequestMessage)
         LOG_DEBUG("get contacts");
         std::shared_ptr<GetContactsRequest> getContactsRequest = std::static_pointer_cast<GetContactsRequest>(
           p_RequestMessage);
-        // braids: the names known from the cache at once (the messenger's
-        // contact sync can take a while after a start)
-        MessageCache::FetchContacts(m_ProfileId);
         CWmGetContacts(m_ConnId);
       }
       break;
@@ -717,6 +714,7 @@ void WmChat::PerformRequest(std::shared_ptr<RequestMessage> p_RequestMessage)
         std::shared_ptr<GetAvatarRequest> getAvatarRequest =
           std::static_pointer_cast<GetAvatarRequest>(p_RequestMessage);
         CWmGetAvatar(m_ConnId, const_cast<char*>(getAvatarRequest->id.c_str()), getAvatarRequest->full ? 1 : 0);
+        requestIntervalDelay = false; // braids: queued in Go, one WhatsApp query at a time
       }
       break;
 

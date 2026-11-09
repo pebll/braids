@@ -8,6 +8,7 @@
 """braidsd core test with the Dummy protocol: login flow, chat model, restart, removal."""
 
 import argparse
+import json
 import os
 import shutil
 import stat
@@ -345,6 +346,9 @@ def main():
               "full-size picture answered from the cache")
         d.call("avatars.getFull", {"accountId": account_id, "id": "Kevin_0"})
         check(d.wait_event("avatar.full", lambda p: p["id"] == "Kevin_0")["path"] == "", "no picture: empty path")
+        avatars_file = os.path.join(profile_dir, "braids-avatars.json")
+        wait_until(lambda: os.path.exists(avatars_file) and "Pam_0" in json.load(open(avatars_file)),
+                   "known pictures saved")
 
         # braids' own mute setting, kept across restarts
         check(account["capabilities"]["muteChat"], "mute capability")
@@ -368,6 +372,8 @@ def main():
         d = Braidsd(args.braidsd, confdir)
         accounts = d.call("accounts.list")
         check([a["accountId"] for a in accounts] == [account_id], "account loaded after restart")
+        check(d.call("avatars.get", {"accountId": account_id, "ids": ["Pam_0"]})["avatars"].get("Pam_0") == small,
+              "the saved picture at once after a restart")
         wait_until(lambda: len(d.call("chats.list")) >= 2, "chats synced after restart")
         check(True, "chats available after restart")
         wait_until(lambda: any(m["text"] == "kept for later" and not m.get("pending") for m in

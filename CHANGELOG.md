@@ -33,9 +33,11 @@ release workflow publishes the section of a version as its release notes.
 - WhatsApp: votes in polls reach the other phones. In chats where WhatsApp
   uses its new account ids (LIDs) instead of phone numbers, braids encrypted
   the vote for the phone number and the others could not read it.
-- After a start or an update, names and profile pictures show at once from
-  braids' own cache instead of loading again one by one (WhatsApp, Signal,
-  Matrix); WhatsApp pictures are then checked for changes in the background.
+- After a start or an update, names and profile pictures show at once: braids
+  keeps the pictures it knows (`braids-avatars.json` in the account's profile)
+  and loads the saved names before the messenger's contact sync; pictures are
+  then checked for changes in the background (they were fetched again one by
+  one, names waited for the connection).
 
 ## [0.3.2] - 2026-11-09
 
