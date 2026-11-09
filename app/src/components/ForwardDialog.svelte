@@ -5,9 +5,9 @@
 
   braids is distributed under the GNU AGPL v3 license, see LICENSE for details.
 
-  Forward a message: pick a chat of any account, the message (text and
-  attachment) is sent there as a new message, optionally with a "Forwarded
-  from" line on top.
+  Forward one or more messages: pick a chat of any account, each message
+  (text and attachment) is sent there as a new message, in their order,
+  optionally with a "Forwarded from" line on top of the first.
 -->
 <script lang="ts">
   import { LoaderCircle, Search, X } from '@lucide/svelte';
@@ -18,7 +18,8 @@
   import { ui } from '../lib/ui.svelte';
   import Avatar from './Avatar.svelte';
 
-  let { m }: { m: Message } = $props();
+  let { messages }: { messages: Message[] } = $props();
+  const m = $derived(messages[0]);
 
   let query = $state('');
   let withOrigin = $state(true);
@@ -27,7 +28,9 @@
 
   const source = $derived(store.chats[chatKey(m.accountId, m.chatId)]);
   const origin = $derived.by(() => {
-    const sender = m.isOutgoing ? 'me' : store.senderName(m);
+    const senders = new Set(messages.map((x) => (x.isOutgoing ? 'me' : store.senderName(x))));
+    const sender = senders.size === 1 ? [...senders][0] : '';
+    if (!sender) return `Forwarded from ${source ? store.chatName(source) : 'a chat'}`;
     return source?.isGroup ? `Forwarded from ${sender} (in ${store.chatName(source)})` : `Forwarded from ${sender}`;
   });
 
@@ -49,7 +52,7 @@
   }
 
   // the attachment must be local to be sent again
-  async function localFile(): Promise<string> {
+  async function localFile(m: Message): Promise<string> {
     if (!m.file) return '';
     const current = () => store.messages[chatKey(m.accountId, m.chatId)]?.items.find((x) => x.id === m.id) ?? m;
     if (fileReady(current().file)) return current().file!.path;
@@ -69,11 +72,21 @@
     const key = chatKey(c.accountId, c.id);
     busy = key;
     try {
-      const filePath = await localFile();
-      const text = [withOrigin ? `_${origin}_` : '', m.text].filter(Boolean).join('\n');
-      await api.call('messages.send', { accountId: c.accountId, chatId: c.id, ...(text ? { text } : {}), ...(filePath ? { filePath } : {}) });
+      // a copy: closing the dialog clears ui.forward (this prop)
+      const list = [...messages];
+      const originLine = origin;
+      // files first, so a download that fails sends nothing
+      const files: string[] = [];
+      for (const x of list) files.push(await localFile(x));
+      for (let i = 0; i < list.length; i++) {
+        const text = [withOrigin && i === 0 ? `_${originLine}_` : '', list[i].text].filter(Boolean).join('\n');
+        const filePath = files[i];
+        if (!text && !filePath) continue;
+        await api.call('messages.send', { accountId: c.accountId, chatId: c.id, ...(text ? { text } : {}), ...(filePath ? { filePath } : {}) });
+      }
       close();
-      store.toast(`Forwarded to ${store.chatName(c)}.`, 'info', { label: 'Open', run: () => store.openChat(key) });
+      ui.selection = null;
+      store.toast(`Forwarded ${list.length === 1 ? '' : `${list.length} messages `}to ${store.chatName(c)}.`, 'info', { label: 'Open', run: () => store.openChat(key) });
     } catch (e) {
       store.toastError(e);
     } finally {
@@ -87,13 +100,16 @@
 <div class="scrim" role="presentation" onclick={(e) => e.target === e.currentTarget && close()}>
   <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="forward-title">
     <div class="dialog-head">
-      <h2 id="forward-title">Forward message</h2>
+      <h2 id="forward-title">{messages.length === 1 ? 'Forward message' : `Forward ${messages.length} messages`}</h2>
       <button class="icon-btn" aria-label="Close" onclick={close}><X size={18} /></button>
     </div>
     <div class="dialog-body">
       <div class="preview">
         {#if withOrigin}<em>{origin}</em>{/if}
-        <span>{store.previewText(m) || m.file?.name || 'Attachment'}</span>
+        {#each messages.slice(0, 3) as x (x.id)}
+          <span>{store.previewText(x) || x.file?.name || 'Attachment'}</span>
+        {/each}
+        {#if messages.length > 3}<span class="more">and {messages.length - 3} more</span>{/if}
       </div>
       <label class="origin">
         <input type="checkbox" bind:checked={withOrigin} />
@@ -121,9 +137,11 @@
 <style>
   .preview {
     display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-left: 3px solid var(--accent); border-radius: 6px;
-    background: var(--surface-2); font-size: 13px; color: var(--text-2); max-height: 84px; overflow: hidden;
+    background: var(--surface-2); font-size: 13px; color: var(--text-2); max-height: 112px; overflow: hidden;
   }
   .preview em { color: var(--text-muted); }
+  .preview span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .preview .more { color: var(--text-muted); }
   .origin { display: flex; align-items: center; gap: 8px; font-size: 13px; }
   .search { display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 10px; border-radius: var(--radius-md); background: var(--surface-2); border: 1px solid var(--border); color: var(--text-muted); }
   .search input { flex: 1; border: 0; outline: none; background: transparent; color: var(--text); }

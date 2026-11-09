@@ -194,6 +194,28 @@ def main():
                      -32602, "no votes in an ended poll")
         check(True, "poll ended")
 
+        # "joined Telegram": off by default, no message and no new chat until someone writes
+        accounts = d.call("accounts.list")
+        check(all(a["options"]["showJoinedMessages"] is False for a in accounts), "joined messages off by default")
+        d.call("messages.send", {"accountId": account_id, "chatId": group["id"], "text": "/joined"})
+        try:
+            ev = d.wait_event(("message.added", "chat.updated", "notification"),
+                              lambda p: "Holly_0" in (p.get("chatId"), p.get("id")), timeout=1.5)
+            check(False, f"the joined message is left out: {ev}")
+        except TimeoutError:
+            check(True, "the joined message is left out")
+        check(not any(c["id"] == "Holly_0" for c in d.call("chats.list", {"accountId": account_id})),
+              "a chat with only a joined message is not listed")
+        d.call("messages.send", {"accountId": account_id, "chatId": group["id"], "text": "/joined hi there"})
+        d.wait_event("chat.updated", lambda p: p["id"] == "Holly_0")
+        check(any(c["id"] == "Holly_0" for c in d.call("chats.list", {"accountId": account_id})),
+              "listed once someone writes")
+        d.call("accounts.setOption", {"accountId": account_id, "name": "showJoinedMessages", "value": True})
+        check(d.call("accounts.list")[0]["options"]["showJoinedMessages"] is True, "option set")
+        d.call("accounts.setOption", {"accountId": account_id, "name": "showJoinedMessages", "value": False})
+        expect_error(lambda: d.call("accounts.setOption", {"accountId": account_id, "name": "nope", "value": True}),
+                     -32602, "unknown option rejected")
+
         expect_error(lambda: d.call("messages.send", {"accountId": account_id, "chatId": group["id"]}),
                      -32602, "send without text or file rejected")
 
@@ -237,7 +259,7 @@ def main():
         # group events are flagged as system messages
         full = d.call("messages.get", {"accountId": account_id, "chatId": group["id"], "limit": 50})["messages"]
         joined = [m for m in full if m["text"] == "[Joined]"]
-        check(len(joined) == 1 and joined[0]["system"] == "joined", "group event marked as system message")
+        check(joined and all(m["system"] == "joined" for m in joined), "group event marked as system message")
         check(all(m["system"] == "" for m in full if m["text"] != "[Joined]"), "normal messages not system")
 
         # unread counts: Kevin has two unread messages

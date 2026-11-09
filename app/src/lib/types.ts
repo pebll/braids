@@ -34,6 +34,7 @@ export interface Account {
   error: string;
   syncing: boolean; // the protocol is fetching / syncing
   capabilities: Capabilities;
+  options?: { showJoinedMessages?: boolean }; // braids' own (accounts.setOption)
 }
 
 export interface FileRef {

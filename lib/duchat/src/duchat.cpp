@@ -661,6 +661,42 @@ void DuChat::PerformRequest(std::shared_ptr<RequestMessage> p_RequestMessage)
           end->closed = true;
           m_MessageHandler(end);
         }
+
+        // braids tests: "/joined" - Holly joins the messenger (a new chat with
+        // only "[Joined Telegram]"); "/joined hi" - then Holly writes there
+        if (StrUtil::StartsWith(chatMessage.text, "/joined"))
+        {
+          const std::string joinedChatId = "Holly_0";
+          ChatMessage joined;
+          joined.id = "joined_" + std::to_string(now);
+          joined.senderId = joinedChatId;
+          joined.timeSent = now + 1;
+          joined.isOutgoing = false;
+          joined.text = (chatMessage.text == "/joined") ? "[Joined Telegram]" : chatMessage.text.substr(8);
+          s_Messages[joinedChatId].insert(s_Messages[joinedChatId].begin(), joined);
+
+          std::shared_ptr<NewContactsNotify> contacts = std::make_shared<NewContactsNotify>(m_ProfileId);
+          ContactInfo contactInfo;
+          contactInfo.id = joinedChatId;
+          contactInfo.name = "Holly";
+          contacts->contactInfos = { contactInfo };
+          m_MessageHandler(contacts);
+
+          std::shared_ptr<NewMessagesNotify> messages = std::make_shared<NewMessagesNotify>(m_ProfileId);
+          messages->success = true;
+          messages->chatId = joinedChatId;
+          messages->chatMessages = { joined };
+          m_MessageHandler(messages);
+
+          std::shared_ptr<NewChatsNotify> chats = std::make_shared<NewChatsNotify>(m_ProfileId);
+          chats->success = true;
+          ChatInfo chatInfo;
+          chatInfo.id = joinedChatId;
+          chatInfo.isUnread = true;
+          chatInfo.lastMessageTime = joined.timeSent;
+          chats->chatInfos = { chatInfo };
+          m_MessageHandler(chats);
+        }
       }
       break;
 

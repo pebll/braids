@@ -223,7 +223,9 @@
       // a tap on the mic is not a message
       if (send && clip && clip.durationMs >= 700) {
         const quotedId = ui.reply?.id;
-        await api.call('messages.send', { accountId, chatId, filePath: clip.path, isVoice: true, ...(quotedId ? { quotedId } : {}) });
+        // Signal voice messages are AAC: its iPhone app plays no Ogg/Opus
+        const filePath = (store.accounts[accountId]?.protocol === 'Signal' && (await api.voiceToAac(clip.path))) || clip.path;
+        await api.call('messages.send', { accountId, chatId, filePath, isVoice: true, ...(quotedId ? { quotedId } : {}) });
         ui.reply = null;
       } else if (send && clip) {
         store.toast('Hold on a bit longer: the recording was too short.');
@@ -449,9 +451,6 @@
   {:else}
   <div class="row">
     <button class="icon-btn lg" aria-label="Attach file" title="Attach file" onclick={pick} disabled={!!ui.edit}><Paperclip size={20} strokeWidth={1.75} /></button>
-    {#if canPoll}
-      <button class="icon-btn lg" aria-label="New poll" title="New poll" onclick={() => (ui.pollFor = chatKey)} disabled={!!ui.edit}><ChartColumnBig size={20} strokeWidth={1.75} /></button>
-    {/if}
     <div class="box">
       <textarea
         bind:this={textarea}
@@ -490,6 +489,9 @@
         <EmojiPicker onPick={insertEmoji} onClose={() => { emojiOpen = false; textarea?.focus(); }} />
       {/if}
     </div>
+    {#if canPoll}
+      <button class="icon-btn lg" aria-label="New poll" title="New poll" onclick={() => (ui.pollFor = chatKey)} disabled={!!ui.edit}><ChartColumnBig size={20} strokeWidth={1.75} /></button>
+    {/if}
     {#if !text.trim() && !attachments.length && !ui.edit}
       <button class="send mic" aria-label="Record voice message" title="Record a voice message" onclick={startRecording} disabled={recStarting}>
         {#if recStarting}<LoaderCircle size={19} class="spin" />{:else}<Mic size={19} strokeWidth={1.9} />{/if}

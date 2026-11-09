@@ -6,7 +6,7 @@ release workflow publishes the section of a version as its release notes.
 
 ## [Unreleased]
 
-## [0.3.2] - 2026-11-06
+## [0.3.2] - 2026-11-09
 
 ### New
 - Polls on all messengers: see them with live results, vote (and take the
@@ -22,8 +22,35 @@ release workflow publishes the section of a version as its release notes.
 - Settings → About: Report a bug, Suggest a feature, Known issues (GitHub).
 - Image viewer: Show in chat, Copy image (also Ctrl+C) and Save as (also
   Ctrl+S) next to "Open with default app".
+- Matrix invites can be accepted or declined in braids: an invited room
+  shows "<name> invited you" and Join / Decline instead of the message box
+  (it said to use another Matrix client, and its name started with
+  "[Invite]").
+- Select several messages ("Select" in the message menu, or Ctrl+click;
+  Shift+click adds a range) to forward, copy or delete them together. (#25)
+- Telegram: "<contact> joined Telegram" messages are left out, and the new
+  chat they open stays out of the list until someone writes in it. Turn
+  them back on per account in Settings → Accounts.
 
 ### Fixed
+- Signal: photos, files and voice messages could not be sent at all ("Not
+  sent", also when forwarding): Signal's server now wants the upload's size
+  when asked for an upload slot. (#26)
+- Signal voice messages play on iPhones: they are sent as AAC, as Signal's
+  own apps record them (Signal on iPhone plays no Ogg). Needs an AAC encoder
+  (gstreamer1.0-libav, recommended by the .deb); without one the Ogg file
+  is sent as before.
+- WhatsApp photos sent together (an album) are shown; they were dropped.
+  Older WhatsApp photos and files, removed from WhatsApp's servers, are asked
+  from the sender's phone again, as WhatsApp's apps do. (#24)
+- Forwarding WhatsApp photos to Signal: the photo is downloaded (also older
+  ones), and a Signal message whose picture cannot be uploaded is marked
+  "Not sent" instead of going out without it. (#26)
+- WhatsApp unread counts were too high after connecting: of the chat history
+  WhatsApp sends, every received message counted as new when the chat had
+  any unread. Now only as many as WhatsApp counts; the "New messages" line
+  sits accordingly (after your last own or read message, not above the
+  unread count).
 - Links no longer open inside braids, with no way back (when no browser was
   running): the window never leaves braids, web pages go to the default
   browser. (#20)

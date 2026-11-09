@@ -22,10 +22,17 @@
   import type { Message } from '../lib/types';
   import { ui } from '../lib/ui.svelte';
   import Avatar from './Avatar.svelte';
+  import InviteBar from './InviteBar.svelte';
+  import SelectionBar from './SelectionBar.svelte';
   import Composer from './Composer.svelte';
   import MessageItem from './MessageItem.svelte';
 
   let { chatKey }: { chatKey: string } = $props();
+
+  // a selection belongs to its chat: another chat ends it
+  $effect(() => {
+    if (ui.selection && ui.selection.chatKey !== chatKey) ui.selection = null;
+  });
 
   const GROUP_GAP = 5 * 60 * 1000;
   const WINDOW = 150; // messages rendered when at the bottom
@@ -468,7 +475,13 @@
       <button class="to-bottom" aria-label="Scroll to latest" onclick={scrollToBottom}><ArrowDown size={18} /></button>
     {/if}
 
-    <Composer bind:this={composer} {chatKey} />
+    {#if store.isInvite(chat)}
+      <InviteBar {chat} />
+    {:else if ui.selection?.chatKey === chatKey}
+      <SelectionBar />
+    {:else}
+      <Composer bind:this={composer} {chatKey} />
+    {/if}
 
     {#if ui.dropHover}
       <div class="drop">

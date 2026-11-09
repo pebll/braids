@@ -50,6 +50,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -63,6 +64,9 @@ import (
 )
 
 var outMutex sync.Mutex
+
+// whether invites are joined at once (flag -autojoin, command autojoin)
+var autojoin atomic.Bool
 
 func out(v map[string]any) {
 	outMutex.Lock()
@@ -84,8 +88,9 @@ func main() {
 	user := flag.String("user", "bob", "username")
 	pass := flag.String("pass", "", "password")
 	store := flag.String("store", "", "store directory")
-	autojoin := flag.Bool("autojoin", true, "auto-join invites")
+	autojoinFlag := flag.Bool("autojoin", true, "auto-join invites")
 	flag.Parse()
+	autojoin.Store(*autojoinFlag)
 
 	_ = os.MkdirAll(*store, 0700)
 	ctx := context.Background()
@@ -182,7 +187,7 @@ func main() {
 	})
 	syncer.OnEventType(event.StateMember, func(ctx context.Context, evt *event.Event) {
 		content := evt.Content.AsMember()
-		if *autojoin && content.Membership == event.MembershipInvite && evt.GetStateKey() == client.UserID.String() {
+		if autojoin.Load() && content.Membership == event.MembershipInvite && evt.GetStateKey() == client.UserID.String() {
 			_, err := client.JoinRoomByID(ctx, evt.RoomID)
 			out(map[string]any{"type": "autojoin", "room": evt.RoomID, "ok": err == nil})
 		}
@@ -269,6 +274,11 @@ func (p *peer) command(ctx context.Context, line string) (map[string]any, error)
 	cli := p.client
 
 	switch f[0] {
+	case "autojoin":
+		// autojoin on|off: whether invites are joined at once
+		autojoin.Store(arg(1) != "off")
+		return nil, nil
+
 	case "publicroom":
 		resp, err := cli.CreateRoom(ctx, &mautrix.ReqCreateRoom{Preset: "public_chat", RoomAliasName: arg(1), Name: rest(2)})
 		if err != nil {

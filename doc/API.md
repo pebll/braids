@@ -1,7 +1,7 @@
 braidsd API
 ===========
 
-Status: draft, API version `0.12.0`. The API is JSON-RPC 2.0
+Status: draft, API version `0.13.0`. The API is JSON-RPC 2.0
 with one JSON object per line, served on a Unix socket and/or stdin/stdout.
 
 Transport
@@ -58,7 +58,8 @@ Objects
                       "pinChat", "archiveChat", "pinMessage",
                       "limitedReactions", "readReceiptsPerMessage",
                       "avatars", "descriptions", "joinChat", "createGroup", "muteChat",
-                      "polls", "pollsInGroupsOnly"}}
+                      "polls", "pollsInGroupsOnly"},
+     "options": {"showJoinedMessages"}}   (braids' own, `accounts.setOption`)
 
 - **Chat**
 
@@ -136,6 +137,7 @@ Methods
 | `accounts.authInput` | `setupId` or `accountId`, `field`, `value` | `{}`; error 5 if no input for `field` is pending |
 | `accounts.authCancel` | `setupId` or `accountId` | `{}` |
 | `accounts.reconnect` | `accountId`? (all without) | `{count}`: the accounts asked to drop their connection and connect again now (after the computer woke up or the network came back; a dead connection is otherwise noticed only by a keep-alive timeout). Their state goes through `connecting` as usual |
+| `accounts.setOption` | `accountId`, `name`, `value` | `{}`; braids' own account options, in `Account.options`: `showJoinedMessages` (false): "<contact> joined Telegram" messages; while off they are left out when they arrive, and a new chat with nothing else is not listed until someone writes in it |
 | `accounts.remove` | `accountId` | `{}`, then `account.removed` |
 | `chats.list` | `accountId`?, `includeArchived`? (false) | `[Chat]` sorted: pinned, then recent activity |
 | `chats.get` | `accountId`, `chatId` | `Chat` |
@@ -156,7 +158,7 @@ Methods
 | `messages.search` | `text` (case-insensitive for ASCII letters), `accountId`? and `chatId`? (all chats/accounts without), `beforeTime`?, `limit`? (40, max 200) | `{items: [Message] newest first, nextBefore}` like `media.list`; group events are left out |
 | `members.get` | `accountId`, `chatId` | `{accountId, chatId, members: [Contact]}` (async) |
 | `messages.get` | `accountId`, `chatId`, `fromMsgId`? (latest), `limit`? (30) | `{accountId, chatId, fromMsgId, messages: [Message] oldest first, timedOut}` (async, from cache or server) |
-| `messages.send` | `accountId`, `chatId`, `text`?, `quotedId`?, `poll`? (`{question, options: [text], multiple}`, 2–12 options, without text or file; account capability `polls`, on Telegram in groups only: `pollsInGroupsOnly`), `filePath`? (absolute), `isVoice`? (false; the file, Ogg/Opus, is sent as a voice note: WhatsApp PTT, Telegram voice note, Signal voice message, Matrix MSC3245 voice) | `{msgId}`: the local id of the pending message, which arrives at once as `message.added` with `pending` (see Message) |
+| `messages.send` | `accountId`, `chatId`, `text`?, `quotedId`?, `poll`? (`{question, options: [text], multiple}`, 2–12 options, without text or file; account capability `polls`, on Telegram in groups only: `pollsInGroupsOnly`), `filePath`? (absolute), `isVoice`? (false; the file, Ogg/Opus (AAC for Signal: the app converts it, Signal on iPhone plays no Ogg), is sent as a voice note: WhatsApp PTT, Telegram voice note, Signal voice message, Matrix MSC3245 voice) | `{msgId}`: the local id of the pending message, which arrives at once as `message.added` with `pending` (see Message) |
 | `messages.vote` | `accountId`, `chatId`, `msgId` (a poll), `optionIds` (`[]` takes the vote back; one option unless `multiple`) | `{}`; the poll arrives as `message.updated` |
 | `messages.resend` | `accountId`, `chatId`, `msgId` (a `failed` pending message) | `{}`, then `message.updated` |
 | `messages.edit` | `accountId`, `chatId`, `msgId`, `text` | `{}` (error 4 outside the edit window) |

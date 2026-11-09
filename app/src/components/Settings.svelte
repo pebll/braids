@@ -114,6 +114,18 @@
     settings.save();
   }
 
+  // kept by braidsd: it leaves the messages and their new chats out
+  async function setShowJoined(value: boolean) {
+    if (!account) return;
+    const a = account;
+    try {
+      await api.call('accounts.setOption', { accountId: a.accountId, name: 'showJoinedMessages', value });
+      a.options = { ...a.options, showJoinedMessages: value };
+    } catch (e) {
+      store.toastError(e);
+    }
+  }
+
   function stateLabel(state: string): string {
     return { online: 'online', connecting: 'connecting', offline: 'offline', error: 'error' }[state] ?? state;
   }
@@ -306,6 +318,13 @@
           <button class="toggle" role="switch" aria-label="Notifications for this account" aria-checked={settings.accounts[account.accountId]?.notify !== false}
             onclick={() => setAccount('notify', settings.accounts[account.accountId]?.notify === false)}></button>
         </div>
+        {#if account.protocol === 'Telegram'}
+          <div class="row">
+            <div class="row-text"><b>“Joined Telegram” messages</b><span>Off: a contact joining Telegram adds no message and no new chat</span></div>
+            <button class="toggle" role="switch" aria-label="Joined Telegram messages" aria-checked={!!account.options?.showJoinedMessages}
+              onclick={() => setShowJoined(!account.options?.showJoinedMessages)}></button>
+          </div>
+        {/if}
         <div class="buttons">
           <button class="btn danger" onclick={removeAccount} disabled={removing}><Trash2 size={16} />Remove account…</button>
         </div>

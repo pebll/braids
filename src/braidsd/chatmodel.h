@@ -93,6 +93,10 @@ public:
   void ArchiveChat(const std::string& p_AccountId, const std::string& p_ChatId, bool p_IsArchived);
   void MuteChat(const std::string& p_AccountId, const std::string& p_ChatId, bool p_IsMuted);
   void MarkUnread(const std::string& p_AccountId, const std::string& p_ChatId);
+  // "Joined Telegram" messages: off (default) leaves them out and keeps chats
+  // that have nothing else out of the list (kept with the mute settings)
+  void SetShowJoined(const std::string& p_AccountId, bool p_Show);
+  bool GetShowJoined(const std::string& p_AccountId);
   void DeleteChat(const std::string& p_AccountId, const std::string& p_ChatId);
   void SetCurrentChat(const std::string& p_AccountId, const std::string& p_ChatId);
   void FindMessage(const std::string& p_AccountId, const std::string& p_ChatId, const std::string& p_Text,
@@ -148,6 +152,10 @@ private:
     std::unordered_map<std::string, bool> muted;
     // chats marked unread in braids, until read (kept with the mute settings)
     std::unordered_set<std::string> markedUnread;
+    // "Joined Telegram" messages shown, and the new chats left out of the
+    // list while they had only such a message (kept with the mute settings)
+    bool showJoined = false;
+    std::unordered_set<std::string> hiddenChats;
     // unread counts from the cache at connect, for chats whose unread
     // messages are not loaded
     std::map<std::string, int> cachedUnread;

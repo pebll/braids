@@ -27,7 +27,7 @@
 #include "timeutil.h"
 
 // semver of the API; clients must match the major version
-static const std::string s_ApiVersion = "0.12.0";
+static const std::string s_ApiVersion = "0.13.0";
 static const int64_t s_StartTime = TimeUtil::GetCurrentTimeMSec();
 
 static const char* AuthStepToString(AuthStep p_Step)
@@ -315,6 +315,23 @@ void Core::Dispatch(const std::string& p_Method, const json& p_Params, const Rep
 
     LOG_INFO("reconnect %d accounts", count);
     p_Reply.Ok(json{ { "count", count } });
+  }
+  else if (p_Method == "accounts.setOption")
+  {
+    const std::string accountId = ParamStr(params, "accountId");
+    const std::string name = ParamStr(params, "name");
+    if (!m_Accounts.count(accountId))
+    {
+      throw ApiException(ApiErrorUnknownAccount, "unknown account");
+    }
+
+    if (name != "showJoinedMessages")
+    {
+      throw ApiException(ApiErrorInvalidParams, "unknown option " + name);
+    }
+
+    m_ChatModel->SetShowJoined(accountId, ParamBool(params, "value", false));
+    p_Reply.Ok(json::object());
   }
   else if (p_Method == "accounts.remove")
   {
@@ -1013,6 +1030,7 @@ json Core::AccountToJson(const Account& p_Account)
     { "error", p_Account.error },
     { "syncing", p_Account.syncing },
     { "capabilities", ChatModel::CapabilitiesToJson(p_Account.protocol, p_Account.protocolName) },
+    { "options", json{ { "showJoinedMessages", m_ChatModel->GetShowJoined(p_Account.id) } } },
   };
 }
 

@@ -36,6 +36,7 @@ import (
 
 	"go.mau.fi/whatsmeow/proto/waCompanionReg"
 	"go.mau.fi/whatsmeow/proto/waE2E"
+	"go.mau.fi/whatsmeow/proto/waHistorySync"
 	"go.mau.fi/whatsmeow/proto/waWeb"
 	"go.mau.fi/whatsmeow/store"
 
@@ -389,11 +390,24 @@ type DownloadInfo struct {
 
 	FileEncSha256 []byte `json:"FileEncSha256_arraybyte"`
 	FileSha256    []byte `json:"FileSha256_arraybyte"`
+
+	// braids: the message, to ask for the media again once it is gone from
+	// WhatsApp's servers (gowm_media.go); empty in older file ids
+	MsgId     string `json:"MsgId_string,omitempty"`
+	ChatJid   string `json:"ChatJid_string,omitempty"`
+	SenderJid string `json:"SenderJid_string,omitempty"`
+	FromMe    bool   `json:"FromMe_bool,omitempty"`
 }
 
-func DownloadableMessageToFileId(client *whatsmeow.Client, msg whatsmeow.DownloadableMessage, targetPath string) string {
+func DownloadableMessageToFileId(client *whatsmeow.Client, msg whatsmeow.DownloadableMessage, targetPath string, messageInfo *types.MessageInfo) string {
 	var info DownloadInfo
 	info.Version = downloadInfoVersion
+	if messageInfo != nil {
+		info.MsgId = messageInfo.ID
+		info.ChatJid = messageInfo.Chat.String()
+		info.SenderJid = messageInfo.Sender.ToNonAD().String()
+		info.FromMe = messageInfo.IsFromMe
+	}
 
 	info.TargetPath = targetPath
 	info.MediaKey = msg.GetMediaKey()
@@ -433,7 +447,7 @@ func DownloadableMessageToFileId(client *whatsmeow.Client, msg whatsmeow.Downloa
 	return str
 }
 
-func DownloadFromFileId(connId int, fileId string) (string, int) {
+func DownloadFromFileId(connId int, fileId string, chatId string, msgId string) (string, int) {
 	LOG_TRACE(fmt.Sprintf("fileId %s", fileId))
 	var info DownloadInfo
 	if err := json.Unmarshal([]byte(fileId), &info); err != nil {
@@ -464,6 +478,11 @@ func DownloadFromFileId(connId int, fileId string) (string, int) {
 		CWmSetStatus(connId, FlagFetching)
 
 		data, err := DownloadFromFileInfo(client, info)
+		if err != nil && isMediaGone(err) {
+			// gone from WhatsApp's servers: ask the phone to upload it again
+			LOG_DEBUG(fmt.Sprintf("media gone, retry: %v", err))
+			data, err = retryMediaDownload(client, info, chatId, msgId)
+		}
 		if err != nil {
 			LOG_WARNING(fmt.Sprintf("download error %#v", err))
 			fileStatus = FileStatusDownloadFailed
@@ -832,6 +851,9 @@ func (handler *WmEventHandler) HandleEvent(rawEvt interface{}) {
 		LOG_TRACE(fmt.Sprintf("%#v", evt))
 		handler.HandleMessage(evt.Info, evt.Message, false /*isSyncRead*/)
 
+	case *events.MediaRetry:
+		handleMediaRetry(evt)
+
 	case *events.UndecryptableMessage:
 		LOG_TRACE(fmt.Sprintf("%#v", evt))
 		handler.HandleUndecryptableMessage(evt)
@@ -1023,6 +1045,50 @@ func (handler *WmEventHandler) HandleChatPresence(chatPresence *events.ChatPrese
 	CWmNewTypingNotify(connId, chatId, userId, BoolToInt(isTyping))
 }
 
+// countsAsUnread: a message WhatsApp counts in a chat's unread number (not
+// reactions, edits, deletions, poll votes, album headers and the like).
+func countsAsUnread(msg *waE2E.Message) bool {
+	if child := msg.GetAssociatedChildMessage().GetMessage(); child != nil {
+		msg = child
+	}
+	return msg.ReactionMessage == nil && msg.ProtocolMessage == nil && msg.PollUpdateMessage == nil &&
+		msg.AlbumMessage == nil && msg.KeepInChatMessage == nil && msg.PinInChatMessage == nil &&
+		msg.EncReactionMessage == nil && msg.GetEditedMessage() == nil &&
+		(msg.SenderKeyDistributionMessage == nil || msg.Conversation != nil || msg.ExtendedTextMessage != nil ||
+			msg.ImageMessage != nil || msg.VideoMessage != nil || msg.AudioMessage != nil || msg.DocumentMessage != nil)
+}
+
+// syncUnreadIds: the ids of the newest unreadCount received messages of a
+// history sync batch.
+func syncUnreadIds(selfJid types.JID, chatJid types.JID, syncMessages []*waHistorySync.HistorySyncMsg, unreadCount int) map[string]bool {
+	unread := map[string]bool{}
+	if unreadCount <= 0 {
+		return unread
+	}
+
+	type received struct {
+		id   string
+		time time.Time
+	}
+	var list []received
+	for _, syncMessage := range syncMessages {
+		webMessageInfo := syncMessage.GetMessage()
+		messageInfo := ParseWebMessageInfo(selfJid, chatJid, webMessageInfo)
+		message := webMessageInfo.GetMessage()
+		if messageInfo == nil || message == nil || messageInfo.IsFromMe || !countsAsUnread(message) {
+			continue
+		}
+		list = append(list, received{messageInfo.ID, messageInfo.Timestamp})
+	}
+
+	sort.Slice(list, func(i, j int) bool { return list[i].time.After(list[j].time) })
+	for i := 0; i < len(list) && i < unreadCount; i++ {
+		unread[list[i].id] = true
+	}
+
+	return unread
+}
+
 func (handler *WmEventHandler) HandleHistorySync(historySync *events.HistorySync) {
 	var client *whatsmeow.Client = GetClient(handler.connId)
 	if client == nil || client.Store.ID == nil {
@@ -1048,9 +1114,12 @@ func (handler *WmEventHandler) HandleHistorySync(historySync *events.HistorySync
 		isUnread := 0
 		lastMessageTime := 0
 
-		isSyncRead := (conversation.GetUnreadCount() == 0)
 		hasMessages := false
 		syncMessages := conversation.GetMessages()
+		// braids: WhatsApp gives the chat's unread count; only that many of the
+		// newest received messages are unread, the older ones were read (else
+		// every received message of the batch counted as new)
+		unreadIds := syncUnreadIds(selfJid, chatJid, syncMessages, int(conversation.GetUnreadCount()))
 		for _, syncMessage := range syncMessages {
 			webMessageInfo := syncMessage.Message
 			messageInfo := ParseWebMessageInfo(selfJid, chatJid, webMessageInfo)
@@ -1060,6 +1129,7 @@ func (handler *WmEventHandler) HandleHistorySync(historySync *events.HistorySync
 				continue
 			}
 
+			isSyncRead := !unreadIds[messageInfo.ID]
 			handler.HandleMessage(*messageInfo, message, isSyncRead)
 			hasMessages = true
 
@@ -1706,6 +1776,19 @@ func GetContactCards(contacts []*waE2E.ContactMessage) []ContactCard {
 }
 
 func (handler *WmEventHandler) HandleMessage(messageInfo types.MessageInfo, msg *waE2E.Message, isSyncRead bool) {
+	// braids: photos and videos sent together come as an album: a header
+	// (shown as nothing) and each item wrapped as an associated child
+	if child := msg.GetAssociatedChildMessage().GetMessage(); child != nil {
+		if msg.MessageContextInfo != nil && child.MessageContextInfo == nil {
+			child.MessageContextInfo = msg.MessageContextInfo
+		}
+		msg = child
+	}
+	if msg.GetAlbumMessage() != nil {
+		LOG_TRACE(fmt.Sprintf("album %s", messageInfo.ID))
+		return
+	}
+
 	switch {
 	case msg.Conversation != nil || msg.ExtendedTextMessage != nil:
 		handler.HandleTextMessage(messageInfo, msg, isSyncRead)
@@ -1936,7 +2019,7 @@ func (handler *WmEventHandler) HandleImageMessage(messageInfo types.MessageInfo,
 	if !isEdited {
 		var tmpPath string = GetPath(connId) + "/tmp"
 		filePath = fmt.Sprintf("%s/%s%s", tmpPath, messageInfo.ID, ext)
-		fileId = DownloadableMessageToFileId(client, img, filePath)
+		fileId = DownloadableMessageToFileId(client, img, filePath, &messageInfo)
 	}
 
 	// general
@@ -1999,7 +2082,7 @@ func (handler *WmEventHandler) HandleVideoMessage(messageInfo types.MessageInfo,
 	if !isEdited {
 		var tmpPath string = GetPath(connId) + "/tmp"
 		filePath = fmt.Sprintf("%s/%s%s", tmpPath, messageInfo.ID, ext)
-		fileId = DownloadableMessageToFileId(client, vid, filePath)
+		fileId = DownloadableMessageToFileId(client, vid, filePath, &messageInfo)
 	}
 
 	// general
@@ -2050,7 +2133,7 @@ func (handler *WmEventHandler) HandleAudioMessage(messageInfo types.MessageInfo,
 	// file id, path and status
 	var tmpPath string = GetPath(connId) + "/tmp"
 	filePath := fmt.Sprintf("%s/%s%s", tmpPath, messageInfo.ID, ext)
-	fileId := DownloadableMessageToFileId(client, aud, filePath)
+	fileId := DownloadableMessageToFileId(client, aud, filePath, &messageInfo)
 	fileStatus := FileStatusNotDownloaded
 
 	// general
@@ -2104,7 +2187,7 @@ func (handler *WmEventHandler) HandleDocumentMessage(messageInfo types.MessageIn
 	if !isEdited {
 		var tmpPath string = GetPath(connId) + "/tmp"
 		filePath = fmt.Sprintf("%s/%s-%s", tmpPath, messageInfo.ID, doc.GetFileName())
-		fileId = DownloadableMessageToFileId(client, doc, filePath)
+		fileId = DownloadableMessageToFileId(client, doc, filePath, &messageInfo)
 	}
 
 	// general
@@ -2155,7 +2238,7 @@ func (handler *WmEventHandler) HandleStickerMessage(messageInfo types.MessageInf
 	// file id, path and status
 	var tmpPath string = GetPath(connId) + "/tmp"
 	filePath := fmt.Sprintf("%s/%s%s", tmpPath, messageInfo.ID, ext)
-	fileId := DownloadableMessageToFileId(client, sticker, filePath)
+	fileId := DownloadableMessageToFileId(client, sticker, filePath, &messageInfo)
 	fileStatus := FileStatusNotDownloaded
 
 	// general
@@ -3824,7 +3907,7 @@ func WmDownloadFile(connId int, chatId string, msgId string, fileId string, acti
 	}
 
 	// download file
-	filePath, fileStatus := DownloadFromFileId(connId, fileId)
+	filePath, fileStatus := DownloadFromFileId(connId, fileId, chatId, msgId)
 
 	// notify result (pass fileId back so the attachment stays re-downloadable if its file is
 	// later removed, ex: when the profile tmp dir is cleared between sessions)

@@ -142,5 +142,11 @@ Scheduled-later features are in `doc/BACKLOG.md`.
   others braidsd counts each vote (`ChatMessage.pollVotes`, cache columns
   `poll`/`pollVotes`, `ChatModel::OnPoll`). Dummy: `/poll`, `/vote N`,
   `/endpoll`; the Matrix test peer: `poll`, `vote`, `endpoll`.
+- Telegram "joined Telegram" messages: left out by braidsd unless the
+  account option `showJoinedMessages` (`accounts.setOption`, kept in
+  `braids-chats.json` with the chats it hides, `hiddenChats`) is on.
+  Dummy: `/joined`, `/joined <text>`.
+- Voice messages are recorded as Ogg/Opus; for Signal the app converts them
+  to AAC first (`voice::to_aac`, Signal on iPhone plays no Ogg).
 - Chat list keyboard: one highlight (`ui.listCursor`, `ui.list`), Alt+J/K
   move it, Enter opens.

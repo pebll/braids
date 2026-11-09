@@ -2617,7 +2617,9 @@ func SgSendMessage(connId int, chatId string, text string, quotedId string, quot
 			if readErr == nil {
 				attachment, uploadErr := client.UploadAttachment(ctx, fileData)
 				if uploadErr != nil {
-					LOG_WARNING(fmt.Sprintf("upload attachment error %#v", uploadErr))
+					// braids: not sent without its attachment (shown as failed, "Send again")
+					LOG_WARNING(fmt.Sprintf("upload attachment error (%d bytes, %s): %v", len(fileData), fileType, uploadErr))
+					return -1
 				} else {
 					if fileType != "" {
 						attachment.ContentType = proto.String(fileType)
@@ -2638,7 +2640,13 @@ func SgSendMessage(connId int, chatId string, text string, quotedId string, quot
 
 					if isVoice {
 						LOG_TRACE("send voice message")
-						attachment.ContentType = proto.String("audio/ogg")
+						// braids: AAC (converted by the app, as Signal's apps
+						// record; its iPhone app plays no Ogg), else Ogg/Opus
+						if strings.Contains(fileType, "aac") {
+							attachment.ContentType = proto.String("audio/aac")
+						} else {
+							attachment.ContentType = proto.String("audio/ogg")
+						}
 						attachment.Flags = proto.Uint32(uint32(signalpb.AttachmentPointer_VOICE_MESSAGE))
 						dataMsg.Attachments = []*signalpb.AttachmentPointer{attachment}
 					} else if isSendAsSpecial && (mimeSubType == "webp") {
@@ -2659,7 +2667,8 @@ func SgSendMessage(connId int, chatId string, text string, quotedId string, quot
 					}
 				}
 			} else {
-				LOG_WARNING(fmt.Sprintf("file not found: %s", filePath))
+				LOG_WARNING(fmt.Sprintf("attachment not readable: %s: %v", filePath, readErr))
+				return -1
 			}
 		}
 

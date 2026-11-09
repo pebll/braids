@@ -213,6 +213,16 @@ async fn voice_stop(cancel: bool) -> Result<Option<VoiceClip>, String> {
         .map(|clip| clip.map(|(path, duration_ms)| VoiceClip { path: path.to_string_lossy().into_owned(), duration_ms }))
 }
 
+/// The recorded voice message as AAC, for Signal (its iPhone app plays no
+/// Ogg); null without an AAC encoder (then the Ogg file is sent).
+#[tauri::command]
+async fn voice_to_aac(path: String) -> Result<Option<String>, String> {
+    tauri::async_runtime::spawn_blocking(move || voice::to_aac(std::path::Path::new(&path)))
+        .await
+        .map_err(|e| e.to_string())?
+        .map(|out| out.map(|p| p.to_string_lossy().into_owned()))
+}
+
 /// Saves a copy of a received file where the user picks in the system save
 /// dialog (starting in Downloads), returns the new path, "" if cancelled.
 #[tauri::command]
@@ -367,7 +377,7 @@ pub fn run() {
                 }
             }
         })
-        .invoke_handler(tauri::generate_handler![api_call, daemon_connected, set_close_to_tray, set_badge, save_temp_file, save_file_as, licenses_path, voice_start, voice_stop, link_preview, check_update, install_kind])
+        .invoke_handler(tauri::generate_handler![api_call, daemon_connected, set_close_to_tray, set_badge, save_temp_file, save_file_as, licenses_path, voice_start, voice_stop, voice_to_aac, link_preview, check_update, install_kind])
         .run(tauri::generate_context!())
         .expect("error while running braids");
 }
