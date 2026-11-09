@@ -19,7 +19,7 @@
 
 app-id: io.github.pebll.braids
 runtime: org.gnome.Platform
-runtime-version: '48'
+runtime-version: '51'
 sdk: org.gnome.Sdk
 command: braids
 finish-args:
@@ -36,17 +36,7 @@ finish-args:
   # saving attachments ("Download file")
   - --filesystem=xdg-download
 
-# videos: H.264 and AAC through the runtime's FFmpeg extension (GNOME 48 is
-# on freedesktop 24.08)
-add-extensions:
-  org.freedesktop.Platform.ffmpeg-full:
-    directory: lib/ffmpeg
-    version: '24.08'
-    add-ld-path: .
-    autodownload: true
-    autodelete: false
-cleanup-commands:
-  - mkdir -p /app/lib/ffmpeg
+# videos (H.264, AAC): the runtime's codecs-extra extension, installed with it
 
 modules:
   - shared-modules/libayatana-appindicator/libayatana-appindicator-gtk3.json

@@ -138,6 +138,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     container:
+      # the newest image; flatpak-builder installs the manifest's runtime (51)
       image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-48
       options: --privileged
     steps:
@@ -159,11 +160,13 @@ jobs:
         upload-artifact: false
         cache-key: flatpak-builder-${{ matrix.arch }}-${{ github.sha }}
     - name: Flathub checks (linter, as on Flathub)
-      # reported, not blocking the release
+      # reported (both checks), not blocking the release
       continue-on-error: true
       run: |
-        flatpak-builder-lint --exceptions manifest utils/dist/flatpak/io.github.pebll.braids.yml
-        flatpak-builder-lint --exceptions repo repo
+        status=0
+        flatpak-builder-lint --exceptions manifest utils/dist/flatpak/io.github.pebll.braids.yml || status=1
+        flatpak-builder-lint --exceptions repo repo || status=1
+        exit $status
     - name: Checksum
       run: sha256sum "braids-${{ matrix.arch }}.flatpak" > "braids-${{ matrix.arch }}.flatpak.sha256"
     - name: Keep package
