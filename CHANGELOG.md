@@ -6,7 +6,7 @@ release workflow publishes the section of a version as its release notes.
 
 ## [Unreleased]
 
-## [0.3.2] - 2026-11-06
+## [0.3.2] - 2026-11-09
 
 ### New
 - Polls on all messengers: see them with live results, vote (and take the
