@@ -160,9 +160,37 @@ jobs:
           braids-${{ matrix.arch }}.flatpak
           braids-${{ matrix.arch }}.flatpak.sha256
 
+  nix:
+    # the Nix package (nix/package.nix) with this build's tarball: its
+    # libraries from nixpkgs resolve and braidsd loads every protocol
+    needs: linux
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v5
+    - name: Release tarball
+      uses: actions/download-artifact@v4
+      with:
+        name: braids-linux-x86_64
+        path: dist
+    - name: Install Nix
+      uses: cachix/install-nix-action@v31
+      with:
+        nix_path: nixpkgs=channel:nixos-unstable
+    - name: Build and check
+      run: |
+        nix-build -E 'with import <nixpkgs> {}; callPackage ./nix/package.nix {
+          tarball = ./dist/braids-linux-x86_64.tar.gz; release = { version = "ci"; sha256 = {}; }; }'
+        ldd=$(nix-build --no-out-link '<nixpkgs>' -A glibc.bin)/bin/ldd
+        ! $ldd result/bin/.braids-wrapped result/bin/.braidsd-wrapped | grep "not found"
+        HOME="$(mktemp -d)" result/bin/braidsd --list-protocols
+    - name: Flake evaluates
+      run: nix --extra-experimental-features "nix-command flakes" flake check --no-build
+
   publish:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [linux, flatpak]
+    needs: [linux, flatpak, nix]
     runs-on: ubuntu-24.04
     steps:
     - name: Checkout
@@ -202,3 +230,23 @@ jobs:
           dist/*.flatpak
           dist/*.sha256
           utils/dist/install.sh
+
+  nix-release:
+    # the flake (nix run github:pebll/braids) follows the published release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: publish
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    steps:
+    - name: Checkout main
+      uses: actions/checkout@v5
+      with:
+        ref: main
+    - name: nix/release.json of this release
+      run: |
+        utils/dist/nix-update "${GITHUB_REF_NAME#v}"
+        if git diff --quiet; then exit 0; fi
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git commit -am "Nix: braids ${GITHUB_REF_NAME#v}"
+        git push origin HEAD:main

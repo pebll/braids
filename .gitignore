@@ -18,3 +18,4 @@ app/test-results/
 /build-flatpak
 /.flatpak-builder
 /utils/dist/flatpak/shared-modules
+result

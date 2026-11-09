@@ -6,6 +6,10 @@ release workflow publishes the section of a version as its release notes.
 
 ## [Unreleased]
 
+### New
+- Nix and NixOS: `nix run github:pebll/braids` runs the latest release
+  (or `nix profile install github:pebll/braids`).
+
 ### Changed
 - Poll results: the leading option's bar is full and the others relative
   to it, each option shows its number of votes and the pictures of up to
