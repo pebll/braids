@@ -275,6 +275,10 @@ try {
   await page.getByRole('option', { name: /Michael/ }).click();
   await page.waitForFunction(() => [...document.querySelectorAll('.msg .image img')].some((img) => img.naturalWidth > 0));
   check(true, 'sent image shown inline');
+  const michaelRow = page.getByRole('option', { name: /Michael/ });
+  await michaelRow.locator('.preview .thumb').waitFor();
+  const rowText = await michaelRow.locator('.preview').textContent();
+  check(rowText.includes('Photo') && !rowText.includes('.png'), 'chat list: a photo previewed as a thumbnail, without its file name');
   await page.locator('.msg.own', { has: page.locator('.image') }).last().click({ button: 'right' });
   check(await page.getByRole('menuitem', { name: 'Copy image' }).count() === 1, 'photo menu offers Copy image');
   await page.getByRole('menuitem', { name: 'Copy image' }).click();
@@ -1083,10 +1087,17 @@ try {
   await pollComposer.press('Enter');
   const lunch = page.locator('.msg:not(.own) .poll', { hasText: 'Lunch?' });
   await lunch.waitFor();
-  check(await lunch.locator('.option', { hasText: 'Sushi' }).locator('.share').textContent() === '100 %', "others' votes shown");
+  const sushi = lunch.locator('.option', { hasText: 'Sushi' });
+  check(await sushi.locator('.votes').textContent() === '1', "others' votes shown as a count");
+  check(await sushi.locator('.faces .avatar').count() === 1, "the voter's picture next to the count");
+  check(await sushi.locator('.bar').evaluate((e) => e.style.width) === '100%', 'the leading option has a full bar');
   await lunch.locator('.option', { hasText: 'Pizza' }).click();
   await lunch.locator('.option[aria-pressed=true]', { hasText: 'Pizza' }).waitFor();
   check(true, "voting in someone else's poll");
+  check(await lunch.locator('.option', { hasText: 'Pizza' }).locator('.face').first().getAttribute('title') === 'Stanley',
+    'own vote shown with your name and picture, not "You"');
+  check(await lunch.locator('.option', { hasText: 'Salad' }).locator('.bar').evaluate((e) => e.style.width) === '0%',
+    'an option without votes has no bar');
   await shot('poll');
   await page.getByRole('button', { name: 'Settings' }).click();
   await page.locator('[aria-labelledby=newchat-title]').waitFor({ state: 'detached' }).catch(() => {});

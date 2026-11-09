@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"time"
 
+	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
@@ -212,21 +213,37 @@ func WmVotePoll(connId int, chatId string, msgId string, pollSenderId string, fr
 		return jids
 	}
 
+	// the vote is encrypted with the poll creator and our own id in the form
+	// the poll was sent with (phone number or LID): the stored secret tells
+	// which, and a vote in the other form cannot be read by the other phones
 	var message *waE2E.Message
+	err = whatsmeow.ErrOriginalMessageSecretNotFound
 	for _, chat := range withLID(chatJid) {
-		for _, sender := range withLID(senderJid) {
-			pollInfo := &types.MessageInfo{
-				MessageSource: types.MessageSource{Chat: chat, Sender: sender, IsFromMe: fromMe != 0,
-					IsGroup: chat.Server == types.GroupServer},
-				ID: msgId,
-			}
-			if message, err = client.BuildPollVote(ctx, pollInfo, names); err == nil {
-				break
+		secret, realSender, lookupErr := client.Store.MsgSecrets.GetMessageSecret(ctx, chat, senderJid, msgId)
+		if lookupErr != nil || secret == nil {
+			continue
+		}
+
+		sender := senderJid
+		if !realSender.IsEmpty() {
+			sender = realSender
+		}
+
+		pollChat := chat
+		if (pollChat.Server == types.DefaultUserServer) && (sender.Server == types.HiddenUserServer) {
+			if lid, lidErr := client.Store.LIDs.GetLIDForPN(ctx, pollChat); lidErr == nil && !lid.IsEmpty() {
+				pollChat = lid
 			}
 		}
-		if message != nil && err == nil {
-			break
+
+		pollInfo := &types.MessageInfo{
+			MessageSource: types.MessageSource{Chat: pollChat, Sender: sender, IsFromMe: fromMe != 0,
+				IsGroup: pollChat.Server == types.GroupServer},
+			ID: msgId,
 		}
+		LOG_TRACE(fmt.Sprintf("poll vote %s as %s in %s", msgId, sender.Server, pollChat.Server))
+		message, err = client.BuildPollVote(ctx, pollInfo, names)
+		break
 	}
 
 	if err != nil || message == nil {

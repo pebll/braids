@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright (c) 2026 braids contributors -->
+<component type="desktop-application">
+  <id>io.github.pebll.braids</id>
+  <name>braids</name>
+  <summary>Telegram, WhatsApp, Signal and Matrix in one app</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>AGPL-3.0-only</project_license>
+  <developer id="io.github.pebll">
+    <name>braids contributors</name>
+  </developer>
+  <description>
+    <p>
+      braids is an open source desktop messenger: your Telegram, WhatsApp,
+      Signal and Matrix chats in one inbox. Messages stay on your computer.
+    </p>
+    <ul>
+      <li>One chat list for all accounts, with favorites, an unread filter and archive</li>
+      <li>Photos, videos, files, stickers, link previews and voice messages (record and play)</li>
+      <li>Replies, reactions, edits, mentions, forwarding, pinned messages and polls</li>
+      <li>Search across all chats, shared media, keyboard shortcuts for everything</li>
+      <li>Desktop notifications, tray icon, light and dark theme</li>
+    </ul>
+    <p>
+      braids is not affiliated with Telegram, WhatsApp, Signal or Matrix.
+      WhatsApp support is unofficial; WhatsApp may restrict accounts using it.
+    </p>
+  </description>
+  <launchable type="desktop-id">io.github.pebll.braids.desktop</launchable>
+  <url type="homepage">https://pebll.github.io/braids/</url>
+  <url type="bugtracker">https://github.com/pebll/braids/issues</url>
+  <url type="vcs-browser">https://github.com/pebll/braids</url>
+  <url type="contribute">https://github.com/pebll/braids/blob/main/.github/CONTRIBUTING.md</url>
+  <branding>
+    <color type="primary" scheme_preference="light">#f7e8dd</color>
+    <color type="primary" scheme_preference="dark">#3b2a1f</color>
+  </branding>
+  <screenshots>
+    <screenshot type="default">
+      <caption>All chats of all messengers in one inbox</caption>
+      <image>https://pebll.github.io/braids/img/inbox-light.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Dark theme</caption>
+      <image>https://pebll.github.io/braids/img/inbox-dark.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Forward messages to any chat, on any messenger</caption>
+      <image>https://pebll.github.io/braids/img/forward-dark.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Link previews</caption>
+      <image>https://pebll.github.io/braids/img/link-dark.png</image>
+    </screenshot>
+  </screenshots>
+  <content_rating type="oars-1.1">
+    <content_attribute id="social-chat">intense</content_attribute>
+    <content_attribute id="social-audio">intense</content_attribute>
+    <content_attribute id="social-contacts">intense</content_attribute>
+    <content_attribute id="social-info">mild</content_attribute>
+  </content_rating>
+  <requires>
+    <display_length compare="ge">360</display_length>
+  </requires>
+  <recommends>
+    <control>keyboard</control>
+    <control>pointing</control>
+  </recommends>
+  <categories>
+    <category>Network</category>
+    <category>InstantMessaging</category>
+    <category>Chat</category>
+  </categories>
+  <keywords>
+    <keyword>telegram</keyword>
+    <keyword>whatsapp</keyword>
+    <keyword>signal</keyword>
+    <keyword>matrix</keyword>
+    <keyword>messenger</keyword>
+    <keyword>chat</keyword>
+  </keywords>
+  <provides>
+    <binary>braids</binary>
+  </provides>
+  <releases>
+    <release version="0.3.2" date="2026-11-09">
+      <url>https://github.com/pebll/braids/releases/tag/v0.3.2</url>
+      <description>
+        <ul>
+          <li>Polls on all messengers: see them with live results, vote (and take the vote back), make your own with the poll button next to the attach button (single or multiple choice, up to 12 options).</li>
+          <li>Text size: Settings → General, or Ctrl+Plus / Ctrl+Minus / Ctrl+0 (also Ctrl+=).</li>
+          <li>Emoji shortcodes: type : and a few letters (:thu) for suggestions, Tab or Enter inserts.</li>
+          <li>"Copy image" in the menu of photos.</li>
+          <li>Settings → About: Report a bug, Suggest a feature, Known issues (GitHub).</li>
+          <li>Image viewer: Show in chat, Copy image (also Ctrl+C) and Save as (also Ctrl+S) next to "Open with default app".</li>
+          <li>Matrix invites can be accepted or declined in braids: an invited room shows "&lt;name&gt; invited you" and Join / Decline instead of the message box (it said to use another Matrix client, and its name started with "[Invite]").</li>
+          <li>Select several messages ("Select" in the message menu, or Ctrl+click; Shift+click adds a range) to forward, copy or delete them together.</li>
+        </ul>
+      </description>
+    </release>
+    <release version="0.3.1" date="2026-11-05">
+      <url>https://github.com/pebll/braids/releases/tag/v0.3.1</url>
+      <description>
+        <ul>
+          <li>Keyboard shortcuts overview: Ctrl+/ lists all shortcuts with your own bindings, and links to Settings → Keyboard to change them.</li>
+          <li>Profile pictures open in full size: the viewer shows the small picture at once and switches to the full-resolution one when it has been fetched (Telegram, WhatsApp and Matrix; Signal has one size).</li>
+          <li>Test builds of pull requests: install.sh --pr &lt;number&gt; (or --branch &lt;name&gt;) installs them without a release; see the website's download section.</li>
+          <li>The app icon reads at small sizes (GNOME top bar, browser tab): a bigger braid with thicker strands on a warm grey circle that stays visible on dark panels.</li>
+          <li>Shortcuts follow the key's character on any layout: Ctrl+, opens Settings also where "," sits on the US M key (it went to Matrix).</li>
+          <li>The tray icon could stay empty in GNOME's top bar after braids restarted: every start reused the same icon file name, which the panel kept cached.</li>
+          <li>Labels no longer break onto two lines in narrow controls ("On top" in Settings, "Message a contact" in New chat).</li>
+          <li>"Go to" shortcuts (folders, accounts, Ctrl+N with nothing unread, back to chat list) clear the search.</li>
+        </ul>
+      </description>
+    </release>
+    <release version="0.3.0" date="2026-11-05">
+      <url>https://github.com/pebll/braids/releases/tag/v0.3.0</url>
+      <description>
+        <ul>
+          <li>Messages you send show up at once.</li>
+          <li>braids reconnects right after the computer wakes up or the network comes back, instead of waiting for the connection to time out.</li>
+          <li>Keyboard: Alt+J/K (and the arrow keys) move a highlight through the chat list and the search results without opening anything.</li>
+          <li>An "Unread" folder (Ctrl+U) with the unread chats.</li>
+          <li>An unread chat opens at the "New messages" line, a read one at the newest message.</li>
+          <li>Click a profile picture in the chat info to see it full size.</li>
+          <li>Ctrl+N with no unread chat left closes the open chat.</li>
+          <li>Videos (MP4 and others), GIF videos and video stickers play in the app.</li>
+        </ul>
+      </description>
+    </release>
+    <release version="0.2.0" date="2026-11-02">
+      <url>https://github.com/pebll/braids/releases/tag/v0.2.0</url>
+      <description>
+        <ul>
+          <li>Search the messages of all chats from the chat list (Ctrl+Space).</li>
+          <li>Stickers and GIFs show inline, including Telegram's animated stickers.</li>
+          <li>Previews for links in messages.</li>
+          <li>An emoji picker in the composer, with search and recently used emoji.</li>
+          <li>A bar for pinned messages at the top of a chat.</li>
+          <li>Create new groups on Telegram, WhatsApp, Signal and Matrix.</li>
+          <li>Drag and drop files into a chat.</li>
+          <li>Ctrl+C copies text: the selection, or the message under the mouse.</li>
+        </ul>
+      </description>
+    </release>
+    <release version="0.1.0" date="2026-11-01">
+      <url>https://github.com/pebll/braids/releases/tag/v0.1.0</url>
+      <description>
+        <ul>
+          <li>The first release.</li>
+          <li>Telegram, WhatsApp, Signal and Matrix (with end-to-end encryption) in one desktop app for Linux.</li>
+          <li>One chat list across all accounts, with folders for each messenger, favorites, muting, archive and "mark unread".</li>
+          <li>Text with formatting, replies, reactions, @mentions, edit and delete.</li>
+          <li>Photos and videos with a built-in viewer and player, files, and voice messages (play and record).</li>
+          <li>Forward messages from any messenger to any other.</li>
+          <li>Join groups by invite link.</li>
+          <li>Shared media for each chat, read receipts, typing indicators, notifications and an unread tray icon.</li>
+        </ul>
+      </description>
+    </release>
+  </releases>
+</component>

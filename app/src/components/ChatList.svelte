@@ -10,14 +10,14 @@
   and through the messages of all chats (messages.search); context menu per chat.
 -->
 <script lang="ts">
-  import { AtSign, BellOff, LoaderCircle, Menu as MenuIcon, Search, SquarePen, WifiOff, X } from '@lucide/svelte';
+  import { AtSign, BellOff, Camera, FileText, Film, LoaderCircle, Menu as MenuIcon, Mic, Search, SquarePen, Sticker, WifiOff, X } from '@lucide/svelte';
   import { onDestroy, onMount, untrack } from 'svelte';
   import { chatMenu } from '../lib/actions';
   import * as api from '../lib/api';
   import { listTime } from '../lib/format';
   import { bindings, comboKeys } from '../lib/keybinds.svelte';
   import { settings } from '../lib/settings.svelte';
-  import { chatKey, store } from '../lib/store.svelte';
+  import { chatKey, fileMime, fileReady, isVoiceNote, store } from '../lib/store.svelte';
   import type { Chat, Message } from '../lib/types';
   import { ui } from '../lib/ui.svelte';
   import Avatar from './Avatar.svelte';
@@ -49,7 +49,36 @@
     ui.focusComposer++;
   }
 
-  function preview(c: Chat): { prefix: string; prefixKind: string; text: string } {
+  type Media = { icon: typeof Mic; thumbs: string[] };
+
+  // the last message's attachment: an icon and, for photos, small previews
+  // (an album, photos sent together, as "3 Photos" with up to three)
+  function media(c: Chat, m: Message): { media: Media; text: string } | null {
+    if (!m.file || m.isDeleted) return null;
+    const mime = fileMime(m.file);
+    const caption = store.previewText(m);
+    if (m.file.kind === 'sticker' || m.file.kind === 'gif') return { media: { icon: Sticker, thumbs: [] }, text: caption };
+    if (isVoiceNote(m)) return { media: { icon: Mic, thumbs: [] }, text: caption };
+    if (mime.startsWith('video/')) return { media: { icon: Film, thumbs: [] }, text: caption };
+    if (!mime.startsWith('image/')) return { media: { icon: FileText, thumbs: [] }, text: caption };
+
+    // the newest messages of the same sender that are photos, sent within a minute
+    const items = store.messages[chatKey(c.accountId, c.id)]?.items ?? [];
+    let album = [m];
+    if (items.length && items[items.length - 1].id === m.id) {
+      album = [];
+      for (let i = items.length - 1; i >= 0; i--) {
+        const x = items[i];
+        if (x.senderId !== m.senderId || !x.file || x.file.kind || !fileMime(x.file).startsWith('image/') || m.time - x.time > 60000) break;
+        album.unshift(x);
+      }
+    }
+    const thumbs = album.filter((x) => fileReady(x.file)).slice(-3).map((x) => x.file!.path);
+    const text = album.length > 1 ? `${album.length} Photos${m.text ? `: ${caption.replace(/^Photo: /, '')}` : ''}` : caption;
+    return { media: { icon: Camera, thumbs }, text };
+  }
+
+  function preview(c: Chat): { prefix: string; prefixKind: string; text: string; media?: Media } {
     const key = chatKey(c.accountId, c.id);
     const typing = store.typingNames(key);
     if (typing.length) return { prefix: '', prefixKind: 'typing', text: c.isGroup ? `${typing[0].split(' ')[0]} is typing…` : 'typing…' };
@@ -59,6 +88,8 @@
     if (!m) return { prefix: '', prefixKind: '', text: '' };
     if (m.system) return { prefix: '', prefixKind: '', text: store.systemLine(m) };
     const prefix = m.isOutgoing ? 'You:' : c.isGroup ? `${store.senderName(m).split(' ')[0]}:` : '';
+    const attachment = media(c, m);
+    if (attachment) return { prefix, prefixKind: 'sender', ...attachment };
     return { prefix, prefixKind: 'sender', text: store.previewText(m) };
   }
 
@@ -317,7 +348,8 @@
                 <span class="typing">{p.text}</span>
               {:else}
                 {#if p.prefix}<span class="prefix" class:draft={p.prefixKind === 'draft'}>{p.prefix}</span>{/if}
-                {p.text}
+                <!-- no spaces between icon, thumbnails and text: the margins set the gaps -->
+                {#if p.media}<span class="media-icon"><p.media.icon size={13} strokeWidth={2} /></span>{#each p.media.thumbs as path, i (i)}<img class="thumb" src={api.fileUrl(path)} alt="" draggable="false" />{/each}{/if}{p.text}
               {/if}
             </span>
             {#if c.isUnreadMention}<span class="mention-dot" title="Mentioned"><AtSign size={12} strokeWidth={2.5} /></span>{/if}
@@ -418,6 +450,8 @@
   .unread.muted .time { color: var(--text-muted); }
   .preview { font-size: 13px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
   .unread .preview { color: var(--text); }
+  .media-icon { display: inline-flex; vertical-align: -2px; margin-right: 4px; }
+  .thumb { width: 16px; height: 16px; border-radius: 3px; object-fit: cover; vertical-align: -3px; margin-right: 3px; }
   .prefix { color: var(--text-2); font-weight: 500; }
   .unread .prefix { font-weight: 600; }
   .prefix.draft { color: var(--danger); font-weight: 600; }

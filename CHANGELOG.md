@@ -6,6 +6,39 @@ release workflow publishes the section of a version as its release notes.
 
 ## [Unreleased]
 
+### New
+- Nix and NixOS: `nix run github:pebll/braids` runs the latest release
+  (or `nix profile install github:pebll/braids`).
+- A new braids version is also announced as a desktop notification (once
+  per version, with desktop notifications on), and is checked for while
+  braids keeps running, not only at start. "Get it" opens the website's
+  download section instead of the GitHub release page.
+
+### Changed
+- Poll results: the leading option's bar is full and the others relative
+  to it, each option shows its number of votes and the pictures of up to
+  five voters (+N for more; Telegram does not tell who voted). (#29)
+- Chat list: photos, voice messages, videos and files in the last message
+  show an icon; photos a small preview ("3 Photos" with up to three for
+  photos sent together), voice messages their length ("Voice message
+  (2:12)") instead of the file name. (#28)
+- The Flatpak is now io.github.pebll.braids (was org.braids.app), as
+  Flathub requires. Installing it adds a new app: to keep your accounts,
+  quit braids, then move the data and remove the old one:
+  `mv ~/.var/app/org.braids.app ~/.var/app/io.github.pebll.braids` and
+  `flatpak uninstall org.braids.app`. Its software center page has
+  screenshots and the release notes.
+
+### Fixed
+- WhatsApp: votes in polls reach the other phones. In chats where WhatsApp
+  uses its new account ids (LIDs) instead of phone numbers, braids encrypted
+  the vote for the phone number and the others could not read it.
+- After a start or an update, names and profile pictures show at once: braids
+  keeps the pictures it knows (`braids-avatars.json` in the account's profile)
+  and loads the saved names before the messenger's contact sync; pictures are
+  then checked for changes in the background (they were fetched again one by
+  one, names waited for the connection).
+
 ## [0.3.2] - 2026-11-09
 
 ### New

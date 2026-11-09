@@ -714,6 +714,7 @@ void WmChat::PerformRequest(std::shared_ptr<RequestMessage> p_RequestMessage)
         std::shared_ptr<GetAvatarRequest> getAvatarRequest =
           std::static_pointer_cast<GetAvatarRequest>(p_RequestMessage);
         CWmGetAvatar(m_ConnId, const_cast<char*>(getAvatarRequest->id.c_str()), getAvatarRequest->full ? 1 : 0);
+        requestIntervalDelay = false; // braids: queued in Go, one WhatsApp query at a time
       }
       break;
 

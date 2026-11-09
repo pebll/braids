@@ -36,6 +36,16 @@ set(LIBSIGNAL_FFI_FILE ${LIBSIGNAL_FFI_DIR}/libsignal_ffi.a)
 
 set(LIBSIGNAL_USE_DOWNLOAD FALSE)
 
+# libsignal version the Go code needs (a source build is marked with it)
+file(STRINGS "${SIGNAL_GO_DIR}/ext/signal/pkg/libsignalgo/signalversion/version.go" LIBSIGNAL_VERSION_LINE REGEX "const Version")
+string(REGEX REPLACE ".*\"(.*)\".*" "\\1" LIBSIGNAL_REQUIRED_VERSION "${LIBSIGNAL_VERSION_LINE}")
+set(LIBSIGNAL_FFI_VERSION_FILE ${LIBSIGNAL_FFI_DIR}/libsignal_ffi.version)
+set(LIBSIGNAL_FFI_BUILT_VERSION "")
+if(EXISTS ${LIBSIGNAL_FFI_VERSION_FILE})
+  file(READ ${LIBSIGNAL_FFI_VERSION_FILE} LIBSIGNAL_FFI_BUILT_VERSION)
+  string(STRIP "${LIBSIGNAL_FFI_BUILT_VERSION}" LIBSIGNAL_FFI_BUILT_VERSION)
+endif()
+
 if(DOWNLOAD_LIBSIGNAL)
   # Detect OS for libsignal download
   if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
@@ -68,7 +78,10 @@ if(DOWNLOAD_LIBSIGNAL)
         file(REMOVE ${LIBSIGNAL_FFI_FILE})
         file(REMOVE ${LIBSIGNAL_FFI_REF_FILE})
       endif()
-    elseif(EXISTS ${LIBSIGNAL_FFI_FILE} AND NOT EXISTS ${LIBSIGNAL_FFI_REF_FILE})
+    elseif(EXISTS ${LIBSIGNAL_FFI_FILE} AND NOT EXISTS ${LIBSIGNAL_FFI_REF_FILE} AND
+           NOT "${LIBSIGNAL_FFI_BUILT_VERSION}" STREQUAL "${LIBSIGNAL_REQUIRED_VERSION}")
+      # braids: kept when built from source for this version (the downloads
+      # are job artifacts that expire; CI caches the source build)
       message(STATUS "No ref file found for existing libsignal_ffi.a, re-downloading")
       file(REMOVE ${LIBSIGNAL_FFI_FILE})
     endif()
@@ -111,12 +124,7 @@ endif()
 
 if(NOT LIBSIGNAL_USE_DOWNLOAD)
   # Build libsignal_ffi from source
-  # Determine required version from signalversion/version.go
-  file(STRINGS "${SIGNAL_GO_DIR}/ext/signal/pkg/libsignalgo/signalversion/version.go" LIBSIGNAL_VERSION_LINE REGEX "const Version")
-  string(REGEX REPLACE ".*\"(.*)\".*" "\\1" LIBSIGNAL_REQUIRED_VERSION "${LIBSIGNAL_VERSION_LINE}")
-
   # Invalidate cached libsignal_ffi.a if version has changed
-  set(LIBSIGNAL_FFI_VERSION_FILE ${LIBSIGNAL_FFI_DIR}/libsignal_ffi.version)
   if(EXISTS ${LIBSIGNAL_FFI_FILE} AND EXISTS ${LIBSIGNAL_FFI_VERSION_FILE})
     file(READ ${LIBSIGNAL_FFI_VERSION_FILE} LIBSIGNAL_FFI_CACHED_VERSION)
     string(STRIP "${LIBSIGNAL_FFI_CACHED_VERSION}" LIBSIGNAL_FFI_CACHED_VERSION)

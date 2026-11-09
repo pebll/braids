@@ -144,6 +144,11 @@ private:
     std::unordered_set<std::string> statusRequested;
     std::unordered_map<std::string, std::string> avatars; // user or chat id -> image path ("" none)
     std::unordered_set<std::string> avatarsRequested;
+    // the pictures known at the last run (<profile>/braids-avatars.json):
+    // shown at once after a start, while the protocol checks them again
+    std::unordered_map<std::string, std::string> savedAvatars;
+    bool avatarsDirty = false;
+    int64_t avatarsSavedAt = 0;
     std::unordered_map<std::string, std::string> fullAvatars; // full-size pictures fetched for the viewer
     std::unordered_map<std::string, std::string> descriptions; // user or chat id -> text ("" none)
     std::unordered_set<std::string> descriptionsRequested;
@@ -221,6 +226,8 @@ private:
   void RemoveOutboxEntry(const std::string& p_AccountId, const std::string& p_LocalId);
   json OutboxEntryToJson(const std::string& p_AccountId, const OutboxEntry& p_Entry);
   void LoadOutbox(const std::string& p_AccountId);
+  void LoadAvatars(const std::string& p_AccountId);
+  void SaveAvatars(const std::string& p_AccountId);
   void SaveOutbox(const std::string& p_AccountId);
 
   void MarkChatDirty(const std::string& p_AccountId, const std::string& p_ChatId);

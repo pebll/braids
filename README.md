@@ -25,6 +25,10 @@ Prefer a package? Every [release](https://github.com/pebll/braids/releases/lates
 has a **.deb**, a **Flatpak**, an **AppImage** and a self-contained archive.
 Uninstall with `curl -fsSL https://pebll.github.io/braids/install.sh | sh -s -- --uninstall`.
 
+Nix and NixOS: `nix run github:pebll/braids` (or `nix profile install
+github:pebll/braids`; on NixOS add the flake's `packages.<system>.default`
+to your system or home packages).
+
 Why braids
 ----------
 
@@ -123,6 +127,7 @@ Packaging and releases
     utils/dist/package-linux     dist/braids-linux-<arch>.tar.gz, a .deb, an
                                  AppImage (--appimage, needs appimagetool)
     utils/dist/flatpak/          Flatpak manifest (made from the tarball)
+    flake.nix, nix/              Nix package (the release tarball)
     utils/dist/install.sh        the install script (curl ... | sh)
 
 Pushing a tag `vX.Y.Z` (matching the version in `app/src-tauri/tauri.conf.json`)

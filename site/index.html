@@ -321,8 +321,15 @@
           <h3>Flatpak</h3>
           <p>Runs in a sandbox on any distribution with Flatpak. Updates come with each release, installed the same way.</p>
           <pre>flatpak install --user ./braids-x86_64.flatpak
-flatpak run org.braids.app</pre>
+flatpak run io.github.pebll.braids</pre>
           <div class="actions"><a class="btn ghost" href="https://github.com/pebll/braids/releases/latest/download/braids-x86_64.flatpak">Download .flatpak</a></div>
+        </div>
+        <div class="card">
+          <h3>Nix and NixOS</h3>
+          <p>A flake with the latest release, its libraries from nixpkgs. Run it once or install it to your profile.</p>
+          <pre>nix run github:pebll/braids
+nix profile install github:pebll/braids</pre>
+          <div class="actions"><a class="btn ghost" href="https://github.com/pebll/braids/blob/main/flake.nix">flake.nix</a></div>
         </div>
         <div class="card">
           <h3>AppImage</h3>

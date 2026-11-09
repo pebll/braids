@@ -274,7 +274,12 @@ class Store {
     if (m.system) return this.systemLine(m);
     if (m.poll) return `📊 ${m.poll.question}`;
     const text = plainText(m.text);
-    if (m.file) return text ? `${fileLabel(m)}: ${text}` : `${fileLabel(m)}: ${m.file.name}`;
+    if (m.file) {
+      const label = fileLabel(m);
+      if (text) return `${label}: ${text}`;
+      // photos, videos and voice messages by kind, not by their (generated) file name
+      return label === 'File' || label === 'Audio' ? `${label}: ${m.file.name}` : label;
+    }
     return text;
   }
 
@@ -897,7 +902,12 @@ class Store {
         // tell again next time
       }
       if (told !== u.version) {
-        this.toast(`braids ${u.version} is available.`, 'info', { label: 'Get it', run: () => api.openUrl(u.url).catch((e) => this.toastError(e)) });
+        const getIt = () => api.openUrl(u.url).catch((e) => this.toastError(e));
+        this.toast(`braids ${u.version} is available.`, 'info', { label: 'Get it', run: getIt });
+        // also as a desktop notification: the window is often hidden in the tray
+        if (settings.notifications) {
+          api.notify(`braids ${u.version} is available`, 'Update from the website: pebll.github.io/braids', getIt).catch(() => {});
+        }
       }
     }
     return u;
@@ -983,8 +993,17 @@ export function fileLabel(m: Message): string {
   if (m.file?.kind === 'gif') return 'GIF';
   if (mime.startsWith('image/')) return 'Photo';
   if (mime.startsWith('video/')) return 'Video';
+  if (isVoiceNote(m)) {
+    const sec = m.file?.durationSec ?? 0;
+    return sec > 0 ? `Voice message (${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')})` : 'Voice message';
+  }
   if (mime.startsWith('audio/')) return 'Audio';
   return 'File';
+}
+
+// a voice message: Opus / AAC audio as the messengers' apps record it
+export function isVoiceNote(m: Message): boolean {
+  return /^audio\/(ogg|opus|aac|x-hx-aac|mp4)/.test(fileMime(m.file));
 }
 
 export const store = new Store();

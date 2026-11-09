@@ -38,6 +38,8 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v5
+    - name: Flathub page lists the released versions
+      run: python3 utils/dist/flatpak/update-releases --check
     - name: Setup ccache
       uses: ./.github/actions/setup-ccache
       with:
@@ -75,6 +77,20 @@ jobs:
           echo "::error::repository secrets TG_API_ID / TG_API_HASH are missing"
           exit 1
         fi
+    - name: protoc for libsignal (Ubuntu 22.04's is too old)
+      run: |
+        v=29.3
+        a=$(uname -m | sed 's/aarch64/aarch_64/')
+        curl -fsSL -o "${RUNNER_TEMP}/protoc.zip" "https://github.com/protocolbuffers/protobuf/releases/download/v${v}/protoc-${v}-linux-${a}.zip"
+        sudo unzip -o -q "${RUNNER_TEMP}/protoc.zip" -d /usr/local bin/protoc 'include/*'
+        protoc --version
+    - name: libsignal cache (built from source when the prebuilt download is gone)
+      uses: actions/cache@v4
+      with:
+        path: |
+          build-release/lib/gostat/libsignal
+          build-release/lib/sgchat/go/libsignal
+        key: libsignal-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('lib/sgchat/go/libsignal.cmake', 'lib/sgchat/go/ext/signal/pkg/libsignalgo/signalversion/version.go') }}
     - name: Rust cache
       uses: actions/cache@v4
       with:
@@ -122,6 +138,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     container:
+      # the newest image; flatpak-builder installs the manifest's runtime (51)
       image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-48
       options: --privileged
     steps:
@@ -137,11 +154,31 @@ jobs:
     - name: Build
       uses: flatpak/flatpak-github-actions/flatpak-builder@v6
       with:
-        manifest-path: utils/dist/flatpak/org.braids.app.yml
+        manifest-path: utils/dist/flatpak/io.github.pebll.braids.yml
         bundle: braids-${{ matrix.arch }}.flatpak
         arch: ${{ matrix.arch }}
         upload-artifact: false
         cache-key: flatpak-builder-${{ matrix.arch }}-${{ github.sha }}
+    - name: Flathub checks (linter, as on Flathub)
+      # reported (both checks), not blocking the release
+      continue-on-error: true
+      run: |
+        status=0
+        flatpak-builder-lint --exceptions manifest utils/dist/flatpak/io.github.pebll.braids.yml || status=1
+        flatpak-builder-lint --exceptions repo repo > lint.json || true
+        cat lint.json
+        # screenshots are copied to Flathub's media server only by its own
+        # build servers: those two errors are expected here, any other counts
+        python3 -c '
+        import json, sys
+        text = open("lint.json").read().strip()
+        errors = json.loads(text).get("errors", []) if text else []
+        expected = {"appstream-external-screenshot-url", "appstream-screenshots-not-mirrored-in-ostree"}
+        left = [e for e in errors if e not in expected]
+        print("errors:", left or "none")
+        sys.exit(1 if left else 0)
+        ' || status=1
+        exit $status
     - name: Checksum
       run: sha256sum "braids-${{ matrix.arch }}.flatpak" > "braids-${{ matrix.arch }}.flatpak.sha256"
     - name: Keep package
@@ -152,9 +189,37 @@ jobs:
           braids-${{ matrix.arch }}.flatpak
           braids-${{ matrix.arch }}.flatpak.sha256
 
+  nix:
+    # the Nix package (nix/package.nix) with this build's tarball: its
+    # libraries from nixpkgs resolve and braidsd loads every protocol
+    needs: linux
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v5
+    - name: Release tarball
+      uses: actions/download-artifact@v4
+      with:
+        name: braids-linux-x86_64
+        path: dist
+    - name: Install Nix
+      uses: cachix/install-nix-action@v31
+      with:
+        nix_path: nixpkgs=channel:nixos-unstable
+    - name: Build and check
+      run: |
+        nix-build -E 'with import <nixpkgs> {}; callPackage ./nix/package.nix {
+          tarball = ./dist/braids-linux-x86_64.tar.gz; release = { version = "ci"; sha256 = {}; }; }'
+        ldd=$(nix-build --no-out-link '<nixpkgs>' -A glibc.bin)/bin/ldd
+        ! $ldd result/bin/.braids-wrapped result/bin/.braidsd-wrapped | grep "not found"
+        HOME="$(mktemp -d)" result/bin/braidsd --list-protocols
+    - name: Flake evaluates
+      run: nix --extra-experimental-features "nix-command flakes" flake check --no-build
+
   publish:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [linux, flatpak]
+    needs: [linux, flatpak, nix]
     runs-on: ubuntu-24.04
     steps:
     - name: Checkout
@@ -194,3 +259,23 @@ jobs:
           dist/*.flatpak
           dist/*.sha256
           utils/dist/install.sh
+
+  nix-release:
+    # the flake (nix run github:pebll/braids) follows the published release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: publish
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    steps:
+    - name: Checkout main
+      uses: actions/checkout@v5
+      with:
+        ref: main
+    - name: nix/release.json of this release
+      run: |
+        utils/dist/nix-update "${GITHUB_REF_NAME#v}"
+        if git diff --quiet; then exit 0; fi
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git commit -am "Nix: braids ${GITHUB_REF_NAME#v}"
+        git push origin HEAD:main

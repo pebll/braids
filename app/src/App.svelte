@@ -76,7 +76,11 @@
     const observer = new ResizeObserver(onResize);
     observer.observe(document.documentElement);
     api.setCloseToTray(settings.closeToTray);
-    if (settings.checkUpdates) setTimeout(() => store.checkUpdates(), 20000);
+    // at start and every 6 hours while running (braids stays in the tray for
+    // days); the check itself asks GitHub at most once a day
+    const checkUpdates = () => settings.checkUpdates && store.checkUpdates();
+    setTimeout(checkUpdates, 20000);
+    const updateTimer = setInterval(checkUpdates, 6 * 3600 * 1000);
     api.onFileDrop(
       (paths) => {
         if (store.current && paths.length) conversation?.addFiles(paths);
@@ -84,6 +88,7 @@
       (hover) => (ui.dropHover = hover && !!store.current),
     );
     return () => {
+      clearInterval(updateTimer);
       window.removeEventListener('resize', onResize);
       window.visualViewport?.removeEventListener('resize', onResize);
       observer.disconnect();

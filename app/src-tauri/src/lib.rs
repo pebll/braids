@@ -115,7 +115,8 @@ async fn check_update() -> Option<Update> {
         let release: Value = serde_json::from_str(&body).ok()?;
         let tag = release["tag_name"].as_str()?.trim_start_matches('v').to_string();
         let newer = version_parts(&tag) > version_parts(env!("CARGO_PKG_VERSION"));
-        newer.then(|| Update { version: tag, url: release["html_url"].as_str().unwrap_or_default().to_string() })
+        // the website's download section: every way to install or update
+        newer.then(|| Update { version: tag, url: "https://pebll.github.io/braids/#download".to_string() })
     })
     .await
     .ok()

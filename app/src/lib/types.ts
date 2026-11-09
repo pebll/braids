@@ -44,6 +44,7 @@ export interface FileRef {
   mimeType: string;
   kind?: '' | 'sticker' | 'gif'; // shown without a bubble / muted and looping
   status: 'none' | 'notDownloaded' | 'downloading' | 'downloaded' | 'failed';
+  durationSec?: number; // voice messages (Ogg/Opus, once downloaded); 0 unknown
 }
 
 export interface PollOption {
