@@ -156,11 +156,11 @@ if [[ "${DEPS}" == "1" ]]; then
     WL_CLIPBOARD=$([[ "$XDG_SESSION_TYPE" == "wayland" || -n "$WAYLAND_DISPLAY" ]] && echo "wl-clipboard")
 
     if [[ "${DISTRO}" == "Ubuntu" ]]; then
-      sudo apt update && sudo apt ${YES} install ccache cmake build-essential gperf help2man libreadline-dev libssl-dev libncurses-dev libncursesw5-dev ncurses-doc zlib1g-dev libsqlite3-dev libmagic-dev ${WL_CLIPBOARD} || exiterr "deps failed (${DISTRO}), exiting."
+      sudo apt update && sudo apt ${YES} install ccache cmake build-essential gperf help2man libreadline-dev libssl-dev libncurses-dev libncursesw5-dev ncurses-doc zlib1g-dev libsqlite3-dev libmagic-dev clang protobuf-compiler ${WL_CLIPBOARD} || exiterr "deps failed (${DISTRO}), exiting."
       sudo apt ${YES} install golang-1.23 || exiterr "deps failed (${DISTRO} apt golang), exiting."
       sudo update-alternatives --install /usr/bin/go go /usr/lib/go-1.23/bin/go 123 || exiterr "deps failed (${DISTRO} select golang), exiting."
     elif [[ "${DISTRO}" == "Debian GNU/Linux" ]] || [[ "${DISTRO}" == "Devuan GNU/Linux" ]]; then
-      sudo apt update && sudo apt ${YES} install ccache cmake build-essential gperf help2man libreadline-dev libssl-dev libncurses-dev libncursesw5-dev ncurses-doc zlib1g-dev libsqlite3-dev libmagic-dev ${WL_CLIPBOARD} || exiterr "deps failed (${DISTRO}), exiting."
+      sudo apt update && sudo apt ${YES} install ccache cmake build-essential gperf help2man libreadline-dev libssl-dev libncurses-dev libncursesw5-dev ncurses-doc zlib1g-dev libsqlite3-dev libmagic-dev clang protobuf-compiler ${WL_CLIPBOARD} || exiterr "deps failed (${DISTRO}), exiting."
       RELEASE=$(lsb_release -a | grep 'Codename:' | awk -F':' '{print $2}' | awk '{$1=$1;print}')
       if [[ "${RELEASE}" == "trixie" ]] || [[ "${RELEASE}" == "excalibur" ]]; then
         sudo apt ${YES} install golang-go || exiterr "deps failed (${DISTRO} ${RELEASE}), exiting."
@@ -179,14 +179,14 @@ if [[ "${DEPS}" == "1" ]]; then
         exiterr "deps failed (${DISTRO} ${RELEASE}), exiting."
       fi
     elif [[ "${DISTRO}" == "Raspbian GNU/Linux" ]] || [[ "${DISTRO}" == "Pop!_OS" ]]; then
-      sudo apt update && sudo apt ${YES} install ccache cmake build-essential gperf help2man libreadline-dev libssl-dev libncurses-dev libncursesw5-dev ncurses-doc zlib1g-dev libsqlite3-dev libmagic-dev golang ${WL_CLIPBOARD} || exiterr "deps failed (${DISTRO}), exiting."
+      sudo apt update && sudo apt ${YES} install ccache cmake build-essential gperf help2man libreadline-dev libssl-dev libncurses-dev libncursesw5-dev ncurses-doc zlib1g-dev libsqlite3-dev libmagic-dev clang protobuf-compiler golang ${WL_CLIPBOARD} || exiterr "deps failed (${DISTRO}), exiting."
     elif [[ "${DISTRO}" == "Gentoo" ]]; then
       WL_CLIPBOARD=${WL_CLIPBOARD:+gui-apps/$WL_CLIPBOARD}
       sudo emerge -n dev-build/cmake dev-util/ccache dev-util/gperf sys-apps/help2man sys-libs/readline dev-libs/openssl sys-libs/ncurses sys-libs/zlib dev-db/sqlite sys-apps/file dev-lang/go ${WL_CLIPBOARD} || exiterr "deps failed (${DISTRO}), exiting."
     elif [[ "${DISTRO}" == "Fedora Linux" ]]; then
-      sudo dnf ${YES} install git cmake clang golang ccache file-devel file-libs gperf readline-devel openssl-devel ncurses-devel sqlite-devel zlib-devel ${WL_CLIPBOARD} || exiterr "deps failed (${DISTRO}), exiting."
+      sudo dnf ${YES} install git cmake clang protobuf-compiler golang ccache file-devel file-libs gperf readline-devel openssl-devel ncurses-devel sqlite-devel zlib-devel ${WL_CLIPBOARD} || exiterr "deps failed (${DISTRO}), exiting."
     elif [[ "${DISTRO}" == "Arch Linux" ]] || [[ "${DISTRO}" == "Arch Linux ARM" ]] || [[ "${DISTRO}" == "EndeavourOS" ]]; then
-      sudo pacman -S ccache cmake file go gperf help2man ncurses openssl readline sqlite zlib base-devel ${WL_CLIPBOARD} || exiterr "deps failed (${DISTRO}), exiting."
+      sudo pacman -S ccache clang protobuf cmake file go gperf help2man ncurses openssl readline sqlite zlib base-devel ${WL_CLIPBOARD} || exiterr "deps failed (${DISTRO}), exiting."
     elif [[ "${DISTRO}" == "Void" ]]; then
       sudo xbps-install ${YES} base-devel go ccache cmake gperf help2man libmagick-devel readline-devel sqlite-devel file-devel openssl-devel ${WL_CLIPBOARD} || exiterr "deps failed (${DISTRO}), exiting."
     elif [[ "${DISTRO}" == "Alpine Linux" ]]; then

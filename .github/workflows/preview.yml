@@ -61,6 +61,13 @@ jobs:
       with:
         # shared with the release builds: mostly cached
         cache_key_prefix: release-${{ matrix.arch }}
+    - name: libsignal cache (built from source when the prebuilt download is gone)
+      uses: actions/cache@v4
+      with:
+        path: |
+          build-release/lib/gostat/libsignal
+          build-release/lib/sgchat/go/libsignal
+        key: libsignal-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('lib/sgchat/go/libsignal.cmake', 'lib/sgchat/go/ext/signal/pkg/libsignalgo/signalversion/version.go') }}
     - name: Setup Node
       uses: actions/setup-node@v4
       with:
