@@ -68,13 +68,15 @@ modules:
   - name: libsignal
     buildsystem: simple
     build-options:
+      append-path: /usr/lib/sdk/llvm22/bin
       env:
         CARGO_HOME: /run/build/libsignal/cargo
         LIBCLANG_PATH: /usr/lib/sdk/llvm22/lib
         CARGO_NET_OFFLINE: 'true'
         RUSTFLAGS: -Ctarget-feature=-crt-static
     build-commands:
-      - cargo build --offline --release -p libsignal-ffi
+      # bindgen: the extension's clang headers (stddef.h, ...)
+      - BINDGEN_EXTRA_CLANG_ARGS="-resource-dir=$(/usr/lib/sdk/llvm22/bin/clang -print-resource-dir)" cargo build --offline --release -p libsignal-ffi
       - install -Dm644 target/release/libsignal_ffi.a /app/braids-build/libsignal_ffi.a
     cleanup:
       - '*'
