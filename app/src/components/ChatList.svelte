@@ -348,11 +348,8 @@
                 <span class="typing">{p.text}</span>
               {:else}
                 {#if p.prefix}<span class="prefix" class:draft={p.prefixKind === 'draft'}>{p.prefix}</span>{/if}
-                {#if p.media}
-                  <span class="media-icon"><p.media.icon size={13} strokeWidth={2} /></span>
-                  {#each p.media.thumbs as path, i (i)}<img class="thumb" src={api.fileUrl(path)} alt="" draggable="false" />{/each}
-                {/if}
-                {p.text}
+                <!-- no spaces between icon, thumbnails and text: the margins set the gaps -->
+                {#if p.media}<span class="media-icon"><p.media.icon size={13} strokeWidth={2} /></span>{#each p.media.thumbs as path, i (i)}<img class="thumb" src={api.fileUrl(path)} alt="" draggable="false" />{/each}{/if}{p.text}
               {/if}
             </span>
             {#if c.isUnreadMention}<span class="mention-dot" title="Mentioned"><AtSign size={12} strokeWidth={2.5} /></span>{/if}
@@ -453,7 +450,7 @@
   .unread.muted .time { color: var(--text-muted); }
   .preview { font-size: 13px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
   .unread .preview { color: var(--text); }
-  .media-icon { display: inline-flex; vertical-align: -2px; margin-right: 3px; }
+  .media-icon { display: inline-flex; vertical-align: -2px; margin-right: 4px; }
   .thumb { width: 16px; height: 16px; border-radius: 3px; object-fit: cover; vertical-align: -3px; margin-right: 3px; }
   .prefix { color: var(--text-2); font-weight: 500; }
   .unread .prefix { font-weight: 600; }

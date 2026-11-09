@@ -32,11 +32,6 @@
     return most ? Math.round((votes / most) * 100) : 0;
   }
 
-  function percent(votes: number): number {
-    const sum = poll.options.reduce((n, o) => n + o.votes, 0);
-    return sum ? Math.round((votes / sum) * 100) : 0;
-  }
-
   function name(id: string): string {
     return id === selfId ? 'You' : store.contacts[m.accountId]?.[id]?.name || id;
   }
@@ -50,7 +45,7 @@
   function title(ids: string[], votes: number): string {
     if (!votes) return '';
     const names = ids.map(name).join(', ');
-    return `${votes === 1 ? '1 vote' : `${votes} votes`} (${percent(votes)} %)${names ? `: ${names}` : ''}`;
+    return `${votes === 1 ? '1 vote' : `${votes} votes`}${names ? `: ${names}` : ''}`;
   }
 
   async function vote(id: string) {
