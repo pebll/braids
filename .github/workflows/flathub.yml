@@ -1,0 +1,77 @@
+# flathub.yml
+#
+# Copyright (c) 2026 braids contributors
+#
+# braids is distributed under the GNU AGPL v3 license, see LICENSE for details.
+#
+# Builds the Flathub manifest (utils/dist/flathub: braids from source,
+# offline) as Flathub would: generates the dependency sources, builds, runs
+# Flathub's linter. The generated sources are kept as the run's artifact
+# "flathub-sources" (for the Flathub repository).
+
+name: Flathub
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [flathub]
+
+jobs:
+  sources:
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Generators
+      run: |
+        git clone --depth 1 https://github.com/flatpak/flatpak-builder-tools /tmp/fbt
+        pip install --break-system-packages aiohttp toml tomlkit /tmp/fbt/node
+    - name: Generate
+      run: |
+        out=utils/dist/flathub
+        python3 /tmp/fbt/cargo/flatpak-cargo-generator.py app/src-tauri/Cargo.lock -o $out/cargo-sources.json
+        tag="$(sed -n 's/^ *tag: *\(v[0-9.]*\)$/\1/p' $out/io.github.pebll.braids.yml | head -1)"
+        git clone --depth 1 --branch "$tag" https://github.com/signalapp/libsignal.git /tmp/libsignal
+        python3 /tmp/fbt/cargo/flatpak-cargo-generator.py /tmp/libsignal/Cargo.lock -o $out/libsignal-cargo-sources.json
+        flatpak-node-generator npm app/package-lock.json -o $out/node-sources.json
+        $out/go-sources > $out/go-sources.json 2>/dev/null
+        ls -la $out
+    - name: Keep sources
+      uses: actions/upload-artifact@v4
+      with:
+        name: flathub-sources
+        path: utils/dist/flathub/*.json
+
+  build:
+    needs: sources
+    runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-48
+      options: --privileged
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Sources
+      uses: actions/download-artifact@v4
+      with:
+        name: flathub-sources
+        path: utils/dist/flathub
+    - name: Shared modules, Telegram credentials
+      env:
+        TG_API_ID: ${{ secrets.TG_API_ID }}
+        TG_API_HASH: ${{ secrets.TG_API_HASH }}
+      run: |
+        git clone --depth 1 https://github.com/flathub/shared-modules utils/dist/flathub/shared-modules
+        sed -i "s/@TG_API_ID@/${TG_API_ID}/; s/@TG_API_HASH@/${TG_API_HASH}/" utils/dist/flathub/io.github.pebll.braids.yml
+    - name: Build
+      uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+      with:
+        manifest-path: utils/dist/flathub/io.github.pebll.braids.yml
+        bundle: braids-flathub.flatpak
+        upload-artifact: false
+        cache-key: flathub-x86_64-${{ github.sha }}
+    - name: Flathub linter
+      continue-on-error: true
+      run: |
+        flatpak-builder-lint --exceptions manifest utils/dist/flathub/io.github.pebll.braids.yml || true
+        flatpak-builder-lint --exceptions repo repo || true
