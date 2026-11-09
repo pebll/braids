@@ -1,7 +1,7 @@
 braidsd API
 ===========
 
-Status: draft, API version `0.13.0`. The API is JSON-RPC 2.0
+Status: draft, API version `0.14.0`. The API is JSON-RPC 2.0
 with one JSON object per line, served on a Unix socket and/or stdin/stdout.
 
 Transport
@@ -84,7 +84,8 @@ muted chat); with neither known, `unreadCount` is 1. `isUnread` is also true for
      "isOutgoing", "isRead", "isEdited", "isDeleted", "isPinned", "hasMention",
      "quoted": {"id", "text", "senderId", "senderName"} | null,
      "file": {"id", "path", "name", "mimeType", "kind": "" | "sticker" | "gif",
-              "status": "none|notDownloaded|downloading|downloaded|failed"} | null,
+              "status": "none|notDownloaded|downloading|downloaded|failed",
+              "durationSec": <length of a downloaded Ogg/Opus file, 0 if unknown>} | null,
      "reactions": {"counts": {emoji: n}, "senders": {userId: emoji}, "own": emoji},
      "mentions": {displayName: userId}, "link", "system",
      "poll": {"question", "options": [{"id", "text", "votes", "voters": [userId]}],

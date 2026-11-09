@@ -365,6 +365,52 @@ void ChatModel::UnreadCount(AccountState& p_Account, const ChatInfo& p_ChatInfo,
   }
 }
 
+// length of a downloaded Ogg/Opus file (voice message) in seconds, 0 if
+// unknown: the last page's granule position (48 kHz samples) minus the
+// OpusHead pre-skip; remembered per path
+static int OggOpusDurationSec(const std::string& p_Path)
+{
+  static std::unordered_map<std::string, int> s_Durations;
+  auto it = s_Durations.find(p_Path);
+  if (it != s_Durations.end()) return it->second;
+
+  int duration = 0;
+  const std::string data = FileUtil::ReadFile(p_Path);
+  if ((data.size() >= 64) && (data.compare(0, 4, "OggS") == 0))
+  {
+    auto le = [&data](size_t p_Pos, int p_Bytes)
+    {
+      uint64_t value = 0;
+      for (int i = p_Bytes - 1; i >= 0; --i)
+      {
+        value = (value << 8) | static_cast<uint8_t>(data[p_Pos + i]);
+      }
+
+      return value;
+    };
+
+    uint64_t preSkip = 0;
+    const size_t head = data.find("OpusHead");
+    if ((head != std::string::npos) && (head + 12 <= data.size()))
+    {
+      preSkip = le(head + 10, 2);
+    }
+
+    const size_t last = data.rfind("OggS");
+    if ((last != std::string::npos) && (last + 14 <= data.size()))
+    {
+      const uint64_t granule = le(last + 6, 8);
+      if (granule > preSkip)
+      {
+        duration = static_cast<int>((granule - preSkip + 24000) / 48000);
+      }
+    }
+  }
+
+  s_Durations[p_Path] = duration;
+  return duration;
+}
+
 static bool HasLink(const std::string& p_Text)
 {
   return (p_Text.find("://") != std::string::npos) || (p_Text.find("www.") != std::string::npos);
@@ -3178,6 +3224,11 @@ json ChatModel::MessageToJson(const std::string& p_AccountId, const std::string&
       path.clear();
     }
 
+    // voice messages: the length for previews (Ogg/Opus files once downloaded)
+    const int durationSec = ((status == FileStatusDownloaded) && !path.empty() &&
+                             ((type.find("ogg") != std::string::npos) || (type.find("opus") != std::string::npos)))
+      ? OggOpusDurationSec(path) : 0;
+
     file = json{
       { "id", fileInfo.fileId },
       { "path", path },
@@ -3185,6 +3236,7 @@ json ChatModel::MessageToJson(const std::string& p_AccountId, const std::string&
       { "mimeType", type },
       { "kind", kind },
       { "status", FileStatusToString(status) },
+      { "durationSec", durationSec },
     };
   }
 

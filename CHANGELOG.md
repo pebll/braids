@@ -6,6 +6,15 @@ release workflow publishes the section of a version as its release notes.
 
 ## [Unreleased]
 
+### Changed
+- Poll results: the leading option's bar is full and the others relative
+  to it, each option shows its number of votes and the pictures of up to
+  five voters (+N for more; Telegram does not tell who voted). (#29)
+- Chat list: photos, voice messages, videos and files in the last message
+  show an icon; photos a small preview ("3 Photos" with up to three for
+  photos sent together), voice messages their length ("Voice message
+  (2:12)") instead of the file name. (#28)
+
 ## [0.3.2] - 2026-11-09
 
 ### New
