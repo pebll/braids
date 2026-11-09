@@ -17,6 +17,13 @@ jobs:
       uses: actions/checkout@v5
     - name: Setup ccache
       uses: ./.github/actions/setup-ccache
+    - name: protoc for libsignal (Ubuntu 22.04's is too old)
+      run: |
+        v=29.3
+        a=$(uname -m | sed 's/aarch64/aarch_64/')
+        curl -fsSL -o "${RUNNER_TEMP}/protoc.zip" "https://github.com/protocolbuffers/protobuf/releases/download/v${v}/protoc-${v}-linux-${a}.zip"
+        sudo unzip -o -q "${RUNNER_TEMP}/protoc.zip" -d /usr/local bin/protoc 'include/*'
+        protoc --version
     - name: libsignal cache (built from source when the prebuilt download is gone)
       uses: actions/cache@v4
       with:
