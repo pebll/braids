@@ -155,6 +155,8 @@ jobs:
       uses: flatpak/flatpak-github-actions/flatpak-builder@v6
       with:
         manifest-path: utils/dist/flatpak/io.github.pebll.braids.yml
+        # as Flathub builds: the screenshots copied to its media server
+        mirror-screenshots-url: https://dl.flathub.org/media
         bundle: braids-${{ matrix.arch }}.flatpak
         arch: ${{ matrix.arch }}
         upload-artifact: false
