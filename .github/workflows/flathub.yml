@@ -30,7 +30,7 @@ jobs:
       run: |
         out=utils/dist/flathub
         python3 /tmp/fbt/cargo/flatpak-cargo-generator.py app/src-tauri/Cargo.lock -o $out/cargo-sources.json
-        tag="$(sed -n 's/^ *tag: *\(v[0-9.]*\)$/\1/p' $out/io.github.pebll.braids.yml | head -1)"
+        tag="$(grep -A1 'signalapp/libsignal.git' $out/io.github.pebll.braids.yml | sed -n 's/^ *tag: *//p')"
         git clone --depth 1 --branch "$tag" https://github.com/signalapp/libsignal.git /tmp/libsignal
         python3 /tmp/fbt/cargo/flatpak-cargo-generator.py /tmp/libsignal/Cargo.lock -o $out/libsignal-cargo-sources.json
         flatpak-node-generator npm app/package-lock.json -o $out/node-sources.json
