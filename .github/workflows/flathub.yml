@@ -99,7 +99,6 @@ jobs:
       with:
         manifest-path: utils/dist/flathub/io.github.pebll.braids.yml
         bundle: braids-flathub.flatpak
-        upload-artifact: false
         cache-key: flathub-x86_64-${{ github.sha }}
     - name: Flathub linter
       continue-on-error: true
