@@ -1,4 +1,4 @@
-# org.braids.app.yml
+# io.github.pebll.braids.yml
 #
 # Copyright (c) 2026 braids contributors
 #
@@ -10,11 +10,14 @@
 #
 #   utils/dist/package-linux
 #   git clone --depth 1 https://github.com/flathub/shared-modules utils/dist/flatpak/shared-modules
-#   flatpak-builder --user --install --force-clean build-flatpak utils/dist/flatpak/org.braids.app.yml
+#   flatpak-builder --user --install --force-clean build-flatpak utils/dist/flatpak/io.github.pebll.braids.yml
 #
-# The data lives in ~/.var/app/org.braids.app (not ~/.config/braids).
+# The data lives in ~/.var/app/io.github.pebll.braids (not ~/.config/braids).
+#
+# Flathub builds open source apps from source only (no prebuilt tarball):
+# this manifest is for the release's .flatpak; see doc/BACKLOG.md.
 
-app-id: org.braids.app
+app-id: io.github.pebll.braids
 runtime: org.gnome.Platform
 runtime-version: '48'
 sdk: org.gnome.Sdk
@@ -65,6 +68,7 @@ modules:
       - type: git
         url: https://github.com/file/file.git
         tag: FILE5_46
+        commit: b310a0c2d3e4a1c12d579ad5c0266f1092a91340
 
   - name: braids
     buildsystem: simple
@@ -74,12 +78,12 @@ modules:
       - cp -a tree/share/. /app/share/
       - rm -f /app/share/braids-install.sh /app/share/applications/braids.desktop
       - rm -f /app/share/icons/hicolor/128x128/apps/braids.png /app/share/icons/hicolor/256x256/apps/braids.png
-      - install -Dm644 tree/share/icons/hicolor/128x128/apps/braids.png /app/share/icons/hicolor/128x128/apps/org.braids.app.png
-      - install -Dm644 tree/share/icons/hicolor/256x256/apps/braids.png /app/share/icons/hicolor/256x256/apps/org.braids.app.png
-      - install -Dm644 tree/share/icons/hicolor/scalable/apps/braids.svg /app/share/icons/hicolor/scalable/apps/org.braids.app.svg
+      - install -Dm644 tree/share/icons/hicolor/128x128/apps/braids.png /app/share/icons/hicolor/128x128/apps/io.github.pebll.braids.png
+      - install -Dm644 tree/share/icons/hicolor/256x256/apps/braids.png /app/share/icons/hicolor/256x256/apps/io.github.pebll.braids.png
+      - install -Dm644 tree/share/icons/hicolor/scalable/apps/braids.svg /app/share/icons/hicolor/scalable/apps/io.github.pebll.braids.svg
       - rm -f /app/share/icons/hicolor/scalable/apps/braids.svg
-      - install -Dm644 org.braids.app.desktop /app/share/applications/org.braids.app.desktop
-      - install -Dm644 org.braids.app.metainfo.xml /app/share/metainfo/org.braids.app.metainfo.xml
+      - install -Dm644 io.github.pebll.braids.desktop /app/share/applications/io.github.pebll.braids.desktop
+      - install -Dm644 io.github.pebll.braids.metainfo.xml /app/share/metainfo/io.github.pebll.braids.metainfo.xml
     sources:
       - type: archive
         path: ../../../dist/braids-linux-x86_64.tar.gz
@@ -90,6 +94,6 @@ modules:
         dest: tree
         only-arches: [aarch64]
       - type: file
-        path: org.braids.app.desktop
+        path: io.github.pebll.braids.desktop
       - type: file
-        path: org.braids.app.metainfo.xml
+        path: io.github.pebll.braids.metainfo.xml

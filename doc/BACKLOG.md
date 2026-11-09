@@ -10,8 +10,12 @@ Agreed features not scheduled in a milestone yet. Newest first.
   runs (it holds the sessions and keys), an authenticated WebSocket transport
   instead of the local socket, and TLS. A hosted service is not planned
   (it would hold everyone's message keys).
-- **Flathub**: the Flatpak is attached to releases; publishing it on
-  Flathub needs a build from source (no prebuilt tarball). macOS is not
+- **Flathub**: the Flatpak (io.github.pebll.braids, metainfo and
+  Flathub's linter ready) is attached to releases; Flathub builds open
+  source apps from source only, without network: a manifest building tdlib,
+  libsignal (Rust, now a prebuilt download), the Go protocols (vendored
+  modules), braidsd, the Tauri shell (cargo sources) and the UI (npm
+  sources, flatpak-builder-tools) is still needed. macOS is not
   planned (decided against); Windows and mobile are out of scope.
 
 - **Custom groups**: user-defined chat groups/folders beyond All, Favorites

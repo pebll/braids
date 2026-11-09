@@ -38,6 +38,8 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v5
+    - name: Flathub page lists the released versions
+      run: python3 utils/dist/flatpak/update-releases --check
     - name: Setup ccache
       uses: ./.github/actions/setup-ccache
       with:
@@ -137,11 +139,17 @@ jobs:
     - name: Build
       uses: flatpak/flatpak-github-actions/flatpak-builder@v6
       with:
-        manifest-path: utils/dist/flatpak/org.braids.app.yml
+        manifest-path: utils/dist/flatpak/io.github.pebll.braids.yml
         bundle: braids-${{ matrix.arch }}.flatpak
         arch: ${{ matrix.arch }}
         upload-artifact: false
         cache-key: flatpak-builder-${{ matrix.arch }}-${{ github.sha }}
+    - name: Flathub checks (linter, as on Flathub)
+      # reported, not blocking the release
+      continue-on-error: true
+      run: |
+        flatpak-builder-lint --exceptions manifest utils/dist/flatpak/io.github.pebll.braids.yml
+        flatpak-builder-lint --exceptions repo repo
     - name: Checksum
       run: sha256sum "braids-${{ matrix.arch }}.flatpak" > "braids-${{ matrix.arch }}.flatpak.sha256"
     - name: Keep package

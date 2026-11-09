@@ -14,6 +14,12 @@ release workflow publishes the section of a version as its release notes.
   show an icon; photos a small preview ("3 Photos" with up to three for
   photos sent together), voice messages their length ("Voice message
   (2:12)") instead of the file name. (#28)
+- The Flatpak is now io.github.pebll.braids (was org.braids.app), as
+  Flathub requires. Installing it adds a new app: to keep your accounts,
+  quit braids, then move the data and remove the old one:
+  `mv ~/.var/app/org.braids.app ~/.var/app/io.github.pebll.braids` and
+  `flatpak uninstall org.braids.app`. Its software center page has
+  screenshots and the release notes.
 
 ## [0.3.2] - 2026-11-09
 

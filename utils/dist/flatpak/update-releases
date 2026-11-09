@@ -1,0 +1,77 @@
+#!/usr/bin/env python3
+
+# update-releases
+#
+# Copyright (c) 2026 braids contributors
+#
+# braids is distributed under the GNU AGPL v3 license, see LICENSE for details.
+#
+# Writes the <releases> of the AppStream metainfo (the Flathub / software
+# center page) from CHANGELOG.md: each released version with its date and
+# its entries (first sentence each). Run before a release; the release
+# workflow checks that the file is current.
+#
+#   utils/dist/flatpak/update-releases [--check]
+
+import html
+import os
+import re
+import sys
+
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+CHANGELOG = os.path.join(ROOT, "CHANGELOG.md")
+METAINFO = os.path.join(ROOT, "utils", "dist", "flatpak", "io.github.pebll.braids.metainfo.xml")
+MAX_ITEMS = 8
+
+
+def entries(body):
+    """The changelog entries of a version: first sentence, markdown removed."""
+    items = []
+    for item in re.split(r"\n- ", "\n" + body):
+        item = " ".join(line.strip() for line in item.strip().splitlines() if not line.startswith("#"))
+        if not item or item.startswith("#"):
+            continue
+        item = re.sub(r"`([^`]*)`", r"\1", item)
+        item = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", item)
+        item = re.sub(r"\*\*?([^*]*)\*\*?", r"\1", item)
+        item = re.sub(r"\s*\((#\d+(, )?)+\)", "", item)
+        item = re.sub(r"\s*Contributed by @[\w-]+.*$", "", item)
+        sentence = re.match(r"(.+?[.!?])(\s|$)", item)
+        items.append((sentence.group(1) if sentence else item).strip())
+    return items
+
+
+def releases():
+    text = open(CHANGELOG, encoding="utf-8").read()
+    parts = re.split(r"^## \[([^\]]+)\](?: - (\d{4}-\d{2}-\d{2}))?\s*$", text, flags=re.M)
+    out = []
+    for i in range(1, len(parts), 3):
+        version, date, body = parts[i], parts[i + 1], parts[i + 2]
+        if version.lower() == "unreleased" or not date:
+            continue
+        body = re.sub(r"^### .*$", "", body, flags=re.M)
+        items = entries(body)[:MAX_ITEMS]
+        lines = [f'    <release version="{version}" date="{date}">',
+                 f"      <url>https://github.com/pebll/braids/releases/tag/v{version}</url>"]
+        if items:
+            lines.append("      <description>")
+            lines.append("        <ul>")
+            lines += [f"          <li>{html.escape(item, quote=False)}</li>" for item in items]
+            lines.append("        </ul>")
+            lines.append("      </description>")
+        lines.append("    </release>")
+        out.append("\n".join(lines))
+    return "  <releases>\n" + "\n".join(out) + "\n  </releases>"
+
+
+def main():
+    metainfo = open(METAINFO, encoding="utf-8").read()
+    updated = re.sub(r"  <releases>.*?</releases>", lambda _: releases(), metainfo, flags=re.S)
+    if "--check" in sys.argv:
+        if updated != metainfo:
+            sys.exit("metainfo releases are not current: run utils/dist/flatpak/update-releases")
+        return
+    open(METAINFO, "w", encoding="utf-8").write(updated)
+
+
+main()
