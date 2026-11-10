@@ -1,0 +1,141 @@
+# io.github.pebll.braids.yml
+#
+# Copyright (c) 2026 braids contributors
+#
+# braids is distributed under the GNU AGPL v3 license, see LICENSE for details.
+#
+# Flathub manifest: braids built from source, offline (Flathub's build
+# servers have no network). The dependency sources are generated files:
+#   go-sources.json               utils/dist/flathub/go-sources
+#   cargo-sources.json            flatpak-cargo-generator app/src-tauri/Cargo.lock
+#   libsignal-cargo-sources.json  flatpak-cargo-generator <libsignal tag>/Cargo.lock
+#   node-sources.json             flatpak-node-generator npm app/package-lock.json
+# .github/workflows/flathub.yml generates them and builds this manifest; for
+# the Flathub repository the braids source is the release tag (see there).
+# @TG_API_ID@ / @TG_API_HASH@: braids' Telegram API credentials.
+
+app-id: io.github.pebll.braids
+runtime: org.gnome.Platform
+runtime-version: '51'
+sdk: org.gnome.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+  - org.freedesktop.Sdk.Extension.golang
+  - org.freedesktop.Sdk.Extension.node22
+  - org.freedesktop.Sdk.Extension.llvm22
+command: braids
+finish-args:
+  - --share=network
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+  # voice messages: record and play
+  - --socket=pulseaudio
+  # tray icon and notifications
+  - --talk-name=org.kde.StatusNotifierWatcher
+  - --talk-name=org.freedesktop.Notifications
+  # saving attachments ("Download file")
+  - --filesystem=xdg-download
+
+build-options:
+  append-path: /usr/lib/sdk/rust-stable/bin:/usr/lib/sdk/golang/bin:/usr/lib/sdk/node22/bin
+
+modules:
+  - shared-modules/libayatana-appindicator/libayatana-appindicator-gtk3.json
+
+  # libmagic (file types of attachments), not in the runtime
+  - name: libmagic
+    buildsystem: simple
+    build-commands:
+      - autoreconf -fi
+      - ./configure --prefix=/app --disable-static --enable-shared --disable-bzlib --disable-xzlib --disable-zstdlib --disable-lzlib
+      - make -j${FLATPAK_BUILDER_N_JOBS}
+      - make install
+    cleanup:
+      - /bin
+      - /include
+      - /share/man
+      - '*.la'
+    sources:
+      - type: git
+        url: https://github.com/file/file.git
+        tag: FILE5_46
+        commit: b310a0c2d3e4a1c12d579ad5c0266f1092a91340
+
+  # protoc, for libsignal's build (not in the SDK); only used while building
+  - name: protobuf
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -Dprotobuf_BUILD_TESTS=OFF
+      - -Dprotobuf_ABSL_PROVIDER=module
+      - -DCMAKE_INSTALL_PREFIX=/app/braids-build/protobuf
+    cleanup:
+      - '*'
+    sources:
+      - type: git
+        url: https://github.com/protocolbuffers/protobuf.git
+        tag: v29.3
+        commit: b407e8416e3893036aee5af9a12bd9b6a0e2b2e6
+
+  # Signal's library (Rust), linked into the Signal protocol; the version
+  # braids' signalmeow needs (lib/sgchat/go/ext/signal/pkg/libsignalgo/signalversion)
+  - name: libsignal
+    buildsystem: simple
+    build-options:
+      append-path: /usr/lib/sdk/llvm22/bin:/app/braids-build/protobuf/bin
+      env:
+        CARGO_HOME: /run/build/libsignal/cargo
+        LIBCLANG_PATH: /usr/lib/sdk/llvm22/lib
+        PROTOC: /app/braids-build/protobuf/bin/protoc
+        CARGO_NET_OFFLINE: 'true'
+        RUSTFLAGS: -Ctarget-feature=-crt-static
+    build-commands:
+      # bindgen: the extension's clang headers (stddef.h, ...)
+      - BINDGEN_EXTRA_CLANG_ARGS="-resource-dir=$(/usr/lib/sdk/llvm22/bin/clang -print-resource-dir)" cargo build --offline --release -p libsignal-ffi
+      - install -Dm644 target/release/libsignal_ffi.a /app/braids-build/libsignal_ffi.a
+    cleanup:
+      - '*'
+    sources:
+      - type: git
+        url: https://github.com/signalapp/libsignal.git
+        tag: v0.105.0
+        commit: 4beb029d8a941f81e7d9c6d8af1ed25a677569a8
+      - libsignal-cargo-sources.json
+
+  - name: braids
+    buildsystem: simple
+    build-options:
+      env:
+        GOPROXY: file:///run/build/braids/goproxy
+        GOSUMDB: 'off'
+        GOTOOLCHAIN: local
+        CARGO_HOME: /run/build/braids/cargo
+        CARGO_NET_OFFLINE: 'true'
+        npm_config_cache: /run/build/braids/flatpak-node/npm-cache
+        npm_config_offline: 'true'
+        XDG_CACHE_HOME: /run/build/braids/flatpak-node/cache
+    build-commands:
+      # braidsd and the protocols (Telegram's tdlib is in lib/tgchat/ext/td)
+      - cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBRAIDS_RELOCATABLE=ON -DHAS_DUMMY=OFF
+        -DCMAKE_INSTALL_LIBDIR=lib -DBRAIDS_LIBSIGNAL_FFI=/app/braids-build/libsignal_ffi.a
+        -DTG_API_ID=@TG_API_ID@ -DTG_API_HASH=@TG_API_HASH@
+      - cmake --build build -j ${FLATPAK_BUILDER_N_JOBS}
+      - cmake --install build --prefix /app
+      # the app: UI, then the Tauri shell with the UI inside
+      - cd app && npm ci --offline --ignore-scripts && npm run build
+      - cd app/src-tauri && cargo build --offline --release --features tauri/custom-protocol
+      - install -Dm755 app/src-tauri/target/release/braids /app/bin/braids
+      - install -Dm644 app/src-tauri/icons/128x128.png /app/share/icons/hicolor/128x128/apps/io.github.pebll.braids.png
+      - install -Dm644 app/src-tauri/icons/128x128@2x.png /app/share/icons/hicolor/256x256/apps/io.github.pebll.braids.png
+      - install -Dm644 doc/design/icons/braids-linux-512.svg /app/share/icons/hicolor/scalable/apps/io.github.pebll.braids.svg
+      - install -Dm644 utils/dist/flatpak/io.github.pebll.braids.desktop /app/share/applications/io.github.pebll.braids.desktop
+      - install -Dm644 utils/dist/flatpak/io.github.pebll.braids.metainfo.xml /app/share/metainfo/io.github.pebll.braids.metainfo.xml
+    sources:
+      # Flathub: type git, url https://github.com/pebll/braids.git, tag and commit
+      - type: dir
+        path: ../../..
+      - go-sources.json
+      - cargo-sources.json
+      - node-sources.json
