@@ -83,6 +83,29 @@
     <binary>braids</binary>
   </provides>
   <releases>
+    <release version="0.3.4" date="2026-11-10">
+      <url>https://github.com/pebll/braids/releases/tag/v0.3.4</url>
+      <description>
+        <ul>
+          <li>Nix: nix run github:pebll/braids stopped with "cannot write modified lock file": the flake's lock file was missing.</li>
+          <li>Flathub: a manifest that builds braids from source, offline (utils/dist/flathub, built by the Flathub workflow), for the submission to Flathub.</li>
+        </ul>
+      </description>
+    </release>
+    <release version="0.3.3" date="2026-11-09">
+      <url>https://github.com/pebll/braids/releases/tag/v0.3.3</url>
+      <description>
+        <ul>
+          <li>Nix and NixOS: nix run github:pebll/braids runs the latest release (or nix profile install github:pebll/braids).</li>
+          <li>A new braids version is also announced as a desktop notification (once per version, with desktop notifications on), and is checked for while braids keeps running, not only at start.</li>
+          <li>Poll results: the leading option's bar is full and the others relative to it, each option shows its number of votes and the pictures of up to five voters (+N for more; Telegram does not tell who voted).</li>
+          <li>Chat list: photos, voice messages, videos and files in the last message show an icon; photos a small preview ("3 Photos" with up to three for photos sent together), voice messages their length ("Voice message (2:12)") instead of the file name.</li>
+          <li>The Flatpak is now io.github.pebll.braids (was org.braids.app), as Flathub requires.</li>
+          <li>WhatsApp: votes in polls reach the other phones.</li>
+          <li>After a start or an update, names and profile pictures show at once: braids keeps the pictures it knows (braids-avatars.json in the account's profile) and loads the saved names before the messenger's contact sync; pictures are then checked for changes in the background (they were fetched again one by one, names waited for the connection).</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.3.2" date="2026-11-09">
       <url>https://github.com/pebll/braids/releases/tag/v0.3.2</url>
       <description>

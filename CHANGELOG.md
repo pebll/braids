@@ -6,6 +6,19 @@ release workflow publishes the section of a version as its release notes.
 
 ## [Unreleased]
 
+## [0.3.4] - 2026-11-10
+
+### Fixed
+- Nix: `nix run github:pebll/braids` stopped with "cannot write modified
+  lock file": the flake's lock file was missing (#32).
+
+### Changed
+- Flathub: a manifest that builds braids from source, offline
+  (`utils/dist/flathub`, built by the Flathub workflow), for the
+  submission to Flathub.
+
+## [0.3.3] - 2026-11-09
+
 ### New
 - Nix and NixOS: `nix run github:pebll/braids` runs the latest release
   (or `nix profile install github:pebll/braids`).
