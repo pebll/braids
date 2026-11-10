@@ -46,6 +46,17 @@ if(EXISTS ${LIBSIGNAL_FFI_VERSION_FILE})
   string(STRIP "${LIBSIGNAL_FFI_BUILT_VERSION}" LIBSIGNAL_FFI_BUILT_VERSION)
 endif()
 
+# braids: a libsignal_ffi.a built beforehand for this version (the Flatpak
+# builds it in its own module, offline)
+set(BRAIDS_LIBSIGNAL_FFI "" CACHE FILEPATH "libsignal_ffi.a built beforehand (no download or build here)")
+if(BRAIDS_LIBSIGNAL_FFI)
+  file(MAKE_DIRECTORY ${LIBSIGNAL_FFI_DIR})
+  configure_file(${BRAIDS_LIBSIGNAL_FFI} ${LIBSIGNAL_FFI_FILE} COPYONLY)
+  file(WRITE ${LIBSIGNAL_FFI_VERSION_FILE} "${LIBSIGNAL_REQUIRED_VERSION}\n")
+  set(LIBSIGNAL_FFI_BUILT_VERSION "${LIBSIGNAL_REQUIRED_VERSION}")
+  set(DOWNLOAD_LIBSIGNAL OFF)
+endif()
+
 if(DOWNLOAD_LIBSIGNAL)
   # Detect OS for libsignal download
   if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")

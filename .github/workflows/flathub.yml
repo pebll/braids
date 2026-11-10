@@ -1,0 +1,107 @@
+# flathub.yml
+#
+# Copyright (c) 2026 braids contributors
+#
+# braids is distributed under the GNU AGPL v3 license, see LICENSE for details.
+#
+# Builds the Flathub manifest (utils/dist/flathub: braids from source,
+# offline) as Flathub would: generates the dependency sources, builds, runs
+# Flathub's linter. The generated sources are kept as the run's artifact
+# "flathub-sources" (for the Flathub repository).
+
+name: Flathub
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [flathub]
+
+jobs:
+  sources:
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Quick checks (before the long build)
+      run: |
+        m=utils/dist/flathub/io.github.pebll.braids.yml
+        python3 -c "import yaml,sys; yaml.safe_load(open('$m'))"
+        # the manifest's libsignal is the version signalmeow needs
+        tag="$(grep -A1 'signalapp/libsignal.git' $m | sed -n 's/^ *tag: *//p')"
+        need="$(sed -n 's/.*const Version = "\(.*\)".*/\1/p' lib/sgchat/go/ext/signal/pkg/libsignalgo/signalversion/version.go)"
+        echo "libsignal: manifest ${tag}, needed ${need}"
+        [ -n "$tag" ] && [ "$tag" = "$need" ]
+        # each git source's commit is its tag
+        python3 - "$m" <<'PY'
+        import subprocess, sys, yaml
+        def walk(mods):
+            for mod in mods:
+                if isinstance(mod, dict):
+                    yield mod
+                    yield from walk(mod.get("modules", []))
+        bad = 0
+        for mod in walk(yaml.safe_load(open(sys.argv[1]))["modules"]):
+            for src in mod.get("sources", []):
+                if isinstance(src, dict) and src.get("type") == "git" and src.get("tag"):
+                    out = subprocess.run(["git", "ls-remote", src["url"], f"refs/tags/{src['tag']}", f"refs/tags/{src['tag']}^{{}}"],
+                                         capture_output=True, text=True).stdout.split()
+                    ok = src.get("commit") in out
+                    bad += not ok
+                    print(mod["name"], src["tag"], "ok" if ok else f"commit mismatch {out}")
+        sys.exit(bad)
+        PY
+    - name: Generators
+      run: |
+        git clone --depth 1 https://github.com/flatpak/flatpak-builder-tools /tmp/fbt
+        pip install --break-system-packages aiohttp toml tomlkit /tmp/fbt/node
+    - name: Generate
+      run: |
+        out=utils/dist/flathub
+        python3 /tmp/fbt/cargo/flatpak-cargo-generator.py app/src-tauri/Cargo.lock -o $out/cargo-sources.json
+        tag="$(grep -A1 'signalapp/libsignal.git' $out/io.github.pebll.braids.yml | sed -n 's/^ *tag: *//p')"
+        git clone --depth 1 --branch "$tag" https://github.com/signalapp/libsignal.git /tmp/libsignal
+        python3 /tmp/fbt/cargo/flatpak-cargo-generator.py /tmp/libsignal/Cargo.lock -o $out/libsignal-cargo-sources.json
+        flatpak-node-generator npm app/package-lock.json -o $out/node-sources.json
+        $out/go-sources > $out/go-sources.json 2>/dev/null
+        ls -la $out
+        for f in cargo-sources libsignal-cargo-sources node-sources go-sources; do
+          python3 -c "import json,sys; d=json.load(open('$out/$f.json')); assert len(d) > 10, '$f: too few sources'; print('$f', len(d))"
+        done
+    - name: Keep sources
+      uses: actions/upload-artifact@v4
+      with:
+        name: flathub-sources
+        path: utils/dist/flathub/*.json
+
+  build:
+    needs: sources
+    runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-48
+      options: --privileged
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Sources
+      uses: actions/download-artifact@v4
+      with:
+        name: flathub-sources
+        path: utils/dist/flathub
+    - name: Shared modules, Telegram credentials
+      env:
+        TG_API_ID: ${{ secrets.TG_API_ID }}
+        TG_API_HASH: ${{ secrets.TG_API_HASH }}
+      run: |
+        git clone --depth 1 https://github.com/flathub/shared-modules utils/dist/flathub/shared-modules
+        sed -i "s/@TG_API_ID@/${TG_API_ID}/; s/@TG_API_HASH@/${TG_API_HASH}/" utils/dist/flathub/io.github.pebll.braids.yml
+    - name: Build
+      uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+      with:
+        manifest-path: utils/dist/flathub/io.github.pebll.braids.yml
+        bundle: braids-flathub.flatpak
+        cache-key: flathub-x86_64-${{ github.sha }}
+    - name: Flathub linter
+      continue-on-error: true
+      run: |
+        flatpak-builder-lint --exceptions manifest utils/dist/flathub/io.github.pebll.braids.yml || true
+        flatpak-builder-lint --exceptions repo repo || true

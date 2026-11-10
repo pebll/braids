@@ -1,0 +1,66 @@
+#!/usr/bin/env python3
+
+# go-sources
+#
+# Copyright (c) 2026 braids contributors
+#
+# braids is distributed under the GNU AGPL v3 license, see LICENSE for details.
+#
+# Writes the flatpak-builder sources of the Go protocols' modules (all
+# go.sum entries of lib/*/go) as a file proxy in goproxy/ (GOPROXY=file://),
+# so they build offline on Flathub. Downloads each file once for its checksum.
+#
+#   utils/dist/flathub/go-sources > go-sources.json
+
+import glob
+import hashlib
+import json
+import os
+import sys
+import urllib.request
+
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+PROXY = "https://proxy.golang.org"
+
+
+def escape(path):
+    return "".join("!" + c.lower() if c.isupper() else c for c in path)
+
+
+def source(module, version, ext):
+    path = f"{escape(module)}/@v/{escape(version)}.{ext}"
+    url = f"{PROXY}/{path}"
+    with urllib.request.urlopen(url) as r:
+        sha = hashlib.sha256(r.read()).hexdigest()
+    return {"type": "file", "url": url, "sha256": sha,
+            "dest": f"goproxy/{os.path.dirname(path)}", "dest-filename": os.path.basename(path)}
+
+
+def main():
+    wanted = set()
+    for gosum in sorted(glob.glob(os.path.join(ROOT, "lib", "*", "go", "go.sum"))):
+        for line in open(gosum):
+            parts = line.split()
+            if len(parts) != 3:
+                continue
+            module, version = parts[0], parts[1]
+            if version.endswith("/go.mod"):
+                wanted.add((module, version[:-len("/go.mod")], "mod"))
+            else:
+                wanted.add((module, version, "zip"))
+                wanted.add((module, version, "mod"))
+
+    sources = []
+    infos = set()
+    for module, version, ext in sorted(wanted):
+        print(f"{module} {version} {ext}", file=sys.stderr)
+        sources.append(source(module, version, ext))
+        if (module, version) not in infos:
+            infos.add((module, version))
+            sources.append({"type": "inline", "contents": json.dumps({"Version": version}),
+                            "dest": f"goproxy/{escape(module)}/@v", "dest-filename": f"{escape(version)}.info"})
+    json.dump(sources, sys.stdout, indent=2)
+    print()
+
+
+main()
