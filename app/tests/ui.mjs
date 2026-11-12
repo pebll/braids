@@ -141,6 +141,22 @@ try {
   check(await page.locator('.info .member').count() === 5, 'member list shows 5');
   await page.getByRole('button', { name: 'Show all 6' }).click();
   check(await page.locator('.info .member').count() === 6, 'member list expands');
+
+  // add and remove members (#38): Dummy lets self add anyone and remove all but Michael
+  await page.locator('.info').getByRole('button', { name: 'Add people' }).click();
+  await page.locator('input[aria-label="Search people"]').fill('kev');
+  await page.getByRole('checkbox', { name: /Kevin/ }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Add', exact: true }).click();
+  await page.locator('.info .member', { hasText: 'Kevin' }).waitFor();
+  check(await page.locator('.info .member').count() === 7, 'Add people: Kevin added to the member list');
+  await page.locator('.info .member', { hasText: 'Michael' }).click();
+  check(await page.getByRole('menuitem', { name: 'Remove from group' }).count() === 0, 'no Remove for a member self may not remove');
+  await page.keyboard.press('Escape');
+  await page.locator('.info .member', { hasText: 'Kevin' }).click();
+  await page.getByRole('menuitem', { name: 'Remove from group' }).click();
+  await page.getByRole('button', { name: 'Remove', exact: true }).click();
+  await page.locator('.info .member', { hasText: 'Kevin' }).waitFor({ state: 'detached' });
+  check(await page.locator('.info .member').count() === 6, 'Remove from group: Kevin gone after confirming');
   await page.keyboard.press('Control+i');
   await composer.fill('Hello *team* `code`');
   await composer.press('Enter');
@@ -445,6 +461,15 @@ try {
   check(parseInt(await page.locator('.lb-zoom').textContent()) > 150, 'wheel zooms in');
   await page.keyboard.press('0');
   check((await page.locator('.lb-zoom').textContent()) === '100%', '0 resets the zoom');
+  // Ctrl + - 0 zoom the picture, not the app (#31)
+  const appZoom = () => page.evaluate(() => document.getElementById('app').style.zoom || '1');
+  const zoomBefore = await appZoom();
+  await page.keyboard.press('Control+=');
+  check((await page.locator('.lb-zoom').textContent()) === '150%', 'Ctrl+= zooms the picture');
+  await page.keyboard.press('Control+-');
+  await page.keyboard.press('Control+0');
+  check((await page.locator('.lb-zoom').textContent()) === '100%' && (await appZoom()) === zoomBefore && await page.locator('.text-size-notice').count() === 0,
+    'Ctrl + - 0 in the viewer leave the text size alone');
   await page.keyboard.press('Escape');
   await page.locator('.lightbox').waitFor({ state: 'detached' });
   check(true, 'Esc closes the viewer');
@@ -479,6 +504,17 @@ try {
   const kevinRow = page.locator('.chatlist .row', { has: page.locator('.name', { hasText: /^Kevin$/ }) });
   check((await kevinRow.locator('.unread-count').textContent()) === '2', 'unread message count in the list');
   check((await page.getByRole('button', { name: /All chats/ }).locator('.count').textContent()) === '1', 'folder counts chats, not messages');
+  check(!(await page.getByRole('button', { name: /All chats/ }).locator('.count').getAttribute('class')).includes('muted'), 'All chats count in the accent color');
+  check(await page.getByRole('button', { name: /^Unread/ }).locator('.count').count() === 0, 'no count on the Unread folder');
+  const accountCount = page.locator('nav.sidebar .item[title*="—"] .count').first();
+  check((await accountCount.getAttribute('class')).includes('muted'), 'account count grey');
+  await page.keyboard.press('Control+,');
+  await page.getByRole('switch', { name: 'Unread counts on Favorites and accounts' }).click();
+  await page.keyboard.press('Escape');
+  check(await page.locator('nav.sidebar .item[title*="—"] .count').count() === 0, 'account counts hidden by the setting');
+  await page.keyboard.press('Control+,');
+  await page.getByRole('switch', { name: 'Unread counts on Favorites and accounts' }).click();
+  await page.keyboard.press('Escape');
   // only a group event new (Angela joined): grey, not bold, not counted
   const partyRow = page.locator('.chatlist .row', { has: page.locator('.name', { hasText: /^Party Planning$/ }) });
   check(await partyRow.locator('.unread-count.muted').textContent() === '1', 'group event only: grey count');

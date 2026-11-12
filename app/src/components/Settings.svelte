@@ -95,6 +95,34 @@
     }
   }
 
+  // the bug report template (.github/ISSUE_TEMPLATE/bugreport.md) with the
+  // environment filled in
+  async function reportBug() {
+    const info = await api.systemInfo().catch(() => null);
+    const protocols = [...new Set(store.accountList.map((a) => protocolMeta(a.protocol).name))].join(', ');
+    const version = [info?.app, store.daemonVersion && info?.app !== store.daemonVersion ? `core ${store.daemonVersion}` : ''].filter(Boolean).join(', ') || store.daemonVersion;
+    const os = [info?.os, info?.kernel && `kernel ${info.kernel}`, info?.arch, info?.desktop].filter(Boolean).join(', ');
+    const body = [
+      '**Description**:',
+      '',
+      '**How to reproduce it**:',
+      '',
+      '**Environment**:',
+      `- braids version: ${version}`,
+      `- Installed with (install script / .deb / Flatpak / AppImage / archive / Nix / source): ${info?.install ?? ''}`,
+      `- OS / distro: ${os}`,
+      `- Messenger(s): ${protocols}`,
+      '',
+      '**Log**:',
+      '<!--',
+      'Please attach a copy of `~/.config/braids/log.txt` after reviewing and removing',
+      'any sensitive information from it.',
+      '-->',
+      '',
+    ].join('\n');
+    await api.openUrl(`${ISSUES}/new?labels=bug&body=${encodeURIComponent(body)}`);
+  }
+
   async function checkNow() {
     updateStatus = 'Checking…';
     const u = await store.checkUpdates(true);
@@ -217,6 +245,10 @@
               <button aria-pressed={settings.favorites === o.id} onclick={() => set('favorites', o.id)}>{o.label}</button>
             {/each}
           </div>
+        </div>
+        <div class="row">
+          <div class="row-text"><b>Unread counts on Favorites and accounts</b><span>Grey numbers in the sidebar. All chats always shows the total.</span></div>
+          <button class="toggle" role="switch" aria-checked={settings.sidebarCounts} aria-label="Unread counts on Favorites and accounts" onclick={() => set('sidebarCounts', !settings.sidebarCounts)}></button>
         </div>
         <div class="row">
           <div class="row-text"><b>Enter sends the message</b><span>Off: Ctrl+Enter sends, Enter adds a line.</span></div>
@@ -363,7 +395,7 @@
             <b>Feedback</b>
             <span>Found a bug or have an idea? Tell us on GitHub (needs a GitHub account).</span>
             <div class="buttons center">
-              <button class="btn" onclick={() => api.openUrl(`${ISSUES}/new?template=bugreport.md`).catch((e) => store.toastError(e))}><Bug size={16} />Report a bug</button>
+              <button class="btn" onclick={() => reportBug().catch((e) => store.toastError(e))}><Bug size={16} />Report a bug</button>
               <button class="btn" onclick={() => api.openUrl(`${ISSUES}/new?template=feature_request.md`).catch((e) => store.toastError(e))}><Lightbulb size={16} />Suggest a feature</button>
               <button class="btn" onclick={() => api.openUrl(ISSUES).catch((e) => store.toastError(e))}>Known issues</button>
             </div>

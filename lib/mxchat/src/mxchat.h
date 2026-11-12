@@ -115,11 +115,12 @@ void MxNewMessageReactionNotify(int p_ConnId, char* p_ChatId, char* p_MsgId, cha
                                 int p_FromMe);
 void MxNewTypingNotify(int p_ConnId, char* p_ChatId, char* p_UserId, int p_IsTyping);
 void MxNewStatusNotify(int p_ConnId, char* p_UserId, int p_IsOnline, long long p_TimeSeen);
-void MxNewGroupMembersNotify(int p_ConnId, char* p_ChatId, char* p_MembersJson);
+void MxNewGroupMembersNotify(int p_ConnId, char* p_ChatId, char* p_MembersJson, int p_CanAdd, char* p_CanRemove);
 void MxNewAvatarNotify(int p_ConnId, char* p_Id, char* p_FilePath, int p_Full);
 void MxNewDescriptionNotify(int p_ConnId, char* p_Id, char* p_Description);
 void MxJoinChatNotify(int p_ConnId, char* p_Link, int p_Success, char* p_ChatId, char* p_Error);
 void MxCreateGroupNotify(int p_ConnId, char* p_Name, int p_Success, char* p_ChatId, char* p_Error);
+void MxEditMembersNotify(int p_ConnId, char* p_ChatId, char* p_UserIds, int p_Remove, int p_Success, char* p_Error);
 void MxDeleteChatNotify(int p_ConnId, char* p_ChatId);
 void MxDeleteMessageNotify(int p_ConnId, char* p_ChatId, char* p_MsgId, int p_IsOutgoing);
 void MxUpdateMuteNotify(int p_ConnId, char* p_ChatId, int p_IsMuted);

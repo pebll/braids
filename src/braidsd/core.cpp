@@ -27,7 +27,7 @@
 #include "timeutil.h"
 
 // semver of the API; clients must match the major version
-static const std::string s_ApiVersion = "0.14.0";
+static const std::string s_ApiVersion = "0.15.0";
 static const int64_t s_StartTime = TimeUtil::GetCurrentTimeMSec();
 
 static const char* AuthStepToString(AuthStep p_Step)
@@ -534,6 +534,28 @@ void Core::Dispatch(const std::string& p_Method, const json& p_Params, const Rep
   else if (p_Method == "members.get")
   {
     m_ChatModel->GetMembers(ParamStr(params, "accountId"), ParamStr(params, "chatId"), p_Reply);
+  }
+  else if (p_Method == "members.add")
+  {
+    if (!params.contains("userIds") || !params["userIds"].is_array())
+    {
+      throw ApiException(ApiErrorInvalidParams, "missing array param 'userIds'");
+    }
+
+    std::vector<std::string> userIds;
+    for (const auto& id : params["userIds"])
+    {
+      if (id.is_string() && !id.get<std::string>().empty()) userIds.push_back(id.get<std::string>());
+    }
+
+    m_ChatModel->EditMembers(ParamStr(params, "accountId"), ParamStr(params, "chatId"), userIds, false /*p_Remove*/);
+    p_Reply.Ok(json::object());
+  }
+  else if (p_Method == "members.remove")
+  {
+    m_ChatModel->EditMembers(ParamStr(params, "accountId"), ParamStr(params, "chatId"),
+                             std::vector<std::string>{ ParamStr(params, "userId") }, true /*p_Remove*/);
+    p_Reply.Ok(json::object());
   }
   else
   {

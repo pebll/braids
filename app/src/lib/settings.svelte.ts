@@ -36,6 +36,9 @@ class Settings {
   // favorites: their own folder in the sidebar, pinned at the top of the
   // chat lists, or both
   favorites = $state<'folder' | 'top' | 'both'>('folder');
+  // grey unread counts on Favorites and the accounts in the sidebar (All
+  // chats always shows the total, in the accent color)
+  sidebarCounts = $state(true);
   accounts = $state<Record<string, AccountMeta>>({});
   categories = $state<Record<string, ChatCategory>>({}); // chat key -> category
   keybinds = $state<Partial<Record<string, string[]>>>({}); // action -> combos, only changed ones (keybinds.svelte.ts)
@@ -43,7 +46,7 @@ class Settings {
   constructor() {
     try {
       const saved = JSON.parse(localStorage.getItem(KEY) ?? '{}');
-      for (const k of ['theme', 'textSize', 'notifications', 'notificationPreview', 'closeToTray', 'sidebarCollapsed', 'enterSends', 'linkPreviews', 'checkUpdates', 'chatListWidth', 'favorites', 'accounts', 'categories', 'keybinds'] as const) {
+      for (const k of ['theme', 'textSize', 'notifications', 'notificationPreview', 'closeToTray', 'sidebarCollapsed', 'enterSends', 'linkPreviews', 'checkUpdates', 'chatListWidth', 'favorites', 'sidebarCounts', 'accounts', 'categories', 'keybinds'] as const) {
         if (saved[k] !== undefined && (k !== 'textSize' || Number.isFinite(saved[k]) && saved[k] >= 50 && saved[k] <= 200)) (this as any)[k] = saved[k];
       }
     } catch {
@@ -65,6 +68,7 @@ class Settings {
         checkUpdates: this.checkUpdates,
         chatListWidth: this.chatListWidth,
         favorites: this.favorites,
+        sidebarCounts: this.sidebarCounts,
         accounts: this.accounts,
         categories: this.categories,
         keybinds: this.keybinds,

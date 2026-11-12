@@ -6,6 +6,29 @@ release workflow publishes the section of a version as its release notes.
 
 ## [Unreleased]
 
+### New
+- Matrix groups: add people (they get an invitation) with "Add people" in
+  the group info, remove them from a member's menu ("Remove from group").
+  Both show only where your power level in the room allows it. (#38)
+- F11 toggles fullscreen (a shortcut you can change in Settings →
+  Keyboard). (#34)
+- NixOS: a guide to installing braids with a system flake, in the README
+  and linked from the website. (#37)
+
+### Changed
+- Sidebar: only All chats shows its unread count in color. The Unread
+  folder has no count (it was always the same as All chats); Favorites and
+  the accounts show theirs in grey, and a setting (Settings → General) hides
+  them. Archived chats with new messages now also show their count in the
+  collapsed sidebar. (#36)
+- Settings → About → Report a bug fills in the braids version, how braids
+  was installed, your distribution, kernel and desktop, and your
+  messengers. (#39)
+
+### Fixed
+- In the image viewer, Ctrl + / Ctrl − / Ctrl 0 zoomed the whole app
+  instead of the picture. (#31)
+
 ## [0.3.4] - 2026-11-10
 
 ### Fixed

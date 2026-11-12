@@ -72,6 +72,8 @@ class Store {
   messages = $state<Record<string, MessageList>>({});
   contacts = $state<Record<string, Record<string, Contact>>>({});
   members = $state<Record<string, Contact[]>>({});
+  membersCanAdd = $state<Record<string, boolean>>({}); // chat key -> self may add members
+  private pendingMemberEdits = new Map<string, (r: { success: boolean; error: string }) => void>();
   typing = $state<Record<string, Record<string, string>>>({}); // key -> userId -> name
   presence = $state<Record<string, { isOnline: boolean; timeSeen: number }>>({}); // accountId\u0001userId
   avatars = $state<Record<string, string>>({}); // accountId\u0001user or chat id -> image path ('' none)
@@ -475,7 +477,14 @@ class Store {
       for (const key of Object.keys(this.messages)) {
         if (key !== this.current) delete this.messages[key];
       }
+      // member lists (and who may add or remove members) too
+      this.members = {};
+      this.membersCanAdd = {};
       if (this.current && this.chats[this.current]) {
+        const [accountId, chatId] = splitKey(this.current);
+        if (this.chats[this.current].isGroup) {
+          api.call('members.get', { accountId, chatId }).then((r) => this.setMembers(r)).catch(() => {});
+        }
         this.messages[this.current] = emptyList();
         await this.loadOlder(this.current);
       }
@@ -579,7 +588,10 @@ class Store {
         break;
       }
       case 'members.updated':
-        this.members[chatKey(p.accountId, p.chatId)] = p.members;
+        this.setMembers(p);
+        break;
+      case 'members.edited':
+        this.pendingMemberEdits.get(`${p.accountId}\u0002${p.chatId}\u0002${p.remove ? '-' : '+'}`)?.(p);
         break;
       case 'message.added':
       case 'message.updated':
@@ -830,6 +842,32 @@ class Store {
       if (this.chats[key]) await this.openChat(key);
     } finally {
       this.pendingJoins.delete(id);
+    }
+  }
+
+  // a members.get reply or members.updated event
+  setMembers(r: { accountId: string; chatId: string; members: Contact[]; canAdd?: boolean }) {
+    const key = chatKey(r.accountId, r.chatId);
+    this.members[key] = r.members;
+    this.membersCanAdd[key] = !!r.canAdd;
+  }
+
+  // Adds people to a group (Matrix: invites them) or removes one; throws with
+  // the protocol's reason when that fails. The new member list follows as
+  // members.updated.
+  async editMembers(accountId: string, chatId: string, userIds: string[], remove: boolean): Promise<void> {
+    const id = `${accountId}\u0002${chatId}\u0002${remove ? '-' : '+'}`;
+    const result = new Promise<{ success: boolean; error: string }>((resolve) => {
+      this.pendingMemberEdits.set(id, resolve);
+      setTimeout(() => resolve({ success: false, error: 'No answer from the messenger.' }), 60000);
+    });
+    try {
+      if (remove) await api.call('members.remove', { accountId, chatId, userId: userIds[0] });
+      else await api.call('members.add', { accountId, chatId, userIds });
+      const r = await result;
+      if (!r.success) throw new Error(r.error || (remove ? 'Could not remove the member.' : 'Could not add the members.'));
+    } finally {
+      this.pendingMemberEdits.delete(id);
     }
   }
 

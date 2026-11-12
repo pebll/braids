@@ -992,6 +992,16 @@ void ChatModel::OnServiceMessage(std::shared_ptr<ServiceMessage> p_ServiceMessag
       }
       break;
 
+    case EditMembersNotifyType:
+      {
+        std::shared_ptr<EditMembersNotify> editMembersNotify =
+          std::static_pointer_cast<EditMembersNotify>(p_ServiceMessage);
+        Emit("members.edited", json{ { "accountId", accountId }, { "chatId", editMembersNotify->chatId },
+               { "userIds", editMembersNotify->userIds }, { "remove", editMembersNotify->remove },
+               { "success", editMembersNotify->success }, { "error", editMembersNotify->error } });
+      }
+      break;
+
     case CreateGroupNotifyType:
       {
         std::shared_ptr<CreateGroupNotify> createGroupNotify =
@@ -1195,6 +1205,8 @@ void ChatModel::OnServiceMessage(std::shared_ptr<ServiceMessage> p_ServiceMessag
         }
 
         account.groupMembers[chatId] = memberIds;
+        account.groupCanAdd[chatId] = notify->canAdd;
+        account.groupCanRemove[chatId] = std::set<std::string>(notify->canRemove.begin(), notify->canRemove.end());
         ResolvePending(PendingMembers, accountId, chatId, "", false /*p_TimedOut*/);
         Emit("members.updated", MembersJson(accountId, chatId));
       }
@@ -1685,21 +1697,27 @@ json ChatModel::MessagesPage(const std::string& p_AccountId, const std::string& 
 json ChatModel::MembersJson(const std::string& p_AccountId, const std::string& p_ChatId)
 {
   AccountState& account = m_Accounts[p_AccountId];
+  const std::set<std::string>& canRemove = account.groupCanRemove[p_ChatId];
   json members = json::array();
   for (const auto& memberId : account.groupMembers[p_ChatId])
   {
+    json member;
     auto cit = account.contactInfos.find(memberId);
     if (cit != account.contactInfos.end())
     {
-      members.push_back(ContactToJson(cit->second));
+      member = ContactToJson(cit->second);
     }
     else
     {
-      members.push_back(json{ { "id", memberId }, { "name", memberId }, { "phone", "" }, { "isSelf", false } });
+      member = json{ { "id", memberId }, { "name", memberId }, { "phone", "" }, { "isSelf", false } };
     }
+
+    member["canRemove"] = (canRemove.count(memberId) > 0);
+    members.push_back(member);
   }
 
-  return json{ { "accountId", p_AccountId }, { "chatId", p_ChatId }, { "members", members } };
+  return json{ { "accountId", p_AccountId }, { "chatId", p_ChatId }, { "members", members },
+    { "canAdd", account.groupCanAdd[p_ChatId] } };
 }
 
 std::map<std::string, std::string> ChatModel::ParseMentions(const std::string& p_AccountId,
@@ -2723,6 +2741,27 @@ void ChatModel::CreateGroup(const std::string& p_AccountId, const std::string& p
   SendProtocolRequest(p_AccountId, createGroupRequest);
 }
 
+void ChatModel::EditMembers(const std::string& p_AccountId, const std::string& p_ChatId,
+                            const std::vector<std::string>& p_UserIds, bool p_Remove)
+{
+  GetAccountOrThrow(p_AccountId);
+  if (!HasFeature(p_AccountId, FeatureEditMembers))
+  {
+    throw ApiException(ApiErrorUnsupported, "adding and removing members is not supported for this account");
+  }
+
+  if (p_UserIds.empty())
+  {
+    throw ApiException(ApiErrorInvalidParams, "no members given");
+  }
+
+  std::shared_ptr<EditMembersRequest> editMembersRequest = std::make_shared<EditMembersRequest>();
+  editMembersRequest->chatId = p_ChatId;
+  editMembersRequest->userIds = p_UserIds;
+  editMembersRequest->remove = p_Remove;
+  SendProtocolRequest(p_AccountId, editMembersRequest);
+}
+
 void ChatModel::PinChat(const std::string& p_AccountId, const std::string& p_ChatId, bool p_IsPinned)
 {
   GetAccountOrThrow(p_AccountId);
@@ -3407,6 +3446,7 @@ json ChatModel::CapabilitiesToJson(std::shared_ptr<Protocol> p_Protocol, const s
     { "descriptions", p_Protocol->HasFeature(FeatureDescriptions) },
     { "joinChat", p_Protocol->HasFeature(FeatureJoinChat) },
     { "createGroup", p_Protocol->HasFeature(FeatureCreateGroup) },
+    { "editMembers", p_Protocol->HasFeature(FeatureEditMembers) },
     { "polls", p_Protocol->HasFeature(FeaturePolls) },
     { "pollsInGroupsOnly", p_ProtocolName == "Telegram" }, // Telegram: polls only in groups
     { "limitedReactions", p_Protocol->HasFeature(FeatureLimitedReactions) },

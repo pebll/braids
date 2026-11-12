@@ -106,7 +106,7 @@
       searchText = '';
       searchStatus = '';
       if (chat?.isGroup && !store.members[key]) {
-        api.call('members.get', { accountId, chatId }).then((r) => { store.members[key] = r.members; }).catch(() => { store.members[key] = []; });
+        api.call('members.get', { accountId, chatId }).then((r) => store.setMembers(r)).catch(() => { store.members[key] = []; });
       }
     }
     if (opened) openedAt = key;

@@ -53,7 +53,7 @@ bool DuChat::HasFeature(ProtocolFeature p_ProtocolFeature) const
 {
   static int customFeatures =
     FeatureAutoGetContactsOnLogin | FeatureEditMessagesAnytime | FeatureAvatars | FeatureDescriptions | FeatureJoinChat |
-    FeatureCreateGroup | FeaturePinMessage | FeaturePolls;
+    FeatureCreateGroup | FeaturePinMessage | FeaturePolls | FeatureEditMembers;
   return (p_ProtocolFeature & customFeatures);
 }
 
@@ -62,6 +62,41 @@ static std::map<std::string, std::vector<std::string>>& CreatedGroups()
 {
   static std::map<std::string, std::vector<std::string>> s_Groups;
   return s_Groups;
+}
+
+// members of The Office and of the created groups (nullptr for others)
+std::vector<std::string>* DuChat::GroupMembers(const std::string& p_ChatId)
+{
+  std::map<std::string, std::vector<std::string>>& s_Created = CreatedGroups();
+  if (!s_Created.count(p_ChatId) && (p_ChatId == s_GroupId))
+  {
+    s_Created[p_ChatId] = { "Andy_0", "Dwight_0", "Jim_0", "Michael_0", "Pam_0", "Stanley_0" };
+  }
+
+  auto it = s_Created.find(p_ChatId);
+  return (it != s_Created.end()) ? &it->second : nullptr;
+}
+
+void DuChat::SendGroupMembers(const std::string& p_ChatId)
+{
+  std::shared_ptr<NewGroupMembersNotify> newGroupMembersNotify = std::make_shared<NewGroupMembersNotify>(m_ProfileId);
+  newGroupMembersNotify->chatId = p_ChatId;
+  std::vector<std::string>* members = GroupMembers(p_ChatId);
+  if (members != nullptr)
+  {
+    newGroupMembersNotify->canAdd = true;
+    for (const std::string& id : *members)
+    {
+      ContactInfo contactInfo;
+      contactInfo.id = id;
+      contactInfo.name = id.substr(0, id.find('_'));
+      contactInfo.isSelf = (id == GetSelfId());
+      newGroupMembersNotify->contactInfos.push_back(contactInfo);
+      if (!contactInfo.isSelf && (id != "Michael_0")) newGroupMembersNotify->canRemove.push_back(id);
+    }
+  }
+
+  m_MessageHandler(newGroupMembersNotify);
 }
 
 bool DuChat::IsGroupChat(const std::string& p_ChatId) const
@@ -820,34 +855,62 @@ void DuChat::PerformRequest(std::shared_ptr<RequestMessage> p_RequestMessage)
         // The Office: the people writing in it and self (Stanley)
         std::shared_ptr<GetGroupMembersRequest> getGroupMembersRequest =
           std::static_pointer_cast<GetGroupMembersRequest>(p_RequestMessage);
-        std::shared_ptr<NewGroupMembersNotify> newGroupMembersNotify =
-          std::make_shared<NewGroupMembersNotify>(m_ProfileId);
-        newGroupMembersNotify->chatId = getGroupMembersRequest->chatId;
-        std::map<std::string, std::vector<std::string>>& s_Created = CreatedGroups();
-        if (s_Created.count(getGroupMembersRequest->chatId))
+        SendGroupMembers(getGroupMembersRequest->chatId);
+      }
+      break;
+
+    case EditMembersRequestType:
+      {
+        // The Office and created groups; self (Stanley) may add anyone and
+        // remove anyone but Michael (the boss)
+        std::shared_ptr<EditMembersRequest> editMembersRequest =
+          std::static_pointer_cast<EditMembersRequest>(p_RequestMessage);
+        std::shared_ptr<EditMembersNotify> editMembersNotify = std::make_shared<EditMembersNotify>(m_ProfileId);
+        editMembersNotify->chatId = editMembersRequest->chatId;
+        editMembersNotify->userIds = editMembersRequest->userIds;
+        editMembersNotify->remove = editMembersRequest->remove;
+        std::vector<std::string>* members = GroupMembers(editMembersRequest->chatId);
+        if (members == nullptr)
         {
-          for (const std::string& id : s_Created[getGroupMembersRequest->chatId])
-          {
-            ContactInfo contactInfo;
-            contactInfo.id = id;
-            contactInfo.name = id.substr(0, id.find('_'));
-            contactInfo.isSelf = (id == GetSelfId());
-            newGroupMembersNotify->contactInfos.push_back(contactInfo);
-          }
+          editMembersNotify->error = "Not a group.";
         }
-        else if (getGroupMembersRequest->chatId == s_GroupId)
+        else
         {
-          for (const std::string& name : { "Andy", "Dwight", "Jim", "Michael", "Pam", "Stanley" })
+          for (const std::string& id : editMembersRequest->userIds)
           {
-            ContactInfo contactInfo;
-            contactInfo.id = std::string(name) + "_0";
-            contactInfo.name = name;
-            contactInfo.isSelf = (contactInfo.id == "Stanley_0");
-            newGroupMembersNotify->contactInfos.push_back(contactInfo);
+            auto it = std::find(members->begin(), members->end(), id);
+            if (editMembersRequest->remove)
+            {
+              if (it == members->end())
+              {
+                editMembersNotify->error = id + " is not in the group.";
+              }
+              else if ((id == "Michael_0") || (id == GetSelfId()))
+              {
+                editMembersNotify->error = "Not allowed to remove " + id + ".";
+              }
+            }
+            else if (id.find('_') == std::string::npos)
+            {
+              editMembersNotify->error = "Not a Dummy user id: " + id;
+            }
+            if (!editMembersNotify->error.empty()) break;
+          }
+
+          if (editMembersNotify->error.empty())
+          {
+            for (const std::string& id : editMembersRequest->userIds)
+            {
+              auto it = std::find(members->begin(), members->end(), id);
+              if (editMembersRequest->remove) members->erase(it);
+              else if (it == members->end()) members->push_back(id);
+            }
+            editMembersNotify->success = true;
           }
         }
 
-        m_MessageHandler(newGroupMembersNotify);
+        m_MessageHandler(editMembersNotify);
+        if (editMembersNotify->success) SendGroupMembers(editMembersRequest->chatId);
       }
       break;
 

@@ -26,8 +26,63 @@ has a **.deb**, a **Flatpak**, an **AppImage** and a self-contained archive.
 Uninstall with `curl -fsSL https://pebll.github.io/braids/install.sh | sh -s -- --uninstall`.
 
 Nix and NixOS: `nix run github:pebll/braids` (or `nix profile install
-github:pebll/braids`; on NixOS add the flake's `packages.<system>.default`
-to your system or home packages).
+github:pebll/braids`); on NixOS see [NixOS with a flake](#nixos-with-a-flake).
+
+### NixOS with a flake
+
+A flake pins the versions of what it uses in a `flake.lock`, like a lock
+file of a package manager. Your system flake is a `flake.nix` next to your
+`configuration.nix` (usually in `/etc/nixos`); braids comes in as one of its
+inputs, the rest of your configuration stays as it is.
+
+1. Turn on flakes in `configuration.nix` and rebuild once the usual way
+   (`sudo nixos-rebuild switch`), unless they are on already:
+
+   ```nix
+   nix.settings.experimental-features = [ "nix-command" "flakes" ];
+   ```
+
+2. Create `flake.nix` next to `configuration.nix`. Replace `my-host` with
+   your host name (`networking.hostName`), and `x86_64-linux` with
+   `aarch64-linux` on ARM64:
+
+   ```nix
+   {
+     inputs = {
+       nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+       braids.url = "github:pebll/braids";
+     };
+
+     outputs = { nixpkgs, ... }@inputs: {
+       nixosConfigurations.my-host = nixpkgs.lib.nixosSystem {
+         system = "x86_64-linux";
+         specialArgs = { inherit inputs; };
+         modules = [ ./configuration.nix ];
+       };
+     };
+   }
+   ```
+
+3. Add braids to your packages in `configuration.nix`, which now also gets
+   `inputs`:
+
+   ```nix
+   { config, pkgs, inputs, ... }:
+   {
+     environment.systemPackages = [
+       inputs.braids.packages.${pkgs.stdenv.hostPlatform.system}.default
+     ];
+   }
+   ```
+
+   With Home Manager, the same line goes into `home.packages`.
+
+4. Check it with `sudo nixos-rebuild dry-build`, then install it with
+   `sudo nixos-rebuild switch` (with `flake.nix` in `/etc/nixos`,
+   `nixos-rebuild` uses it by itself; elsewhere add `--flake .#my-host`).
+
+To update braids to a newer release, run `nix flake update braids` next to
+`flake.nix`, then `sudo nixos-rebuild switch`.
 
 Why braids
 ----------

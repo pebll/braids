@@ -140,6 +140,75 @@ fn install_kind() -> &'static str {
     }
 }
 
+/// Facts for a bug report (Settings → About → Report a bug): the
+/// distribution (the host's in a Flatpak), kernel, architecture, desktop and
+/// how braids was installed.
+#[derive(serde::Serialize)]
+struct SystemInfo {
+    os: String,
+    kernel: String,
+    arch: &'static str,
+    desktop: String,
+    install: String,
+}
+
+fn os_release_name() -> String {
+    for path in ["/run/host/os-release", "/etc/os-release", "/usr/lib/os-release"] {
+        let Ok(text) = std::fs::read_to_string(path) else { continue };
+        let field = |key: &str| {
+            text.lines()
+                .find_map(|l| l.strip_prefix(key)?.strip_prefix('='))
+                .map(|v| v.trim().trim_matches('"').to_string())
+        };
+        if let Some(name) = field("PRETTY_NAME").or_else(|| field("NAME")) {
+            return name;
+        }
+    }
+    String::new()
+}
+
+fn install_method() -> String {
+    match install_kind() {
+        "flatpak" => return "Flatpak".into(),
+        "appimage" => return "AppImage".into(),
+        _ => {}
+    }
+    let exe = std::env::current_exe().map(|p| p.to_string_lossy().into_owned()).unwrap_or_default();
+    let data = std::env::var("XDG_DATA_HOME")
+        .ok()
+        .filter(|d| !d.is_empty())
+        .or_else(|| std::env::var("HOME").ok().map(|h| format!("{h}/.local/share")))
+        .unwrap_or_default();
+    if exe.starts_with("/nix/store/") {
+        "Nix".into()
+    } else if exe.starts_with("/opt/braids/") {
+        ".deb".into()
+    } else if !data.is_empty() && exe.starts_with(&format!("{data}/braids/")) {
+        "install script".into()
+    } else if exe.contains("/target/debug/") || exe.contains("/target/release/") {
+        "source".into()
+    } else {
+        String::new()
+    }
+}
+
+#[tauri::command]
+fn system_info() -> SystemInfo {
+    let env = |k: &str| std::env::var(k).unwrap_or_default();
+    let desktop = [env("XDG_CURRENT_DESKTOP"), env("XDG_SESSION_TYPE")]
+        .into_iter()
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>()
+        .join(", ");
+    SystemInfo {
+        os: os_release_name(),
+        kernel: std::fs::read_to_string("/proc/sys/kernel/osrelease").map(|s| s.trim().to_string()).unwrap_or_default(),
+        arch: std::env::consts::ARCH,
+        desktop,
+        install: install_method(),
+    }
+}
+
 #[tauri::command]
 fn daemon_connected(state: State<'_, AppState>) -> bool {
     state.daemon.is_connected()
@@ -378,7 +447,7 @@ pub fn run() {
                 }
             }
         })
-        .invoke_handler(tauri::generate_handler![api_call, daemon_connected, set_close_to_tray, set_badge, save_temp_file, save_file_as, licenses_path, voice_start, voice_stop, voice_to_aac, link_preview, check_update, install_kind])
+        .invoke_handler(tauri::generate_handler![api_call, daemon_connected, set_close_to_tray, set_badge, save_temp_file, save_file_as, licenses_path, voice_start, voice_stop, voice_to_aac, link_preview, check_update, install_kind, system_info])
         .run(tauri::generate_context!())
         .expect("error while running braids");
 }

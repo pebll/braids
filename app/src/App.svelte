@@ -19,6 +19,7 @@
   import ForwardDialog from './components/ForwardDialog.svelte';
   import MediaDialog from './components/MediaDialog.svelte';
   import InfoPanel from './components/InfoPanel.svelte';
+  import AddMembers from './components/AddMembers.svelte';
   import NewChat from './components/NewChat.svelte';
   import Overlays from './components/Overlays.svelte';
   import Settings from './components/Settings.svelte';
@@ -232,6 +233,9 @@
         if (!goAccount(ACCOUNT_ACTIONS[action]!)) return false;
         goTo();
         return true;
+      case 'toggleFullscreen':
+        api.toggleFullscreen().catch((e) => store.toastError(e));
+        return true;
       case 'settings':
         ui.settingsSection = 'general';
         ui.settingsOpen = true;
@@ -259,11 +263,17 @@
       return;
     }
     const action = actionFor(e);
-    if (action === 'textSizeIncrease' || action === 'textSizeDecrease' || action === 'textSizeReset') {
+    // also behind dialogs and the image viewer
+    // in the image viewer, Ctrl + - 0 zoom the picture (Lightbox.svelte)
+    if (ui.lightbox && (action === 'textSizeIncrease' || action === 'textSizeDecrease' || action === 'textSizeReset')) {
+      e.preventDefault();
+      return;
+    }
+    if (action === 'textSizeIncrease' || action === 'textSizeDecrease' || action === 'textSizeReset' || action === 'toggleFullscreen') {
       if (run(action)) e.preventDefault();
       return;
     }
-    const modal = ui.settingsOpen || ui.newChatOpen || !!ui.forward || !!ui.pollFor || !!ui.media || ui.shortcuts || !!store.wizardSetupId || !!ui.confirmRequest || !!ui.lightbox || ui.recordingKeys;
+    const modal = ui.settingsOpen || ui.newChatOpen || !!ui.forward || !!ui.pollFor || !!ui.addMembersFor || !!ui.media || ui.shortcuts || !!store.wizardSetupId || !!ui.confirmRequest || !!ui.lightbox || ui.recordingKeys;
     if (modal) {
       // no browser actions (print, new window, ...) behind a dialog either
       if (!ui.recordingKeys && actionFor(e)) e.preventDefault();
@@ -341,6 +351,7 @@
 {#if ui.forward}<ForwardDialog messages={ui.forward} />{/if}
 {#if ui.shortcuts}<ShortcutsDialog />{/if}
 {#if ui.pollFor}<PollDialog chatKey={ui.pollFor} />{/if}
+{#if ui.addMembersFor}<AddMembers chatKey={ui.addMembersFor} />{/if}
 {#if ui.media}<MediaDialog scope={ui.media.chatKey} />{/if}
 {#if prompt && !store.wizardSetupId}<AccountPrompt {prompt} />{/if}
 <Overlays />

@@ -619,7 +619,8 @@ func MxGetGroupMembers(connId int, chatId string) int {
 		}
 
 		sort.Strings(parts)
-		CMxNewGroupMembersNotify(conn.connId, chatId, "["+strings.Join(parts, ",")+"]")
+		canAdd, canRemove := conn.memberPermissions(ctx, roomID, resp.Joined)
+		CMxNewGroupMembersNotify(conn.connId, chatId, "["+strings.Join(parts, ",")+"]", canAdd, strings.Join(canRemove, "\n"))
 	}()
 
 	return 0

@@ -40,6 +40,7 @@ enum ProtocolFeature
   FeatureJoinChat = (1 << 14), // braids extension: handles JoinChatRequest
   FeatureCreateGroup = (1 << 15), // braids extension: handles CreateGroupRequest
   FeaturePolls = (1 << 16), // braids extension: sends polls (ChatMessage.poll), handles VotePollRequest
+  FeatureEditMembers = (1 << 17), // braids extension: handles EditMembersRequest, fills NewGroupMembersNotify.canAdd/canRemove
 };
 
 // Interactive authentication (account setup and re-login), braids extension.
@@ -184,6 +185,7 @@ enum MessageType
   CreateGroupRequestType, // braids extension
   ReconnectRequestType, // braids extension
   VotePollRequestType, // braids extension
+  EditMembersRequestType, // braids extension
   // Service messages
   ServiceMessageType,
   NewContactsNotifyType,
@@ -217,6 +219,7 @@ enum MessageType
   JoinChatNotifyType, // braids extension
   CreateGroupNotifyType, // braids extension
   NewPollNotifyType, // braids extension
+  EditMembersNotifyType, // braids extension
 };
 
 struct ContactInfo
@@ -629,6 +632,18 @@ public:
   std::vector<std::string> userIds;
 };
 
+// Add members to a group (Matrix: invite) or remove them (Matrix: kick),
+// braids extension. Answered with EditMembersNotify; on success the protocol
+// also sends the new member list (NewGroupMembersNotify).
+class EditMembersRequest : public RequestMessage
+{
+public:
+  virtual MessageType GetMessageType() const { return EditMembersRequestType; }
+  std::string chatId;
+  std::vector<std::string> userIds;
+  bool remove = false;
+};
+
 // Service messages
 class ServiceMessage
 {
@@ -886,6 +901,20 @@ public:
   bool closed = false;
 };
 
+// braids extension: the answer to EditMembersRequest
+class EditMembersNotify : public ServiceMessage
+{
+public:
+  explicit EditMembersNotify(const std::string& p_ProfileId)
+    : ServiceMessage(p_ProfileId) { }
+  virtual MessageType GetMessageType() const { return EditMembersNotifyType; }
+  std::string chatId;
+  std::vector<std::string> userIds;
+  bool remove = false;
+  bool success = false;
+  std::string error; // why not, for the user
+};
+
 // Group description or user bio, empty if there is none. Sent for
 // GetDescriptionRequest and when the protocol learns of a change.
 class NewDescriptionNotify : public ServiceMessage
@@ -979,6 +1008,10 @@ public:
   virtual MessageType GetMessageType() const { return NewGroupMembersNotifyType; }
   std::string chatId;
   std::vector<ContactInfo> contactInfos;
+  // braids extension (FeatureEditMembers): whether self may add members, and
+  // the members self may remove
+  bool canAdd = false;
+  std::vector<std::string> canRemove;
 };
 
 class UpdateArchivedNotify : public ServiceMessage

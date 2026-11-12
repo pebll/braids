@@ -1,7 +1,7 @@
 braidsd API
 ===========
 
-Status: draft, API version `0.14.0`. The API is JSON-RPC 2.0
+Status: draft, API version `0.15.0`. The API is JSON-RPC 2.0
 with one JSON object per line, served on a Unix socket and/or stdin/stdout.
 
 Transport
@@ -57,7 +57,7 @@ Objects
      "capabilities": {"editWindowSec": -1 (unlimited) | 0 (none) | seconds,
                       "pinChat", "archiveChat", "pinMessage",
                       "limitedReactions", "readReceiptsPerMessage",
-                      "avatars", "descriptions", "joinChat", "createGroup", "muteChat",
+                      "avatars", "descriptions", "joinChat", "createGroup", "editMembers", "muteChat",
                       "polls", "pollsInGroupsOnly"},
      "options": {"showJoinedMessages"}}   (braids' own, `accounts.setOption`)
 
@@ -157,7 +157,9 @@ Methods
 | `descriptions.get` | `accountId`, `ids` ([user or chat id]) | `{accountId, descriptions: {id: text}}` (group description or user bio; for a one-to-one chat the other user's) with the known ones (`""`: none); the others are fetched once per session and arrive as `description.updated` |
 | `media.list` | `kind` (`media`: images and videos, stickers not included, `files`, `links`, `pinned`: pinned messages), `accountId`? and `chatId`? (all chats/accounts without), `beforeTime`? (ms, from `nextBefore`), `limit`? (60, max 200) | `{items: [Message] newest first, nextBefore}` (`nextBefore` 0: no more); from the history cache and the loaded messages, `files.download` works for these too |
 | `messages.search` | `text` (case-insensitive for ASCII letters), `accountId`? and `chatId`? (all chats/accounts without), `beforeTime`?, `limit`? (40, max 200) | `{items: [Message] newest first, nextBefore}` like `media.list`; group events are left out |
-| `members.get` | `accountId`, `chatId` | `{accountId, chatId, members: [Contact]}` (async) |
+| `members.get` | `accountId`, `chatId` | `{accountId, chatId, members: [Contact + canRemove], canAdd}` (async; `canAdd`: self may add members, `canRemove` per member: self may remove them; both false without capability `editMembers`) |
+| `members.add` | `accountId`, `chatId`, `userIds` (at least one; capability `editMembers`; Matrix: invites them) | `{}`, then `members.edited` and, on success, `members.updated` |
+| `members.remove` | `accountId`, `chatId`, `userId` (capability `editMembers`; Matrix: kicks them) | `{}`, then `members.edited` and, on success, `members.updated` |
 | `messages.get` | `accountId`, `chatId`, `fromMsgId`? (latest), `limit`? (30) | `{accountId, chatId, fromMsgId, messages: [Message] oldest first, timedOut}` (async, from cache or server) |
 | `messages.send` | `accountId`, `chatId`, `text`?, `quotedId`?, `poll`? (`{question, options: [text], multiple}`, 2–12 options, without text or file; account capability `polls`, on Telegram in groups only: `pollsInGroupsOnly`), `filePath`? (absolute), `isVoice`? (false; the file, Ogg/Opus (AAC for Signal: the app converts it, Signal on iPhone plays no Ogg), is sent as a voice note: WhatsApp PTT, Telegram voice note, Signal voice message, Matrix MSC3245 voice) | `{msgId}`: the local id of the pending message, which arrives at once as `message.added` with `pending` (see Message) |
 | `messages.vote` | `accountId`, `chatId`, `msgId` (a poll), `optionIds` (`[]` takes the vote back; one option unless `multiple`) | `{}`; the poll arrives as `message.updated` |
@@ -199,7 +201,8 @@ Events
 | `avatar.updated` | `{accountId, id, path}` (local image file, `""` if none; also sent when a picture changes) |
 | `avatar.full` | `{accountId, id, path}`: answers `avatars.getFull` (the small picture when the protocol has no bigger one, `""` if none) |
 | `description.updated` | `{accountId, id, description}` (plain text, `""` if none; also sent when it changes) |
-| `members.updated` | `{accountId, chatId, members: [Contact]}` |
+| `members.updated` | `{accountId, chatId, members: [Contact + canRemove], canAdd}` (as `members.get`) |
+| `members.edited` | `{accountId, chatId, userIds, remove, success, error}` (after `members.add` / `members.remove`; `error` is a message for the user) |
 | `message.added` | `Message` |
 | `message.updated` | `Message` |
 | `message.removed` | `{accountId, chatId, msgId}` |
