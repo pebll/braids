@@ -10,6 +10,9 @@ release workflow publishes the section of a version as its release notes.
 - Matrix groups: add people (they get an invitation) with "Add people" in
   the group info, remove them from a member's menu ("Remove from group").
   Both show only where your power level in the room allows it. (#38)
+- Hover preview: rest the pointer on a chat in the list to read its new
+  messages (or the last ones) in full without opening it; they stay unread.
+  Can be turned off in Settings → General. (#40)
 - F11 toggles fullscreen (a shortcut you can change in Settings →
   Keyboard). (#34)
 - NixOS: a guide to installing braids with a system flake, in the README

@@ -503,6 +503,17 @@ try {
   // unread message counts
   const kevinRow = page.locator('.chatlist .row', { has: page.locator('.name', { hasText: /^Kevin$/ }) });
   check((await kevinRow.locator('.unread-count').textContent()) === '2', 'unread message count in the list');
+  // hover preview (#40): the unread messages in full, the chat stays unread
+  await kevinRow.hover();
+  const chatPreview = page.locator('.chat-preview');
+  await chatPreview.locator('.msg').first().waitFor({ timeout: 5000 });
+  check(await chatPreview.locator('.msg').count() === 2 && (await chatPreview.locator('.name').textContent()) === 'Kevin',
+    'hover preview shows the 2 unread messages');
+  check((await chatPreview.textContent()).includes('Mini-cupcakes'), 'hover preview: the message text');
+  await shot('hover-preview');
+  await page.mouse.move(5, 5);
+  await chatPreview.waitFor({ state: 'detached' });
+  check((await kevinRow.locator('.unread-count').textContent()) === '2', 'previewed chat stays unread');
   check((await page.getByRole('button', { name: /All chats/ }).locator('.count').textContent()) === '1', 'folder counts chats, not messages');
   check(!(await page.getByRole('button', { name: /All chats/ }).locator('.count').getAttribute('class')).includes('muted'), 'All chats count in the accent color');
   check(await page.getByRole('button', { name: /^Unread/ }).locator('.count').count() === 0, 'no count on the Unread folder');

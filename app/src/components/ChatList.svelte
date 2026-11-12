@@ -22,6 +22,7 @@
   import { ui } from '../lib/ui.svelte';
   import Avatar from './Avatar.svelte';
   import Braid from './Braid.svelte';
+  import ChatPreview from './ChatPreview.svelte';
 
   let searchInput: HTMLInputElement | undefined = $state();
   let listEl: HTMLDivElement | undefined = $state();
@@ -43,7 +44,45 @@
     if (ui.focusSearch) searchInput?.focus();
   });
 
+  // hover preview (#40): after resting on a row, not for the open chat, and
+  // only with a pointer that hovers
+  const PREVIEW_DELAY = 600;
+  const canHover = typeof matchMedia !== 'undefined' && matchMedia('(hover: hover)').matches;
+  let hovered = $state<{ key: string; top: number; left: number } | null>(null);
+  let hoverTimer: ReturnType<typeof setTimeout> | undefined;
+  const hoveredChat = $derived(hovered ? store.chats[hovered.key] : undefined);
+
+  function hoverStart(e: PointerEvent, key: string) {
+    if (!settings.chatPreview || !canHover || e.pointerType === 'touch') return;
+    endPreview();
+    const row = e.currentTarget as HTMLElement;
+    hoverTimer = setTimeout(() => {
+      if (key === store.current || ui.menu || !row.isConnected) return;
+      const r = row.getBoundingClientRect();
+      const list = listEl?.getBoundingClientRect();
+      // the zoom of the browser bridge (Tauri zooms the webview instead)
+      const zoom = api.isTauri ? 1 : settings.textSize / 100;
+      const left = ((list?.right ?? r.right) + 8) / zoom;
+      // no room next to the list (narrow layout): no preview
+      if (left + 340 > window.innerWidth / zoom) return;
+      hovered = { key, top: r.top / zoom, left };
+    }, PREVIEW_DELAY);
+  }
+
+  // opened meanwhile (keyboard, notification): the chat itself is shown
+  $effect(() => {
+    if (hovered && hovered.key === store.current) endPreview();
+  });
+
+  function endPreview() {
+    clearTimeout(hoverTimer);
+    hovered = null;
+  }
+
+  onDestroy(() => clearTimeout(hoverTimer));
+
   function open(c: Chat) {
+    endPreview();
     ui.listCursor = '';
     store.openChat(chatKey(c.accountId, c.id));
     ui.focusComposer++;
@@ -311,7 +350,8 @@
     class:kbd={keyboardNav}
     class:soft={!cursorActive}
     onpointermove={() => (keyboardNav = false)}
-    onkeydown={onKey}
+    onkeydown={(e) => { endPreview(); onKey(e); }}
+    onscroll={endPreview}
   >
     {#each chats as c, i (chatKey(c.accountId, c.id))}
       {@const key = chatKey(c.accountId, c.id)}
@@ -330,7 +370,9 @@
         tabindex="-1"
         onclick={() => open(c)}
         onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); open(c); } }}
-        oncontextmenu={(e) => { e.preventDefault(); ui.openMenu(e, chatMenu(c)); }}
+        oncontextmenu={(e) => { e.preventDefault(); endPreview(); ui.openMenu(e, chatMenu(c)); }}
+        onpointerenter={(e) => hoverStart(e, key)}
+        onpointerleave={endPreview}
       >
         <Avatar name={store.chatName(c)} id={c.id} accountId={c.accountId} group={c.isGroup} ring={selected ? 'var(--selected)' : 'var(--bg-1)'}
           favorite={store.category(c) === 'favorite'}
@@ -407,6 +449,7 @@
     {/if}
   </div>
 </section>
+{#if hovered && hoveredChat}<ChatPreview chat={hoveredChat} top={hovered.top} left={hovered.left} />{/if}
 
 <style>
   .row.fav-end { box-shadow: 0 1px 0 var(--border); margin-bottom: 4px; }

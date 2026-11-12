@@ -251,6 +251,10 @@
           <button class="toggle" role="switch" aria-checked={settings.sidebarCounts} aria-label="Unread counts on Favorites and accounts" onclick={() => set('sidebarCounts', !settings.sidebarCounts)}></button>
         </div>
         <div class="row">
+          <div class="row-text"><b>Preview chats on hover</b><span>Rest the pointer on a chat to read its new messages without opening it (they stay unread).</span></div>
+          <button class="toggle" role="switch" aria-checked={settings.chatPreview} aria-label="Preview chats on hover" onclick={() => set('chatPreview', !settings.chatPreview)}></button>
+        </div>
+        <div class="row">
           <div class="row-text"><b>Enter sends the message</b><span>Off: Ctrl+Enter sends, Enter adds a line.</span></div>
           <button class="toggle" role="switch" aria-checked={settings.enterSends} aria-label="Enter sends" onclick={() => set('enterSends', !settings.enterSends)}></button>
         </div>
