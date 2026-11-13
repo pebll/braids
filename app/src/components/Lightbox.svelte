@@ -141,13 +141,17 @@
       else save();
       return;
     }
-    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.altKey) return;
     const k = e.key;
+    // + - 0 zoom the picture, also with Ctrl (elsewhere the text size, which
+    // App.svelte leaves alone while the viewer is open)
+    const mod = e.ctrlKey || e.metaKey;
     let handled = true;
-    if (k === 'Escape') close();
-    else if (!isVideo && (k === '+' || k === '=')) zoomTo(scale * 1.5);
-    else if (!isVideo && (k === '-' || k === '_')) zoomTo(scale / 1.5);
-    else if (!isVideo && k === '0') zoomTo(1);
+    if ((k === '+' || k === '=') && !isVideo) zoomTo(scale * 1.5);
+    else if ((k === '-' || k === '_') && !isVideo) zoomTo(scale / 1.5);
+    else if (k === '0' && !isVideo) zoomTo(1);
+    else if (mod) return;
+    else if (k === 'Escape') close();
     else if (k === 'ArrowRight' || k === 'j' || k === 'l' || k === 'ArrowDown' || k === 'PageDown') go(1);
     else if (k === 'ArrowLeft' || k === 'k' || k === 'h' || k === 'ArrowUp' || k === 'PageUp') go(-1);
     else handled = false;

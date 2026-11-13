@@ -19,6 +19,19 @@ export async function setWebviewZoom(scale: number): Promise<boolean> {
   return true;
 }
 
+// F11: the window's fullscreen in the app, the page's in a browser
+export async function toggleFullscreen(): Promise<void> {
+  if (isTauri) {
+    const { getCurrentWindow } = await import('@tauri-apps/api/window');
+    const win = getCurrentWindow();
+    await win.setFullscreen(!(await win.isFullscreen()));
+  } else if (document.fullscreenElement) {
+    await document.exitFullscreen();
+  } else {
+    await document.documentElement.requestFullscreen();
+  }
+}
+
 type EventHandler = (event: ApiEvent) => void;
 type ConnectionHandler = (connected: boolean) => void;
 
@@ -118,6 +131,24 @@ export async function installKind(): Promise<string> {
   if (!isTauri) return 'browser';
   const { invoke } = await import('@tauri-apps/api/core');
   return invoke<string>('install_kind');
+}
+
+export interface SystemInfo {
+  app: string; // version of the app (the core's is in the store)
+  os: string;
+  kernel: string;
+  arch: string;
+  desktop: string;
+  install: string;
+}
+
+// For a bug report; in a browser only what the browser tells
+export async function systemInfo(): Promise<SystemInfo> {
+  if (!isTauri) return { app: '', os: navigator.platform, kernel: '', arch: '', desktop: 'browser', install: 'source' };
+  const { invoke } = await import('@tauri-apps/api/core');
+  const { getVersion } = await import('@tauri-apps/api/app');
+  const [info, app] = await Promise.all([invoke<Omit<SystemInfo, 'app'>>('system_info'), getVersion().catch(() => '')]);
+  return { ...info, app };
 }
 
 export async function autostartEnabled(): Promise<boolean> {

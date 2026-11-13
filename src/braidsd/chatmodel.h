@@ -89,6 +89,8 @@ public:
                 int64_t p_BeforeTime, int p_Limit, const std::string& p_Text = "");
   void CreateChat(const std::string& p_AccountId, const std::string& p_UserId);
   void CreateGroup(const std::string& p_AccountId, const std::string& p_Name, const std::vector<std::string>& p_UserIds);
+  void EditMembers(const std::string& p_AccountId, const std::string& p_ChatId,
+                   const std::vector<std::string>& p_UserIds, bool p_Remove);
   void PinChat(const std::string& p_AccountId, const std::string& p_ChatId, bool p_IsPinned);
   void ArchiveChat(const std::string& p_AccountId, const std::string& p_ChatId, bool p_IsArchived);
   void MuteChat(const std::string& p_AccountId, const std::string& p_ChatId, bool p_IsMuted);
@@ -138,6 +140,10 @@ private:
     std::unordered_map<std::string, ContactInfo> contactInfos;
     std::unordered_map<std::string, ChatState> chats;
     std::unordered_map<std::string, std::vector<std::string>> groupMembers;
+    // FeatureEditMembers: per group whether self may add members, and the
+    // members self may remove
+    std::unordered_map<std::string, bool> groupCanAdd;
+    std::unordered_map<std::string, std::set<std::string>> groupCanRemove;
     std::unordered_map<std::string, std::set<std::string>> usersTyping;
     std::unordered_map<std::string, bool> userOnline;
     std::unordered_map<std::string, int64_t> userTimeSeen;

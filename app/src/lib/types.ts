@@ -20,6 +20,7 @@ export interface Capabilities {
   descriptions: boolean;
   joinChat: boolean;
   createGroup: boolean;
+  editMembers: boolean; // members.add / members.remove (Matrix)
   muteChat: boolean;
   polls: boolean;
   pollsInGroupsOnly: boolean; // Telegram
@@ -111,6 +112,7 @@ export interface Contact {
   name: string;
   phone: string;
   isSelf: boolean;
+  canRemove?: boolean; // group members (members.get): self may remove them
 }
 
 export interface AuthPrompt {

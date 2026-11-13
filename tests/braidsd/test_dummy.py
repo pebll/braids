@@ -334,6 +334,31 @@ def main():
         expect_error(lambda: d.call("chats.createGroup", {"accountId": account_id, "name": " ", "userIds": ["Jim_0"]}),
                      -32602, "group without a name rejected")
 
+        # adding and removing members
+        check(account["capabilities"]["editMembers"], "editMembers capability")
+        office = "The Office_0"
+        r = d.call("members.get", {"accountId": account_id, "chatId": office})
+        if "members" not in r:
+            r = d.wait_event("members.updated", lambda p: p["chatId"] == office)
+        check(r["canAdd"], "members: canAdd")
+        removable = {m["id"]: m["canRemove"] for m in r["members"]}
+        check(removable["Jim_0"] and not removable["Michael_0"] and not removable["Stanley_0"], "members: canRemove per member")
+        d.call("members.add", {"accountId": account_id, "chatId": office, "userIds": ["Kevin_0"]})
+        edited = d.wait_event("members.edited", lambda p: p["chatId"] == office)
+        check(edited["success"] and not edited["remove"] and edited["userIds"] == ["Kevin_0"], "members.edited after add")
+        updated = d.wait_event("members.updated", lambda p: p["chatId"] == office and any(m["id"] == "Kevin_0" for m in p["members"]))
+        check(True, "added member listed")
+        d.call("members.remove", {"accountId": account_id, "chatId": office, "userId": "Kevin_0"})
+        edited = d.wait_event("members.edited", lambda p: p["chatId"] == office and p["remove"])
+        check(edited["success"], "members.edited after remove")
+        d.wait_event("members.updated", lambda p: p["chatId"] == office and all(m["id"] != "Kevin_0" for m in p["members"]))
+        check(True, "removed member gone")
+        d.call("members.remove", {"accountId": account_id, "chatId": office, "userId": "Michael_0"})
+        edited = d.wait_event("members.edited", lambda p: p["chatId"] == office and p["remove"])
+        check(not edited["success"] and "Michael_0" in edited["error"], "remove not allowed: error")
+        expect_error(lambda: d.call("members.add", {"accountId": account_id, "chatId": office, "userIds": []}),
+                     -32602, "add without users rejected")
+
         # profile pictures: small ones for the avatars, the full-size one for the viewer
         small = d.call("avatars.get", {"accountId": account_id, "ids": ["Pam_0"]})["avatars"].get("Pam_0")
         if small is None:

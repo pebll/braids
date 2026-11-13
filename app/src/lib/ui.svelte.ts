@@ -53,6 +53,7 @@ class Ui {
   // (Shift+click selects the range from it)
   selection = $state<{ chatKey: string; ids: string[]; anchor: string } | null>(null);
   pollFor = $state(''); // chat key a new poll is being made for (dialog open)
+  addMembersFor = $state(''); // chat key people are being added to (dialog open)
   shortcuts = $state(false); // keyboard shortcuts overview open
   media = $state<{ chatKey: string } | null>(null); // shared media dialog: of a chat, or all ('')
   jumpRequest = $state<{ chatKey: string; msgId: string } | null>(null); // scroll the conversation to a message

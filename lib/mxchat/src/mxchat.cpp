@@ -79,7 +79,7 @@ bool MxChat::HasFeature(ProtocolFeature p_ProtocolFeature) const
     FeatureEditMessagesAnytime |
     FeatureAutoGetContactsOnLogin |
     FeaturePinChat |
-    FeatureAvatars | FeatureDescriptions | FeatureJoinChat | FeatureCreateGroup | FeaturePolls;
+    FeatureAvatars | FeatureDescriptions | FeatureJoinChat | FeatureCreateGroup | FeaturePolls | FeatureEditMembers;
   return (p_ProtocolFeature & customFeatures);
 }
 
@@ -758,6 +758,16 @@ void MxChat::PerformRequest(std::shared_ptr<RequestMessage> p_RequestMessage)
       }
       break;
 
+    case EditMembersRequestType:
+      {
+        std::shared_ptr<EditMembersRequest> editMembersRequest =
+          std::static_pointer_cast<EditMembersRequest>(p_RequestMessage);
+        const std::string userIds = StrUtil::Join(editMembersRequest->userIds, "\n");
+        CMxEditMembers(m_ConnId, const_cast<char*>(editMembersRequest->chatId.c_str()),
+                       const_cast<char*>(userIds.c_str()), editMembersRequest->remove ? 1 : 0);
+      }
+      break;
+
     case GetGroupMembersRequestType:
       {
         std::shared_ptr<GetGroupMembersRequest> getGroupMembersRequest =
@@ -1305,7 +1315,7 @@ void MxNewStatusNotify(int p_ConnId, char* p_UserId, int p_IsOnline, long long p
   free(p_UserId);
 }
 
-void MxNewGroupMembersNotify(int p_ConnId, char* p_ChatId, char* p_MembersJson)
+void MxNewGroupMembersNotify(int p_ConnId, char* p_ChatId, char* p_MembersJson, int p_CanAdd, char* p_CanRemove)
 {
   MxChat* instance = MxChat::GetInstance(p_ConnId);
   if (instance != nullptr)
@@ -1314,11 +1324,17 @@ void MxNewGroupMembersNotify(int p_ConnId, char* p_ChatId, char* p_MembersJson)
       std::make_shared<NewGroupMembersNotify>(instance->GetProfileId());
     notify->chatId = std::string(p_ChatId);
     notify->contactInfos = ProtocolUtil::ContactInfosFromJson(std::string(p_MembersJson));
+    notify->canAdd = (p_CanAdd != 0);
+    for (const auto& userId : StrUtil::Split(std::string(p_CanRemove), '\n'))
+    {
+      if (!userId.empty()) notify->canRemove.push_back(userId);
+    }
     DeferNotify(instance, notify);
   }
 
   free(p_ChatId);
   free(p_MembersJson);
+  free(p_CanRemove);
 }
 
 void MxNewAvatarNotify(int p_ConnId, char* p_Id, char* p_FilePath, int p_Full)
@@ -1385,6 +1401,28 @@ void MxCreateGroupNotify(int p_ConnId, char* p_Name, int p_Success, char* p_Chat
 
   free(p_Name);
   free(p_ChatId);
+  free(p_Error);
+}
+
+void MxEditMembersNotify(int p_ConnId, char* p_ChatId, char* p_UserIds, int p_Remove, int p_Success, char* p_Error)
+{
+  MxChat* instance = MxChat::GetInstance(p_ConnId);
+  if (instance != nullptr)
+  {
+    std::shared_ptr<EditMembersNotify> notify = std::make_shared<EditMembersNotify>(instance->GetProfileId());
+    notify->chatId = std::string(p_ChatId);
+    for (const auto& userId : StrUtil::Split(std::string(p_UserIds), '\n'))
+    {
+      if (!userId.empty()) notify->userIds.push_back(userId);
+    }
+    notify->remove = (p_Remove != 0);
+    notify->success = (p_Success != 0);
+    notify->error = std::string(p_Error);
+    DeferNotify(instance, notify);
+  }
+
+  free(p_ChatId);
+  free(p_UserIds);
   free(p_Error);
 }
 

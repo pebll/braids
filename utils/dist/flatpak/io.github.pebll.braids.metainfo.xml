@@ -83,6 +83,21 @@
     <binary>braids</binary>
   </provides>
   <releases>
+    <release version="0.3.5" date="2026-11-13">
+      <url>https://github.com/pebll/braids/releases/tag/v0.3.5</url>
+      <description>
+        <ul>
+          <li>Matrix groups: add people (they get an invitation) with "Add people" in the group info, remove them from a member's menu ("Remove from group").</li>
+          <li>Hover preview: rest the pointer on a chat in the list to read its new messages (or the last ones) in full without opening it; they stay unread.</li>
+          <li>F11 toggles fullscreen (a shortcut you can change in Settings → Keyboard).</li>
+          <li>NixOS: a guide to installing braids with a system flake, in the README and linked from the website.</li>
+          <li>Sidebar: only All chats shows its unread count in color.</li>
+          <li>New group (Matrix): only people are offered as members, no longer the rooms of direct chats (!… ids that could not be added) and groups.</li>
+          <li>Settings → About → Report a bug fills in the braids version, how braids was installed, your distribution, kernel and desktop, and your messengers.</li>
+          <li>In the image viewer, Ctrl + / Ctrl − / Ctrl 0 zoomed the whole app instead of the picture.</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.3.4" date="2026-11-10">
       <url>https://github.com/pebll/braids/releases/tag/v0.3.4</url>
       <description>

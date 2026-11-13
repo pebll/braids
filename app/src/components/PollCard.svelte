@@ -117,7 +117,7 @@
       </button>
     {/each}
   </div>
-  <div class="summary">{summary}{#if poll.closed} · ended{/if}</div>
+  <div class="summary">{summary}{#if poll.closed}{' · ended'}{/if}</div>
 </div>
 
 <style>

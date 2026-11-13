@@ -1,6 +1,6 @@
 [package]
 name = "braids"
-version = "0.3.4"
+version = "0.3.5"
 description = "braids: Telegram, WhatsApp, Signal and Matrix in one app"
 authors = ["braids contributors"]
 license = "AGPL-3.0-only"

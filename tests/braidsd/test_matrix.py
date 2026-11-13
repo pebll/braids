@@ -297,6 +297,41 @@ def main():
         # members
         members = d.call("members.get", {"accountId": account_id, "chatId": room})
         check({alice_id, bob_id} <= {m["id"] for m in members["members"]}, "members of room")
+        # bob's room (private_chat preset): alice may invite, not kick
+        check(account["capabilities"]["editMembers"], "editMembers capability")
+        mine = {m["id"]: m for m in members["members"]}
+        check(members["canAdd"] and not mine[bob_id]["canRemove"] and not mine[alice_id]["canRemove"],
+              "members: alice may add, not remove, in bob's room")
+
+        # alice's group: she removes bob and adds him again
+        d.call("chats.createGroup", {"accountId": account_id, "name": "Members test", "userIds": [bob_id]})
+        group = d.wait_event("chat.groupCreated", lambda p: p["name"] == "Members test", timeout=60)["chatId"]
+        bob_peer.wait("autojoin", lambda m: m["room"] == group)
+
+        def group_members():
+            r = d.call("members.get", {"accountId": account_id, "chatId": group})
+            return r if "members" in r else d.wait_event("members.updated", lambda p: p["chatId"] == group, timeout=30)
+
+        joined = wait_until(lambda: (lambda r: r if bob_id in {m["id"] for m in r["members"]} else None)(group_members()),
+                            "bob joined the group")
+        byid = {m["id"]: m for m in joined["members"]}
+        check(joined["canAdd"] and byid[bob_id]["canRemove"] and not byid[alice_id]["canRemove"],
+              "members: alice may add and remove bob in her group")
+        d.call("members.remove", {"accountId": account_id, "chatId": group, "userId": bob_id})
+        edited = d.wait_event("members.edited", lambda p: p["chatId"] == group and p["remove"], timeout=60)
+        check(edited["success"], "bob removed")
+        d.wait_event("members.updated", lambda p: p["chatId"] == group and bob_id not in {m["id"] for m in p["members"]},
+                     timeout=60)
+        check(True, "member list without bob")
+        d.call("members.add", {"accountId": account_id, "chatId": group, "userIds": [bob_id]})
+        edited = d.wait_event("members.edited", lambda p: p["chatId"] == group and not p["remove"], timeout=60)
+        check(edited["success"], "bob invited again")
+        bob_peer.wait("autojoin", lambda m: m["room"] == group)
+        wait_until(lambda: bob_id in {m["id"] for m in group_members()["members"]}, "bob back in the group")
+        check(True, "bob back in the group")
+        d.call("members.add", {"accountId": account_id, "chatId": group, "userIds": ["not-a-user-id"]})
+        edited = d.wait_event("members.edited", lambda p: p["chatId"] == group and not p["remove"], timeout=60)
+        check(not edited["success"] and "not-a-user-id" in edited["error"], "invalid user id: error")
 
         # polls (MSC3381), in the encrypted room: bob's poll, votes, braids' own poll, the end
         check(account["capabilities"]["polls"], "polls capability")

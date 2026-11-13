@@ -32,6 +32,7 @@ export type Action =
   | 'textSizeIncrease'
   | 'textSizeDecrease'
   | 'textSizeReset'
+  | 'toggleFullscreen'
   | 'settings'
   | 'shortcuts';
 
@@ -61,6 +62,7 @@ export const ACTIONS: { id: Action; group: ActionGroup; label: string; defaults:
   { id: 'textSizeIncrease', group: 'action', label: 'Increase text size', defaults: ['Mod++', 'Mod+='] },
   { id: 'textSizeDecrease', group: 'action', label: 'Decrease text size', defaults: ['Mod+-'] },
   { id: 'textSizeReset', group: 'action', label: 'Reset text size', defaults: ['Mod+0'] },
+  { id: 'toggleFullscreen', group: 'action', label: 'Toggle fullscreen', defaults: ['F11'] },
   { id: 'settings', group: 'action', label: 'Settings', defaults: ['Mod+,'] },
   { id: 'shortcuts', group: 'action', label: 'Keyboard shortcuts', defaults: ['Mod+/'] },
 ];

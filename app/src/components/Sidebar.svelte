@@ -102,11 +102,11 @@
 
   <div class="items">
     {#each folders as item}
-      {@const n = store.unreadCount(item.f)}
+      {@const n = item.f.kind === 'unread' || (item.f.kind === 'favorites' && !settings.sidebarCounts) ? 0 : store.unreadCount(item.f)}
       <button class="item" class:active={isActive(item.f)} onclick={() => select(item.f)} title={collapsed ? item.label : undefined}>
         <span class="ico"><item.icon size={18} strokeWidth={1.75} /></span>
         {#if !collapsed}<span class="label">{item.label}</span>{/if}
-        {#if n > 0}<span class="count" class:corner={collapsed}>{n}</span>{/if}
+        {#if n > 0}<span class="count" class:muted={item.f.kind !== 'all'} class:corner={collapsed}>{n}</span>{/if}
       </button>
     {/each}
   </div>
@@ -116,7 +116,7 @@
     <div class="items">
       {#each store.accountList as account (account.accountId)}
         {@const f = { kind: 'account', accountId: account.accountId } as Filter}
-        {@const n = store.unreadCount(f)}
+        {@const n = settings.sidebarCounts ? store.unreadCount(f) : 0}
         <button
           class="item"
           class:active={isActive(f)}
@@ -149,7 +149,7 @@
               <span class="state warn" aria-label="Error"><CircleAlert size={15} /></span>
             {/if}
           {/if}
-          {#if n > 0}<span class="count" class:corner={collapsed}>{n}</span>{/if}
+          {#if n > 0}<span class="count muted" class:corner={collapsed}>{n}</span>{/if}
         </button>
       {/each}
     </div>
@@ -160,7 +160,7 @@
     <button class="item" class:active={isActive({ kind: 'archived' })} onclick={() => select({ kind: 'archived' })} title={collapsed ? 'Archived' : undefined}>
       <span class="ico"><Archive size={18} strokeWidth={1.75} /></span>
       {#if !collapsed}<span class="label">Archived</span>{/if}
-      {#if archivedCount > 0 && !collapsed}<span class="count muted" title={`${archivedCount} archived ${archivedCount === 1 ? 'chat' : 'chats'} with new messages`}>{archivedCount}</span>{/if}
+      {#if archivedCount > 0}<span class="count muted" class:corner={collapsed} title={`${archivedCount} archived ${archivedCount === 1 ? 'chat' : 'chats'} with new messages`}>{archivedCount}</span>{/if}
     </button>
     <button class="item" onclick={() => { ui.media = { chatKey: '' }; ui.drawerOpen = false; }} title={collapsed ? 'Shared media' : undefined}>
       <span class="ico"><Images size={18} strokeWidth={1.75} /></span>

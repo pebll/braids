@@ -27,6 +27,8 @@ public:
   bool HasFeature(ProtocolFeature p_ProtocolFeature) const;
   bool IsGroupChat(const std::string& p_ChatId) const;
   std::string GetSelfId() const;
+  std::vector<std::string>* GroupMembers(const std::string& p_ChatId);
+  void SendGroupMembers(const std::string& p_ChatId);
 
   bool SetupProfile(const std::string& p_ProfilesDir, std::string& p_ProfileId);
   bool LoadProfile(const std::string& p_ProfilesDir, const std::string& p_ProfileId);

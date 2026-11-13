@@ -116,6 +116,8 @@
   .dl .tag { align-self: flex-start; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
   .dl pre { margin: 0; padding: 12px 14px; border-radius: 10px; background: var(--code-bg); color: var(--code-text); font: 13px/1.6 var(--mono); overflow-x: auto; }
   .dl .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+  .dl .more { font-size: 14px; color: var(--accent); text-decoration: none; }
+  .dl .more:hover { color: var(--accent-hover); text-decoration: underline; }
   .soon { margin-top: 24px; color: var(--muted); font-size: 15px; }
 
   footer { padding: 40px 0 56px; color: var(--muted); font-size: 14px; border-top: 1px solid var(--border); }
@@ -330,6 +332,7 @@ flatpak run io.github.pebll.braids</pre>
           <pre>nix run github:pebll/braids
 nix profile install github:pebll/braids</pre>
           <div class="actions"><a class="btn ghost" href="https://github.com/pebll/braids/blob/main/flake.nix">flake.nix</a></div>
+          <a class="more" href="https://github.com/pebll/braids#nixos-with-a-flake">More info: NixOS with a flake →</a>
         </div>
         <div class="card">
           <h3>AppImage</h3>

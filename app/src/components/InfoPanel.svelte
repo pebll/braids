@@ -9,13 +9,13 @@
   A 300 px column at >= 1280 px, an overlay sheet below.
 -->
 <script lang="ts">
-  import { Archive, ArchiveRestore, Bell, BellOff, ChevronDown, ChevronUp, Images, LogOut, Search, Star, StarOff, Trash2, X } from '@lucide/svelte';
+  import { Archive, ArchiveRestore, Bell, BellOff, ChevronDown, ChevronUp, Images, LogOut, Search, Star, StarOff, Trash2, UserMinus, UserPlus, X } from '@lucide/svelte';
   import { openLink, personMenu, viewPicture } from '../lib/actions';
   import * as api from '../lib/api';
   import { linkify } from '../lib/format';
   import { protocolMeta } from '../lib/protocols';
   import { fileMime, fileReady, galleryItems, splitKey, store } from '../lib/store.svelte';
-  import type { Message } from '../lib/types';
+  import type { Contact, Message } from '../lib/types';
   import { openLightbox, ui } from '../lib/ui.svelte';
   import Avatar from './Avatar.svelte';
   import ProtocolBadge from './ProtocolBadge.svelte';
@@ -27,6 +27,9 @@
   const account = $derived(store.accounts[accountId]);
   const membersLoaded = $derived(store.members[chatKey] !== undefined);
   const members = $derived(store.members[chatKey] ?? []);
+  // adding and removing members: where the messenger allows it (Matrix: the
+  // own power level in the room)
+  const canAdd = $derived(!!account?.capabilities.editMembers && !!store.membersCanAdd[chatKey]);
   // the newest shared images (also older than the loaded history), again
   // when images are added to the loaded history
   let shared = $state<Message[]>([]);
@@ -62,6 +65,27 @@
     }
   }
 
+  function memberMenu(e: MouseEvent, member: Contact) {
+    const name = member.name || member.id;
+    const items = personMenu(accountId, member.id, name);
+    if (account?.capabilities.editMembers && member.canRemove) {
+      items.push({ label: 'Remove from group', icon: UserMinus, danger: true, run: () => removeMember(member.id, name) });
+    }
+    ui.openMenu(e, items);
+  }
+
+  async function removeMember(userId: string, name: string) {
+    if (!chat) return;
+    const ok = await ui.confirm(`Remove ${name} from “${store.chatName(chat)}”?`, 'They stop getting the group’s messages and can only come back if they are added again.', 'Remove', true);
+    if (!ok) return;
+    try {
+      await store.editMembers(accountId, chatId, [userId], true);
+      store.toast(`${name} removed`);
+    } catch (e) {
+      store.toastError(e);
+    }
+  }
+
   async function leave() {
     if (!chat) return;
     const name = store.chatName(chat);
@@ -93,7 +117,7 @@
         <div class="name">{store.chatName(chat)}</div>
         <div class="sub">
           <ProtocolBadge protocol={account.protocol} color={store.accountColor(accountId)} size={14} />
-          {protocolMeta(account.protocol).name}{#if store.accountName(accountId) !== protocolMeta(account.protocol).name} · {store.accountName(accountId)}{/if}{#if chat.isGroup && members.length} · {members.length} members{/if}
+          {protocolMeta(account.protocol).name}{#if store.accountName(accountId) !== protocolMeta(account.protocol).name}{` · ${store.accountName(accountId)}`}{/if}{#if chat.isGroup && members.length}{` · ${members.length} members`}{/if}
         </div>
         {#if contact?.phone}<div class="sub">{contact.phone}</div>{/if}
         {#if !chat.isGroup}<div class="sub mono">{chat.id}</div>{/if}
@@ -129,7 +153,9 @@
       </div>
 
       {#if chat.isGroup}
-        <div class="section">Members{#if members.length} · {members.length}{/if}</div>
+        <div class="section members-head"><span>Members{#if members.length}{` · ${members.length}`}{/if}</span>
+          {#if canAdd}<button class="link" onclick={() => (ui.addMembersFor = chatKey)}><UserPlus size={14} />Add people</button>{/if}
+        </div>
         {#if !membersLoaded}
           <div class="muted">Loading members…</div>
         {:else if !members.length}
@@ -143,7 +169,7 @@
                 <span class="member-name">You</span>
               </div>
             {:else}
-              <button class="member" onclick={(e) => ui.openMenu(e, personMenu(accountId, member.id, member.name || member.id))}>
+              <button class="member" onclick={(e) => memberMenu(e, member)} oncontextmenu={(e) => { e.preventDefault(); memberMenu(e, member); }}>
                 <Avatar name={member.name || member.id} id={member.id} size={30} owner={accountId} online={store.isOnline(accountId, member.id)} ring="var(--bg-1)" />
                 <span class="member-name">{member.name || member.id}</span>
               </button>
@@ -207,8 +233,9 @@
   button.member:hover { background: var(--hover); }
   .pic { border: 0; background: none; padding: 0; border-radius: 50%; cursor: zoom-in; }
   .member-name { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .media-head { display: flex; align-items: center; justify-content: space-between; }
-  .media-head .link { border: 0; background: none; padding: 0; font-size: 12px; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--accent); }
+  .media-head, .members-head { display: flex; align-items: center; justify-content: space-between; }
+  .members-head .link { display: inline-flex; align-items: center; gap: 4px; }
+  .media-head .link, .members-head .link { border: 0; background: none; padding: 0; font-size: 12px; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--accent); }
   .media { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: -6px; }
   .media button { border: 0; padding: 0; aspect-ratio: 1; border-radius: 6px; overflow: hidden; background: var(--skeleton); }
   .media img { width: 100%; height: 100%; object-fit: cover; display: block; }
