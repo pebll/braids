@@ -137,6 +137,16 @@ class Store {
 
   // only group events (joined, left, ...) are new: shown grey, not counted
   // in folders or the tray, like a muted chat
+  // A contact that is a person who can be added to a group. Matrix lists its
+  // rooms as contacts too (direct chats named after the person, groups):
+  // only user ids (@user:server) are people there; elsewhere groups are
+  // left out.
+  isPerson(accountId: string, c: Contact): boolean {
+    if (c.isSelf || !(c.name || c.id)) return false;
+    if (this.accounts[accountId]?.protocol === 'Matrix') return c.id.startsWith('@');
+    return !this.chats[chatKey(accountId, c.id)]?.isGroup;
+  }
+
   eventsOnly(c: Chat): boolean {
     return c.isUnread && (c.unreadCount ?? 1) === 0 && (c.unreadEvents ?? 0) > 0;
   }

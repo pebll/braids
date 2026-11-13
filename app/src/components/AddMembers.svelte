@@ -11,7 +11,7 @@
 <script lang="ts">
   import { Check, LoaderCircle, Search, UserPlus, X } from '@lucide/svelte';
   import { tick } from 'svelte';
-  import { chatKey as keyOf, splitKey, store } from '../lib/store.svelte';
+  import { splitKey, store } from '../lib/store.svelte';
   import { ui } from '../lib/ui.svelte';
   import Avatar from './Avatar.svelte';
 
@@ -36,7 +36,7 @@
   const contacts = $derived.by(() => {
     const q = query.trim().toLowerCase();
     return Object.values(store.contacts[accountId] ?? {})
-      .filter((c) => !c.isSelf && (c.name || c.id) && !memberIds.has(c.id) && !store.chats[keyOf(accountId, c.id)]?.isGroup)
+      .filter((c) => store.isPerson(accountId, c) && !memberIds.has(c.id))
       .filter((c) => !q || c.name.toLowerCase().includes(q) || c.id.toLowerCase().includes(q) || c.phone.includes(q))
       .sort((a, b) => (a.name || a.id).localeCompare(b.name || b.id))
       .slice(0, 300);

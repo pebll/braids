@@ -119,6 +119,9 @@
       .slice(0, 300);
   });
 
+  // group members: people only (Matrix lists its rooms as contacts too)
+  const people = $derived(contacts.filter((c) => store.isPerson(accountId, c)));
+
   // matrix user ids / phone numbers not in the contact list can be typed directly
   const direct = $derived(/^@[^:\s]+:\S+$/.test(query.trim()) || /^\+\d{6,}$/.test(query.trim().replace(/\s/g, '')));
 
@@ -187,7 +190,7 @@
             <input bind:value={query} placeholder="Add members" aria-label="Search members" />
           </label>
           <div class="list scroll short">
-            {#each contacts as c (c.id)}
+            {#each people as c (c.id)}
               {@const on = members.includes(c.id)}
               <button type="button" class="contact" role="checkbox" aria-checked={on} onclick={() => toggleMember(c.id)}>
                 <Avatar name={c.name || c.id} id={c.id} size={32} owner={accountId} />

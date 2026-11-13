@@ -6,6 +6,8 @@ release workflow publishes the section of a version as its release notes.
 
 ## [Unreleased]
 
+## [0.3.5] - 2026-11-13
+
 ### New
 - Matrix groups: add people (they get an invitation) with "Add people" in
   the group info, remove them from a member's menu ("Remove from group").
@@ -24,6 +26,8 @@ release workflow publishes the section of a version as its release notes.
   the accounts show theirs in grey, and a setting (Settings → General) hides
   them. Archived chats with new messages now also show their count in the
   collapsed sidebar. (#36)
+- New group (Matrix): only people are offered as members, no longer the
+  rooms of direct chats (!… ids that could not be added) and groups.
 - Settings → About → Report a bug fills in the braids version, how braids
   was installed, your distribution, kernel and desktop, and your
   messengers. (#39)

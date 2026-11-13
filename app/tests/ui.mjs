@@ -144,6 +144,7 @@ try {
 
   // add and remove members (#38): Dummy lets self add anyone and remove all but Michael
   await page.locator('.info').getByRole('button', { name: 'Add people' }).click();
+  check(await page.getByRole('dialog').getByRole('checkbox', { name: /Party Planning/ }).count() === 0, 'Add people lists no groups');
   await page.locator('input[aria-label="Search people"]').fill('kev');
   await page.getByRole('checkbox', { name: /Kevin/ }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Add', exact: true }).click();
