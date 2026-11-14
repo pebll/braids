@@ -120,6 +120,24 @@ export interface Update {
 }
 
 // A newer release than this app, or null (up to date, offline, browser).
+// The app's version ('' in a browser)
+export async function appVersion(): Promise<string> {
+  if (!isTauri) return '';
+  const { getVersion } = await import('@tauri-apps/api/app');
+  return getVersion();
+}
+
+// Whether version a (e.g. "0.3.6") is newer than b, as check_update compares
+export function newerVersion(a: string, b: string): boolean {
+  const parts = (v: string) => v.replace(/^v/, '').split(/[.-]/).map((p) => Number(p)).filter((n) => Number.isFinite(n));
+  const x = parts(a);
+  const y = parts(b);
+  for (let i = 0; i < Math.max(x.length, y.length); i++) {
+    if ((x[i] ?? -1) !== (y[i] ?? -1)) return (x[i] ?? -1) > (y[i] ?? -1);
+  }
+  return false;
+}
+
 export async function checkUpdate(): Promise<Update | null> {
   if (!isTauri) return null;
   const { invoke } = await import('@tauri-apps/api/core');

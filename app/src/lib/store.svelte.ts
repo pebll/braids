@@ -933,13 +933,26 @@ class Store {
   // offers it in a toast once per version.
   async checkUpdates(force = false): Promise<api.Update | null> {
     const KEY = 'braids.update.checked';
+    const LATEST = 'braids.update.latest'; // the last answer, for the starts in between
     try {
-      if (!force && Date.now() - Number(localStorage.getItem(KEY) ?? 0) < 24 * 3600 * 1000) return this.update;
+      if (!force && Date.now() - Number(localStorage.getItem(KEY) ?? 0) < 24 * 3600 * 1000) {
+        // not asked again yet: what the last check found, unless this app is
+        // that version (or newer) by now
+        const last = JSON.parse(localStorage.getItem(LATEST) ?? 'null') as api.Update | null;
+        const app = last ? await api.appVersion() : '';
+        this.update = last && app && api.newerVersion(last.version, app) ? last : null;
+        return this.update;
+      }
       localStorage.setItem(KEY, String(Date.now()));
     } catch {
       // no storage: check every start
     }
     this.update = await api.checkUpdate().catch(() => null);
+    try {
+      localStorage.setItem(LATEST, JSON.stringify(this.update));
+    } catch {
+      // asked again next start
+    }
     const u = this.update;
     if (u && !force) {
       let told = '';

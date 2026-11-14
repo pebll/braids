@@ -90,6 +90,19 @@ add_library(ncutil ${LIBRARY_LINKING_TYPE}
 )
 install(TARGETS ncutil DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
+# braids' version: the app's (app/src-tauri/tauri.conf.json), the one place
+# it is bumped. Only apputil.cpp gets it, so a new version recompiles just
+# that file; CMake configures again when the file changes.
+set(BRAIDS_VERSION_FILE "${CMAKE_CURRENT_SOURCE_DIR}/../../app/src-tauri/tauri.conf.json")
+file(STRINGS "${BRAIDS_VERSION_FILE}" BRAIDS_VERSION_LINE REGEX "^  \"version\": \"[^\"]+\"" LIMIT_COUNT 1)
+string(REGEX REPLACE ".*\"version\": \"([^\"]+)\".*" "\\1" BRAIDS_APP_VERSION "${BRAIDS_VERSION_LINE}")
+if(NOT BRAIDS_APP_VERSION MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+")
+  message(FATAL_ERROR "no version found in ${BRAIDS_VERSION_FILE}")
+endif()
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${BRAIDS_VERSION_FILE}")
+set_property(SOURCE src/apputil.cpp APPEND PROPERTY COMPILE_DEFINITIONS "BRAIDS_APP_VERSION=\"${BRAIDS_APP_VERSION}\"")
+message(STATUS "braids version: ${BRAIDS_APP_VERSION}")
+
 # Volatile build metadata (git sha/branch/origin, resolved by the top-level
 # CMakeLists and inherited here) is written to a generated header included only
 # by buildinfo.cpp, rather than passed target-wide via target_compile_definitions,

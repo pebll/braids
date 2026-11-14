@@ -76,7 +76,10 @@ runs braidsd from a cache copy, it outlives the mount);
 `utils/dist/install.sh` installs the tarball per user; tag `v*` runs
 `.github/workflows/release.yml` (both arches, all formats; release notes are
 the version's section of `CHANGELOG.md`: add user-facing changes under
-`[Unreleased]` and rename it to the version before tagging, then run
+`[Unreleased]` and rename it to the version before tagging, bump the version
+in `app/package.json` (+ lock), `app/src-tauri/Cargo.toml` (+ lock) and
+`app/src-tauri/tauri.conf.json` (braidsd takes its version from the last one,
+`lib/ncutil/CMakeLists.txt`), then run
 `utils/dist/flatpak/update-releases` (the metainfo's release list, checked
 by the workflow)). Nix: `flake.nix` / `nix/package.nix` wrap the release tarball, version and
 checksums in `nix/release.json` (`utils/dist/nix-update`, committed to main

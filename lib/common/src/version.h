@@ -7,4 +7,11 @@
 
 #pragma once
 
-#define NCHAT_VERSION "0.3.2" // braids version (macro name kept from nchat)
+// braids' version (macro name kept from nchat). Bumped in one place, the
+// app's app/src-tauri/tauri.conf.json: lib/ncutil/CMakeLists.txt reads it and
+// passes it as BRAIDS_APP_VERSION (it was a number here, and fell behind).
+#ifdef BRAIDS_APP_VERSION
+#define NCHAT_VERSION BRAIDS_APP_VERSION
+#else
+#define NCHAT_VERSION "unknown"
+#endif

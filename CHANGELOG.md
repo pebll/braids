@@ -6,6 +6,17 @@ release workflow publishes the section of a version as its release notes.
 
 ## [Unreleased]
 
+### Changed
+- A dot on the Settings button (and on Settings → About) when a newer
+  braids version is available; Settings then opens on About.
+- Settings → About shows the app's version next to the core's.
+
+### Fixed
+- Settings → About said "Core 0.3.2" since 0.3.2: the core's version was
+  not updated with the app's. Both now come from the same place.
+- The update notice in Settings → About disappeared after restarting
+  braids until the next daily check.
+
 ## [0.3.5] - 2026-11-13
 
 ### New

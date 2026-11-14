@@ -80,10 +80,12 @@
   // start at login (the plugin's state, not a setting) and updates
   let autostart = $state(false);
   let installKind = $state('');
+  let appVersion = $state('');
   let updateStatus = $state('');
   if (api.isTauri) {
     api.autostartEnabled().then((on) => (autostart = on)).catch(() => {});
     api.installKind().then((k) => (installKind = k)).catch(() => {});
+    api.appVersion().then((v) => (appVersion = v)).catch(() => {});
   }
 
   async function toggleAutostart() {
@@ -208,6 +210,7 @@
       {#each SECTIONS as s}
         <button class:active={ui.settingsSection === s.id} onclick={() => { ui.settingsSection = s.id; ui.settingsAccount = ''; }}>
           <s.icon size={16} />{s.label}
+          {#if s.id === 'about' && store.update}<span class="nav-dot" title={`braids ${store.update.version} is available`}></span>{/if}
         </button>
       {/each}
     </nav>
@@ -382,7 +385,7 @@
         <div class="about">
           <Logo size={56} />
           <h2>braids</h2>
-          <span class="hint">Core {store.daemonVersion || '–'} · API {store.apiVersion || '–'} · built on nchat</span>
+          <span class="hint">{#if appVersion}{`Version ${appVersion} · `}{/if}Core {store.daemonVersion || '–'} · API {store.apiVersion || '–'} · built on nchat</span>
           {#if api.isTauri}
             <div class="update">
               {#if store.update}
@@ -424,6 +427,7 @@
   nav button { display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 10px; border: 0; border-radius: var(--radius-md); background: none; text-align: left; font-size: 14px; color: var(--text); }
   nav button:hover { background: var(--hover); }
   nav button.active { background: var(--selected); font-weight: 600; }
+  .nav-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); margin-left: auto; }
   .pane { flex: 1; padding: 20px 24px; position: relative; display: flex; flex-direction: column; gap: 4px; }
   .close { position: absolute; right: 12px; top: 12px; }
   h2 { margin: 0 0 10px; font-size: 20px; font-weight: 650; }

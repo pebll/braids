@@ -524,6 +524,16 @@ try {
   await page.getByRole('switch', { name: 'Unread counts on Favorites and accounts' }).click();
   await page.keyboard.press('Escape');
   check(await page.locator('nav.sidebar .item[title*="—"] .count').count() === 0, 'account counts hidden by the setting');
+  // a newer version: a dot on Settings, which opens on About (with its own dot)
+  check(await page.locator('nav.sidebar .update-dot').count() === 0, 'no update dot when up to date');
+  await page.evaluate(() => { window.__braids.store.update = { version: '9.9.9', url: 'https://example.org' }; });
+  await page.locator('nav.sidebar .update-dot').waitFor();
+  await page.getByRole('button', { name: 'Settings (update available)' }).click();
+  await page.locator('.settings .about').waitFor();
+  check(await page.locator('.settings nav .nav-dot').count() === 1, 'update dot on Settings opens About, dot on About');
+  await page.keyboard.press('Escape');
+  await page.evaluate(() => { window.__braids.store.update = null; });
+  await page.locator('nav.sidebar .update-dot').waitFor({ state: 'detached' });
   await page.keyboard.press('Control+,');
   await page.getByRole('switch', { name: 'Unread counts on Favorites and accounts' }).click();
   await page.keyboard.press('Escape');

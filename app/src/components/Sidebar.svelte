@@ -81,6 +81,13 @@
     ]);
   }
 
+  // with a newer version out, Settings opens on About (its "Get it")
+  function openSettings() {
+    ui.drawerOpen = false;
+    ui.settingsSection = store.update ? 'about' : 'general';
+    ui.settingsOpen = true;
+  }
+
   function openAccountSettings(accountId: string) {
     ui.settingsSection = 'accounts';
     ui.settingsAccount = accountId;
@@ -188,8 +195,10 @@
       </button>
     {/if}
     {#if !collapsed}
-      <button class="icon-btn" aria-label="Settings" title={`Settings${hint('settings')}`} onclick={() => { ui.drawerOpen = false; ui.settingsSection = 'general'; ui.settingsOpen = true; }}>
+      <button class="icon-btn settings-btn" aria-label={store.update ? 'Settings (update available)' : 'Settings'}
+        title={store.update ? `braids ${store.update.version} is available` : `Settings${hint('settings')}`} onclick={openSettings}>
         <Settings size={18} strokeWidth={1.75} />
+        {#if store.update}<span class="update-dot" aria-hidden="true"></span>{/if}
       </button>
     {/if}
   </div>
@@ -197,8 +206,9 @@
     <button class="item" title="Expand sidebar" aria-label="Expand sidebar" onclick={toggle}>
       <span class="ico"><PanelLeftOpen size={18} strokeWidth={1.75} /></span>
     </button>
-    <button class="item" title="Settings" onclick={() => { ui.settingsSection = 'general'; ui.settingsOpen = true; }}>
-      <span class="ico"><Settings size={18} strokeWidth={1.75} /></span>
+    <button class="item" title={store.update ? `Settings — braids ${store.update.version} is available` : 'Settings'}
+      aria-label={store.update ? 'Settings (update available)' : 'Settings'} onclick={openSettings}>
+      <span class="ico"><Settings size={18} strokeWidth={1.75} />{#if store.update}<span class="update-dot" aria-hidden="true"></span>{/if}</span>
     </button>
   {/if}
 </nav>
@@ -238,6 +248,10 @@
   /* not online: bigger, so a problem stands out */
   .dot:not(.online) { right: -4px; bottom: -4px; width: 12px; height: 12px; }
   .state.warn { color: var(--warning); }
+  /* a newer braids version: a dot on the Settings button */
+  .settings-btn { position: relative; }
+  .update-dot { position: absolute; top: 5px; right: 5px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); border: 1.5px solid var(--bg-0); }
+  .ico .update-dot { top: -3px; right: -3px; }
   .count.corner { position: absolute; top: 1px; right: 4px; min-width: 16px; height: 16px; font-size: 10px; line-height: 16px; padding: 0 4px; }
   .section { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); padding: 14px 10px 6px; }
   .sep { height: 1px; background: var(--border); margin: 10px 6px; }
