@@ -638,6 +638,28 @@ try {
   check(await count() === Math.min(total, windowed + 60), 'scrolling up reveals up to 60 more');
   await page.waitForTimeout(100);
   check(await page.locator('.messages').evaluate((el) => el.scrollTop > 200), 'view kept in place while revealing');
+  const toBottom = page.locator('.to-bottom');
+  await toBottom.waitFor();
+  check(await toBottom.locator('.badge').count() === 0, 'scroll button: no badge without new messages');
+  // Jim writes in Oscar's chat; the command itself goes through Michael's
+  // chat, so the open chat gets no message from self (that would scroll down)
+  const incoming = () => page.evaluate(async () => {
+    const call = async (method, params) => (await (await fetch('/__braids/call', { method: 'POST', body: JSON.stringify({ method, params }) })).json()).result;
+    const accounts = await call('accounts.list', {});
+    await call('messages.send', { accountId: accounts[0].accountId, chatId: 'Michael_0', text: '/ping Oscar_0' });
+  });
+  await incoming();
+  await toBottom.locator('.badge').waitFor({ timeout: 10000 });
+  check((await toBottom.locator('.badge').textContent()) === '1', 'scroll button: badge counts a message from someone else');
+  await incoming();
+  await page.waitForFunction(() => document.querySelector('.to-bottom .badge')?.textContent === '2', null, { timeout: 10000 });
+  check(true, 'scroll button: badge goes up with each new message');
+  await toBottom.click();
+  await toBottom.waitFor({ state: 'detached' });
+  check(true, 'scroll button gone back at the bottom');
+  await page.locator('.messages').evaluate((el) => { el.scrollTop = 0; });
+  await toBottom.waitFor();
+  check(await toBottom.locator('.badge').count() === 0, 'scroll button: the count was reset at the bottom');
   await page.getByRole('option', { name: /The Office/ }).click();
 
   // groups have a rounded-square avatar, people a round one

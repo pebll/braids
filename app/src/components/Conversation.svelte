@@ -129,6 +129,25 @@
     });
   });
 
+  // "Scroll to latest" badge: the newest message seen at the bottom, and the
+  // messages from others after it (computed from the list, nothing is missed;
+  // own messages scroll to the bottom, which resets it)
+  let seen = $state({ key: '', id: '' });
+  $effect.pre(() => {
+    const id = items[items.length - 1]?.id ?? '';
+    if (atBottom) untrack(() => { seen = { key: chatKey, id }; });
+  });
+  const newBelow = $derived.by(() => {
+    if (atBottom || seen.key !== chatKey || !seen.id) return 0;
+    const i = items.findIndex((m) => m.id === seen.id);
+    if (i < 0) return 0;
+    let n = 0;
+    for (let j = i + 1; j < items.length; j++) {
+      if (!items[j].isOutgoing && !items[j].system) n++;
+    }
+    return n;
+  });
+
   // an unread chat opens at the "New messages" line (once its messages are
   // there), a read one at the bottom
   $effect(() => {
@@ -486,7 +505,10 @@
     </div>
 
     {#if !atBottom}
-      <button class="to-bottom" aria-label="Scroll to latest" onclick={scrollToBottom}><ArrowDown size={18} /></button>
+      <button class="to-bottom" aria-label={newBelow ? `Scroll to latest (${newBelow} new)` : 'Scroll to latest'} onclick={scrollToBottom}>
+        <ArrowDown size={18} />
+        {#if newBelow}<span class="badge">{newBelow > 999 ? '999+' : newBelow}</span>{/if}
+      </button>
     {/if}
 
     {#if store.isInvite(chat)}
@@ -578,6 +600,12 @@
   .to-bottom {
     position: absolute; right: 20px; bottom: 84px; width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--border);
     background: var(--surface); color: var(--text-2); box-shadow: var(--shadow-2); display: flex; align-items: center; justify-content: center; z-index: 6;
+  }
+
+  .to-bottom .badge {
+    position: absolute; top: -8px; right: -4px; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px;
+    background: var(--accent); color: var(--on-accent); font-size: 11px; font-weight: 700; line-height: 20px; text-align: center;
+    font-variant-numeric: tabular-nums; box-shadow: 0 0 0 2px var(--bg-2); pointer-events: none;
   }
 
   .drop {
