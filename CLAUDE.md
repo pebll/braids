@@ -168,3 +168,17 @@ Scheduled-later features are in `doc/BACKLOG.md`.
   `members.remove`, `members.edited`; `NewGroupMembersNotify.canAdd` /
   `canRemove` come from the room's power levels. Dummy: The Office, self may
   remove anyone but Michael.
+
+## Agent skills
+
+### Issue tracker
+
+GitHub Issues on `pebll/braids`. See `doc/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default labels: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `doc/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `CONTEXT.md` at the repo root and ADRs in `doc/adr/`. See `doc/agents/domain.md`.
