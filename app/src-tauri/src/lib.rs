@@ -9,6 +9,7 @@
 
 mod daemon;
 mod linkpreview;
+mod update;
 mod voice;
 
 use std::fs;
@@ -16,12 +17,13 @@ use std::io::Write;
 use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::Mutex;
 
 use serde_json::Value;
 use tauri::image::Image;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Manager, State, WindowEvent};
+use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
 
 use daemon::{ApiError, Daemon};
 
@@ -30,6 +32,7 @@ struct AppState {
     close_to_tray: AtomicBool,
     temp_counter: AtomicU64,
     tray_level: AtomicU64, // colored strands shown in the tray icon
+    updated_program: Mutex<Option<PathBuf>>, // a newer braids started while this one runs
 }
 
 /// The tray's id. On Linux the icon images are files named after it
@@ -357,6 +360,24 @@ fn licenses_path(app: AppHandle) -> String {
         .unwrap_or_default()
 }
 
+/// braids was started again: show the window, and offer a restart when that
+/// start was a newer version (`braids://updated`, see update.rs).
+fn on_second_start(app: &AppHandle, args: Vec<String>, cwd: String) {
+    show_window(app);
+    if let Some(program) = update::updated_program(&args, &cwd) {
+        *app.state::<AppState>().updated_program.lock().unwrap() = Some(program);
+        let _ = app.emit("braids://updated", ());
+    }
+}
+
+#[tauri::command]
+fn restart_updated(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
+    let program = state.updated_program.lock().unwrap().clone().ok_or("no update to restart into")?;
+    update::restart_into(&program).map_err(|e| e.to_string())?;
+    app.exit(0);
+    Ok(())
+}
+
 fn show_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.unminimize();
@@ -428,7 +449,7 @@ pub fn run() {
     // one braids per profile: starting it again shows the running window
     // (registered first, so a second instance exits before doing anything)
     if !daemon::custom_profile() {
-        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| show_window(app)));
+        builder = builder.plugin(tauri_plugin_single_instance::init(on_second_start));
     }
     builder
         // started at login with --minimized: only the tray icon
@@ -443,6 +464,7 @@ pub fn run() {
             close_to_tray: AtomicBool::new(true),
             temp_counter: AtomicU64::new(1),
             tray_level: AtomicU64::new(0),
+            updated_program: Mutex::new(None),
         })
         .setup(|app| {
             let handle = app.handle().clone();
@@ -473,7 +495,7 @@ pub fn run() {
                 }
             }
         })
-        .invoke_handler(tauri::generate_handler![api_call, daemon_connected, set_close_to_tray, set_badge, save_temp_file, save_file_as, licenses_path, voice_start, voice_stop, voice_to_aac, link_preview, check_update, install_kind, system_info, open_link])
+        .invoke_handler(tauri::generate_handler![api_call, daemon_connected, set_close_to_tray, set_badge, save_temp_file, save_file_as, licenses_path, voice_start, voice_stop, voice_to_aac, link_preview, check_update, install_kind, system_info, open_link, restart_updated])
         .run(tauri::generate_context!())
         .expect("error while running braids");
 }

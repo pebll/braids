@@ -992,10 +992,11 @@ class Store {
 
   // ---- toasts ----
 
-  toast(text: string, kind: Toast['kind'] = 'info', action?: Toast['action']) {
+  // sticky: stays until dismissed (or its action is used)
+  toast(text: string, kind: Toast['kind'] = 'info', action?: Toast['action'], sticky = false) {
     const id = this.toastId++;
     this.toasts.push({ id, text, kind, action });
-    setTimeout(() => this.dismissToast(id), kind === 'error' ? 8000 : 4000);
+    if (!sticky) setTimeout(() => this.dismissToast(id), kind === 'error' ? 8000 : 4000);
   }
 
   toastError(e: unknown) {

@@ -119,6 +119,19 @@ export interface Update {
   url: string;
 }
 
+// braids was started again from a newer installation while this one runs
+// (update.rs): the handler offers restartUpdated()
+export async function onUpdated(handler: () => void): Promise<void> {
+  if (!isTauri) return;
+  const { listen } = await import('@tauri-apps/api/event');
+  await listen('braids://updated', () => handler());
+}
+
+export async function restartUpdated(): Promise<void> {
+  const { invoke } = await import('@tauri-apps/api/core');
+  await invoke('restart_updated');
+}
+
 // A newer release than this app, or null (up to date, offline, browser).
 // The app's version ('' in a browser)
 export async function appVersion(): Promise<string> {

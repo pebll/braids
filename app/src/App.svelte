@@ -82,6 +82,16 @@
     const checkUpdates = () => settings.checkUpdates && store.checkUpdates();
     setTimeout(checkUpdates, 20000);
     const updateTimer = setInterval(checkUpdates, 6 * 3600 * 1000);
+    // a newer braids was started while this one kept running in the tray
+    let updatedShown = false;
+    api.onUpdated(() => {
+      if (updatedShown) return;
+      updatedShown = true;
+      store.toast('braids was updated. Restart to use the new version.', 'info', {
+        label: 'Restart',
+        run: () => api.restartUpdated().catch((e) => store.toastError(e)),
+      }, true);
+    });
     api.onFileDrop(
       (paths) => {
         if (store.current && paths.length) conversation?.addFiles(paths);

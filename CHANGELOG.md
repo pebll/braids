@@ -6,6 +6,10 @@ release workflow publishes the section of a version as its release notes.
 
 ## [Unreleased]
 
+### New
+- The "Scroll to latest" button shows how many new messages arrived while
+  you were scrolled up. (#6, thanks @Pierre-Pln-Bys)
+
 ### Changed
 - Keyboard: Ctrl+J / Ctrl+K (and Ctrl+↓ / Ctrl+↑) now move the highlight in
   the chat list (this was Alt), and Alt+J / Alt+K (and Alt+↓ / Alt+↑) scroll
@@ -15,7 +19,9 @@ release workflow publishes the section of a version as its release notes.
 ### Fixed
 - Nix: after an update, braids kept using the old core until the computer
   restarted (Settings → About showed an older core version). The core is now
-  restarted whenever its version differs from the app's. (#53)
+  restarted whenever its version differs from the app's. And when you
+  start braids after an update while the old version still runs in the
+  tray, it offers to restart into the new version. (#53)
 
 ## [0.3.6] - 2026-11-16
 
