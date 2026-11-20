@@ -178,6 +178,11 @@
       case 'prevChat':
         toList(() => ui.list?.move(action === 'nextChat' ? 1 : -1));
         return true;
+      case 'scrollChatDown':
+      case 'scrollChatUp':
+        if (!ui.conversation) return false;
+        ui.conversation.scroll(action === 'scrollChatDown' ? 1 : -1);
+        return true;
       case 'focusList':
         store.search = '';
         ui.listCursor = '';

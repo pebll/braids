@@ -64,7 +64,7 @@ class Ui {
   focusSearch = $state(0);
   textSizeNotice = $state(0);
   private textSizeNoticeTimer: ReturnType<typeof setTimeout> | undefined;
-  // the chat list's keyboard highlight (Alt+J/K, arrows): a chat key, or a
+  // the chat list's keyboard highlight (Ctrl+J/K, arrows): a chat key, or a
   // message search result ("m\u0002" + chat key + "\u0001" + id); opened with
   // Enter. Shown while the chat list or its search has the focus.
   listCursor = $state('');
@@ -72,6 +72,8 @@ class Ui {
   // move: highlight the next / previous; focus: at the open chat; first: a
   // light highlight on the first chat (after a "go to")
   list: { move(delta: number): void; focus(): void; first(): void } | null = null;
+  // set by the mounted conversation: scroll it a step down (1) or up (-1)
+  conversation: { scroll(direction: number): void } | null = null;
 
   get narrow(): boolean {
     return this.width < 900;

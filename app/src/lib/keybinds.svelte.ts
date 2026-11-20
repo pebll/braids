@@ -23,6 +23,8 @@ export type Action =
   | 'goWhatsApp'
   | 'nextChat'
   | 'prevChat'
+  | 'scrollChatDown'
+  | 'scrollChatUp'
   | 'nextUnread'
   | 'focusList'
   | 'searchChats'
@@ -51,8 +53,10 @@ export const ACTIONS: { id: Action; group: ActionGroup; label: string; defaults:
   { id: 'goSignal', group: 'goto', label: 'Signal account', defaults: ['Mod+S'] },
   { id: 'goTelegram', group: 'goto', label: 'Telegram account', defaults: ['Mod+T'] },
   { id: 'goWhatsApp', group: 'goto', label: 'WhatsApp account', defaults: ['Mod+W'] },
-  { id: 'nextChat', group: 'goto', label: 'Highlight next chat', defaults: ['Alt+ArrowDown', 'Alt+J'] },
-  { id: 'prevChat', group: 'goto', label: 'Highlight previous chat', defaults: ['Alt+ArrowUp', 'Alt+K'] },
+  { id: 'nextChat', group: 'goto', label: 'Highlight next chat', defaults: ['Mod+ArrowDown', 'Mod+J'] },
+  { id: 'prevChat', group: 'goto', label: 'Highlight previous chat', defaults: ['Mod+ArrowUp', 'Mod+K'] },
+  { id: 'scrollChatDown', group: 'goto', label: 'Scroll chat down', defaults: ['Alt+ArrowDown', 'Alt+J'] },
+  { id: 'scrollChatUp', group: 'goto', label: 'Scroll chat up', defaults: ['Alt+ArrowUp', 'Alt+K'] },
   { id: 'focusList', group: 'goto', label: 'Back to chat list', defaults: ['Alt+ArrowLeft', 'Alt+H'] },
   { id: 'nextUnread', group: 'goto', label: 'Next unread chat', defaults: ['Mod+N'] },
   { id: 'searchChats', group: 'action', label: 'Search chats', defaults: ['Mod+Space'] },
@@ -76,8 +80,9 @@ export const ACCOUNT_ACTIONS: Partial<Record<Action, string>> = {
 };
 
 // text editing keys keep their usual meaning in a text field with text
-// (Ctrl+A selects all there, in an empty field it is the shortcut)
-const TEXT_EDITING = new Set(['Mod+A', 'Mod+C', 'Mod+V', 'Mod+X', 'Mod+Z', 'Mod+Shift+Z', 'Mod+Y']);
+// (Ctrl+A selects all there, Ctrl+Up/Down move by paragraph; in an empty
+// field it is the shortcut)
+const TEXT_EDITING = new Set(['Mod+A', 'Mod+C', 'Mod+V', 'Mod+X', 'Mod+Z', 'Mod+Shift+Z', 'Mod+Y', 'Mod+ArrowUp', 'Mod+ArrowDown']);
 
 export const isMac = typeof navigator !== 'undefined' && navigator.platform.toLowerCase().includes('mac');
 

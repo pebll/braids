@@ -157,8 +157,9 @@ Scheduled-later features are in `doc/BACKLOG.md`.
   Dummy: `/joined`, `/joined <text>`.
 - Voice messages are recorded as Ogg/Opus; for Signal the app converts them
   to AAC first (`voice::to_aac`, Signal on iPhone plays no Ogg).
-- Chat list keyboard: one highlight (`ui.listCursor`, `ui.list`), Alt+J/K
-  move it, Enter opens.
+- Chat list keyboard: one highlight (`ui.listCursor`, `ui.list`), Ctrl+J/K
+  (Ctrl+arrows) move it, Enter opens; Alt+J/K (Alt+arrows) scroll the open
+  chat (`ui.conversation`).
 - Links: `api.openUrl` → `open_link` (src-tauri/src/lib.rs), GIO with GDK's
   launch context so the browser gets an activation token / startup id and
   comes to the front; the opener plugin is the fallback.

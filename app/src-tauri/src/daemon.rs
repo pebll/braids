@@ -154,7 +154,9 @@ impl Daemon {
     }
 
     /// A braidsd that keeps running across app restarts would hide an update
-    /// (or a rebuild): restart it when its binary is newer than the process.
+    /// (or a rebuild): restart it when its version differs from the app's
+    /// (an update; Nix gives every file the same 1970 time, issue #53) or its
+    /// binary is newer than the process (a rebuild in development).
     fn restart_if_outdated(&self) {
         for _ in 0..50 {
             if self.is_connected() {
@@ -163,17 +165,16 @@ impl Daemon {
             thread::sleep(Duration::from_millis(100));
         }
         let Ok(hello) = self.call("hello", json!({})) else { return };
-        let Some(start_ms) = hello.get("startTime").and_then(Value::as_i64) else { return };
+        let version = hello.get("version").and_then(Value::as_str).unwrap_or("");
+        let start_ms = hello.get("startTime").and_then(Value::as_i64);
         let modified_ms = std::fs::metadata(find_braidsd())
             .and_then(|m| m.modified())
             .ok()
             .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
             .map(|d| d.as_millis() as i64);
-        if let Some(modified_ms) = modified_ms {
-            if modified_ms > start_ms {
-                eprintln!("braids: braidsd binary is newer than the running daemon, restarting it");
-                let _ = self.call("daemon.shutdown", json!({}));
-            }
+        if is_outdated(version, env!("CARGO_PKG_VERSION"), start_ms, modified_ms) {
+            eprintln!("braids: the running braidsd ({version}) is outdated, restarting it");
+            let _ = self.call("daemon.shutdown", json!({}));
         }
     }
 
@@ -275,5 +276,39 @@ impl Inner {
         // dropping the senders fails the waiting calls
         self.pending.lock().unwrap().clear();
         let _ = app.emit("braids://connection", false);
+    }
+}
+
+/// Whether a running braidsd must be restarted: another version than the app
+/// (empty: an old braidsd that does not say), or a binary newer than the
+/// process.
+fn is_outdated(daemon_version: &str, app_version: &str, start_ms: Option<i64>, modified_ms: Option<i64>) -> bool {
+    if daemon_version != app_version {
+        return true;
+    }
+    matches!((start_ms, modified_ms), (Some(start), Some(modified)) if modified > start)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_outdated;
+
+    #[test]
+    fn restarts_another_version() {
+        // Nix: every file is from 1970, only the version tells
+        assert!(is_outdated("0.3.2", "0.3.6", Some(1_700_000_000_000), Some(1_000)));
+        assert!(is_outdated("", "0.3.6", None, None));
+    }
+
+    #[test]
+    fn restarts_a_rebuilt_binary() {
+        assert!(is_outdated("0.3.6", "0.3.6", Some(1_000), Some(2_000)));
+    }
+
+    #[test]
+    fn keeps_a_current_daemon() {
+        assert!(!is_outdated("0.3.6", "0.3.6", Some(2_000), Some(1_000)));
+        assert!(!is_outdated("0.3.6", "0.3.6", Some(1_700_000_000_000), Some(1_000)));
+        assert!(!is_outdated("0.3.6", "0.3.6", None, None));
     }
 }

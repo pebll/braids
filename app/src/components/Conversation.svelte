@@ -152,6 +152,17 @@
     atBottom = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 40;
   }
 
+  // Alt+J/K: a step of a fifth of the view (at least two lines); scrolling
+  // up reveals older messages as with the mouse (onScroll)
+  function scrollStep(direction: number) {
+    if (!scroller) return;
+    scroller.scrollTop += direction * Math.max(60, Math.round(scroller.clientHeight / 5));
+  }
+  ui.conversation = { scroll: scrollStep };
+  onDestroy(() => {
+    if (ui.conversation?.scroll === scrollStep) ui.conversation = null;
+  });
+
   function scrollToBottom() {
     if (scroller) scroller.scrollTop = scroller.scrollHeight;
     atBottom = true;

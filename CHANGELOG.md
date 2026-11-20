@@ -6,6 +6,17 @@ release workflow publishes the section of a version as its release notes.
 
 ## [Unreleased]
 
+### Changed
+- Keyboard: Ctrl+J / Ctrl+K (and Ctrl+↓ / Ctrl+↑) now move the highlight in
+  the chat list (this was Alt), and Alt+J / Alt+K (and Alt+↓ / Alt+↑) scroll
+  the open chat. Shortcuts you changed yourself stay as they are; all can be
+  changed in Settings → Keyboard.
+
+### Fixed
+- Nix: after an update, braids kept using the old core until the computer
+  restarted (Settings → About showed an older core version). The core is now
+  restarted whenever its version differs from the app's. (#53)
+
 ## [0.3.6] - 2026-11-16
 
 ### New

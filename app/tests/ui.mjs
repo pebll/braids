@@ -632,6 +632,26 @@ try {
   await page.waitForFunction(() => document.querySelectorAll('.messages [data-msg-id]').length <= 150);
   const windowed = await count();
   check(windowed === 150, `back at the bottom: window of ${windowed} messages`);
+  // Alt+K / Alt+J (and Alt+arrows) scroll the open chat, also from the
+  // composer (far from the top: no older messages are revealed here)
+  await page.locator('textarea[aria-label=Message]').focus();
+  const scrollTop = () => page.locator('.messages').evaluate((el) => el.scrollTop);
+  const start = await scrollTop();
+  await page.keyboard.press('Alt+k');
+  await page.waitForFunction((b) => document.querySelector('.messages').scrollTop < b, start);
+  const up = await scrollTop();
+  await page.keyboard.press('Alt+ArrowUp');
+  await page.waitForFunction((u) => document.querySelector('.messages').scrollTop < u, up);
+  check(await page.evaluate(() => document.activeElement?.getAttribute('aria-label') === 'Message'), 'Alt+K / Alt+Up scroll the chat up, the composer keeps the focus');
+  const top = await scrollTop();
+  await page.keyboard.press('Alt+j');
+  await page.waitForFunction((t) => document.querySelector('.messages').scrollTop > t, top);
+  const down = await scrollTop();
+  await page.keyboard.press('Alt+ArrowDown');
+  await page.waitForFunction((d) => document.querySelector('.messages').scrollTop > d, down);
+  check(true, 'Alt+J / Alt+Down scroll the chat back down');
+  await page.locator('.messages').evaluate((el) => { el.scrollTop = el.scrollHeight; });
+  await page.waitForFunction(() => document.querySelectorAll('.messages [data-msg-id]').length <= 150);
   // scrolling up reveals loaded messages, keeping the view in place
   await page.locator('.messages').evaluate((el) => { el.scrollTop = 0; });
   await page.waitForFunction((n) => document.querySelectorAll('.messages [data-msg-id]').length > n, windowed);
@@ -743,20 +763,20 @@ try {
   const selectedName = () => page.locator('[role=option][aria-selected=true] .name').textContent();
   const before = await selectedName();
   const cursorName = () => page.locator('.chatlist .row.cursor .name').textContent();
-  await page.keyboard.press('Alt+j');
+  await page.keyboard.press('Control+j');
   await page.locator('.chatlist .row.cursor').waitFor();
   check((await selectedName()) === before && (await cursorName()) !== before &&
-    await page.evaluate(() => document.activeElement?.getAttribute('aria-label') === 'Chats'), 'Alt+J highlights the next chat without opening it');
+    await page.evaluate(() => document.activeElement?.getAttribute('aria-label') === 'Chats'), 'Ctrl+J highlights the next chat without opening it');
   const highlighted = await cursorName();
   await page.keyboard.press('Enter');
   await page.waitForFunction((n) => document.querySelector('[role=option][aria-selected=true] .name')?.textContent === n, highlighted);
   await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'Message');
   check(await page.locator('textarea[aria-label=Message]').inputValue() === '' && await page.locator('.chatlist .row.cursor').count() === 0,
     'Enter opens the highlighted chat, cursor in the composer');
-  await page.keyboard.press('Alt+k');
+  await page.keyboard.press('Control+k');
   await page.keyboard.press('Enter');
   await page.waitForFunction((b) => document.querySelector('[role=option][aria-selected=true] .name')?.textContent === b, before);
-  check(true, 'Alt+K and Enter go back to the previous chat');
+  check(true, 'Ctrl+K and Enter go back to the previous chat');
   await page.keyboard.press('Alt+h');
   await page.locator('.chatlist .row.cursor').waitFor();
   check((await cursorName()) === before && await page.evaluate(() => document.activeElement?.getAttribute('aria-label') === 'Chats'),
@@ -770,9 +790,9 @@ try {
   await page.keyboard.type('i');
   await page.locator('.chatlist .row.cursor').waitFor();
   const firstHit = await cursorName();
-  await page.keyboard.press('Alt+j');
+  await page.keyboard.press('Control+j');
   check((await cursorName()) !== firstHit && await page.evaluate(() => document.activeElement?.getAttribute('aria-label') === 'Search chats'),
-    'Alt+J in the search moves the highlight, typing goes on in the search');
+    'Ctrl+J in the search moves the highlight, typing goes on in the search');
   const target = await cursorName();
   await page.keyboard.press('Enter');
   await page.waitForFunction((n) => document.querySelector('[role=option][aria-selected=true] .name')?.textContent === n, target);
@@ -1083,15 +1103,15 @@ try {
   await page.keyboard.press('Alt+h');
   await page.locator('.chatlist .row.cursor', { hasText: 'The Office' }).waitFor();
   check(await page.locator('.conv').count() === 0, 'narrow: Alt+H shows the list, the chat highlighted');
-  await page.keyboard.press('Alt+j');
+  await page.keyboard.press('Control+j');
   const narrowTarget = await page.locator('.chatlist .row.cursor .name').textContent();
-  check(narrowTarget !== 'The Office' && await page.locator('.conv').count() === 0, 'narrow: Alt+J highlights in the list');
+  check(narrowTarget !== 'The Office' && await page.locator('.conv').count() === 0, 'narrow: Ctrl+J highlights in the list');
   await page.keyboard.press('Enter');
   await page.locator('.conv header', { hasText: narrowTarget }).waitFor();
   check(true, 'narrow: Enter opens the highlighted chat');
-  await page.keyboard.press('Alt+j');
+  await page.keyboard.press('Control+j');
   await page.locator('.chatlist .row.cursor').waitFor();
-  check(await page.locator('.conv').count() === 0, 'narrow: Alt+J from a chat goes back to the list');
+  check(await page.locator('.conv').count() === 0, 'narrow: Ctrl+J from a chat goes back to the list');
   await page.keyboard.press('Control+a');
   check(await page.locator('.chatlist').count() === 1, 'narrow: folder shortcuts show the list');
   await page.setViewportSize({ width: 1440, height: 900 });
