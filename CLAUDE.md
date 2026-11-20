@@ -4,7 +4,8 @@ braids: open source desktop messenger (Telegram, WhatsApp, Signal, Matrix),
 Linux only (no macOS builds or CI), Tauri GUI on top of a C++ core daemon. Forked from nchat
 (terminal client). Read `doc/REQUIREMENTS.md` and `doc/ARCHITECTURE.md` first;
 they hold the agreed decisions and the milestone plan (M0–M3 done, Telegram/WhatsApp/Signal
-verified with real accounts; M4 remaining: vim mode). The daemon
+verified with real accounts); the plan to 1.0 (version milestones) is
+`doc/ROADMAP.md`, the glossary `CONTEXT.md`. The daemon
 API is in `doc/API.md`; the GUI design brief in `doc/DESIGN_BRIEF.md`, and
 the finished GUI design (tokens, icons, mockups, screenshots) in
 `doc/design/README.md` — follow it when building the Tauri app.
@@ -122,7 +123,7 @@ Scheduled-later features are in `doc/BACKLOG.md`.
   `.env` in the repository root, see `.env.example`; the release
   workflow takes them from repository secrets). Builds without them fall back
   to nchat's credentials (development only).
-- App: vim mode is M4. Muting and "mark unread" are braids' own settings
+- App: muting and "mark unread" are braids' own settings
   (`chats.mute`, `chats.markUnread`, kept in `<profile>/braids-chats.json`),
   not synced to the messenger. Unread counts are computed by braidsd
   (`ChatModel::UnreadCount`, history cache at connect + loaded messages). The

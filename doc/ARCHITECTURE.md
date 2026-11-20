@@ -186,6 +186,6 @@ Milestones
 | **M1** | braidsd core: AccountManager, ChatModel ported from `UiModel::Impl`, event-based login flows | all four protocols can be added and used through an internal test harness (`braidsd --stdio`, `utils/braids-console`; automated: Dummy and Matrix) |
 | **M2** | JSON-RPC API, API docs, `braids-cli` test client, integration tests (local Synapse + `lib/mxchat/test/peer`) | API covers all requests/events; tests run in CI |
 | **M3** | Tauri GUI v1 (REQUIREMENTS.md section 2) | daily-driver usable for the maintainer |
-| **M4** | Notifications, settings incl. vim mode, packaging, release | first public release |
+| **M4** | Replaced by the version milestones in [ROADMAP.md](ROADMAP.md) | |
 
 `reference/` is deleted once M1 has ported what it needs.

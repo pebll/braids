@@ -16,11 +16,12 @@ maintainer; items marked *open* still need a decision.
 | G2 | **GUI that behaves like any other messenger**: chat list on the left, conversation on the right, composer at the bottom, mouse and keyboard. |
 | G3 | **Unified inbox**: all chats of all accounts in one list, sortable by recent activity, filterable by account/protocol and unread. |
 | G4 | **Multiple accounts**, also several per protocol. |
-| G5 | **Optional vim mode**, enabled in settings (off by default), see section 4. |
+| G5 | ~~Optional vim mode~~: dropped (see [ROADMAP.md](ROADMAP.md)); keyboard shortcuts cover navigation. |
 | G6 | **Local-first**: all data on the user's machine, instant start from the local cache, works offline for reading. |
 | G7 | **Privacy**: no telemetry, no hosted service; secrets and message text never written to logs; owner-only file permissions. |
 | G8 | **Open source** under the GNU AGPL v3, usable by everyone. |
-| G9 | **Platforms**: Linux and macOS. |
+| G9 | **Platform**: Linux only (x86_64 and aarch64). |
+| G10 | **For everyone**: 1.0 is usable by non-technical Linux desktop users (first-run flow, plain-language errors, help page). Plan in [ROADMAP.md](ROADMAP.md). |
 
 ## 2. Functional scope (v1)
 
@@ -59,33 +60,25 @@ App
 
 - Desktop notifications (respecting mute), unread badge in the tray/dock.
 - Search messages within a chat (from the local cache).
-- Settings: theme (light/dark/system), notifications, vim mode, downloads
+- Settings: theme (light/dark/system), notifications, downloads
   directory, per-account settings.
-- Keyboard shortcuts for common actions (also without vim mode).
+- Keyboard shortcuts for common actions.
 
 ## 3. Non-goals (not in v1)
 
 - Terminal UI (nchat's ncurses UI is not carried over; it is kept under
   `reference/` only as source material).
-- Windows support.
-- Linking the same person across protocols into one contact.
+- Windows and macOS support.
 - Calls (voice/video), stories/status, polls creation, bots/channel admin,
   message scheduling, account registration, spaces management.
 - Hosted/sync service, mobile apps.
 - Threads UI (thread messages are shown inline as replies).
 
-## 4. Vim mode (optional)
+## 4. Vim mode
 
-Off by default; when enabled, keyboard navigation is modal:
-
-| Mode | Keys |
-| --- | --- |
-| **List** (initial) | `j`/`k` move the chat cursor, `/` search chats, `Enter`/`l` open chat (Normal), `gg`/`G` first/last |
-| **Normal** (in chat) | `j`/`k` select message, `i`/`a` Insert, `r` reply, `e` edit, `dd` delete, `y` copy, `o` open attachment, `s` react, `gg`/`G`, `Ctrl-u`/`Ctrl-d` page, `Esc`/`h` back to List |
-| **Insert** (composer) | normal typing, `Esc` back to Normal, Enter sends |
-
-A mode indicator is always visible while vim mode is on. Mouse use keeps
-working and switches mode as needed.
+Dropped (2026-11-20): keyboard shortcuts (Ctrl+J/K in the chat list,
+Alt+J/K in a chat, Ctrl+Space search, configurable in Settings → Keyboard)
+cover navigation.
 
 ## 5. Protocol unification
 
@@ -118,7 +111,7 @@ Rules:
   with per-message receipts map onto it.
 - **Attachments**: one model (file id, name, mime type, size, local path,
   download state, encrypted yes/no), downloaded on demand or prefetched.
-- **Contacts**: per account; no cross-protocol merging (non-goal).
+- **Contacts**: per account; one contact across messengers is planned for 0.9 (ROADMAP.md).
 
 ## 6. Non-functional requirements
 
@@ -127,7 +120,7 @@ Rules:
 - No data loss on crash; core keeps running when the GUI closes (tray).
 - Daemon API documented and versioned; GUI and core can be updated
   independently within a major API version.
-- Builds reproducibly from source on Linux and macOS; CI builds all four
+- Builds reproducibly from source on Linux; CI builds all four
   protocols.
 
 ## 7. Constraints, risks and open items
@@ -142,7 +135,7 @@ Rules:
   `THIRD_PARTY_LICENSES` and shipped with binaries.
 - **Name**: availability of "braids" (GitHub org, Flathub, AUR, Homebrew,
   domain) to be checked before public announcement. *open*
-- **Distribution format**: AppImage / Flatpak / deb on Linux, dmg on macOS;
-  macOS signing/notarization needs an Apple developer account. *open*
+- **Distribution format**: tarball, .deb, AppImage, Flatpak (Flathub for
+  1.0) and Nix.
 - Login flows of all protocols are currently terminal-based (stdin prompts,
   QR printed to the terminal) and must be reworked into API events (M1).
