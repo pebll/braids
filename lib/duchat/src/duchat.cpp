@@ -732,6 +732,28 @@ void DuChat::PerformRequest(std::shared_ptr<RequestMessage> p_RequestMessage)
           chats->chatInfos = { chatInfo };
           m_MessageHandler(chats);
         }
+
+        // braids tests: "/ping <chatId>" - Jim writes "ping" in that chat. The
+        // command is sent from another chat, so the chat that gets the message
+        // does not get a message from self at the same time
+        if (StrUtil::StartsWith(chatMessage.text, "/ping "))
+        {
+          const std::string pingChatId = chatMessage.text.substr(6);
+          ChatMessage ping;
+          ping.id = "ping_" + std::to_string(now);
+          ping.senderId = "Jim_0";
+          ping.text = "ping";
+          ping.timeSent = now + 1;
+          ping.isOutgoing = false;
+          s_Messages[pingChatId].insert(s_Messages[pingChatId].begin(), ping);
+
+          std::shared_ptr<NewMessagesNotify> pingMessages = std::make_shared<NewMessagesNotify>(m_ProfileId);
+          pingMessages->success = true;
+          pingMessages->chatId = pingChatId;
+          pingMessages->chatMessages = { ping };
+          m_MessageHandler(pingMessages);
+        }
+
       }
       break;
 
