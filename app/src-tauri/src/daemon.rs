@@ -135,7 +135,9 @@ impl Daemon {
                     Ok(stream) => {
                         if !checked.swap(true, Ordering::SeqCst) {
                             let daemon = Daemon { inner: inner.clone() };
-                            thread::spawn(move || daemon.restart_if_outdated());
+                            // tauri.conf.json's version, as braidsd's (lib/ncutil/CMakeLists.txt)
+                            let version = app.package_info().version.to_string();
+                            thread::spawn(move || daemon.restart_if_outdated(&version));
                         }
                         inner.run(&app, stream);
                         thread::sleep(Duration::from_millis(500));
@@ -157,7 +159,7 @@ impl Daemon {
     /// (or a rebuild): restart it when its version differs from the app's
     /// (an update; Nix gives every file the same 1970 time, issue #53) or its
     /// binary is newer than the process (a rebuild in development).
-    fn restart_if_outdated(&self) {
+    fn restart_if_outdated(&self, app_version: &str) {
         for _ in 0..50 {
             if self.is_connected() {
                 break;
@@ -172,8 +174,8 @@ impl Daemon {
             .ok()
             .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
             .map(|d| d.as_millis() as i64);
-        if is_outdated(version, env!("CARGO_PKG_VERSION"), start_ms, modified_ms) {
-            eprintln!("braids: the running braidsd ({version}) is outdated, restarting it");
+        if is_outdated(version, app_version, start_ms, modified_ms) {
+            eprintln!("braids: the running braidsd ({version}) is outdated (app {app_version}), restarting it");
             let _ = self.call("daemon.shutdown", json!({}));
         }
     }

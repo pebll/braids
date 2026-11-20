@@ -794,6 +794,10 @@ try {
   check((await cursorName()) !== firstHit && await page.evaluate(() => document.activeElement?.getAttribute('aria-label') === 'Search chats'),
     'Ctrl+J in the search moves the highlight, typing goes on in the search');
   const target = await cursorName();
+  await page.keyboard.press('Control+ArrowUp');
+  check((await cursorName()) === firstHit, 'Ctrl+Up in the search moves the highlight back');
+  await page.keyboard.press('Control+ArrowDown');
+  check((await cursorName()) === target, 'Ctrl+Down in the search moves the highlight on');
   await page.keyboard.press('Enter');
   await page.waitForFunction((n) => document.querySelector('[role=option][aria-selected=true] .name')?.textContent === n, target);
   check(true, 'Enter in the search opens the highlighted result');

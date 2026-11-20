@@ -12,7 +12,7 @@
 -->
 <script lang="ts">
   import { ArrowDown, ChevronLeft, ChevronUp, EllipsisVertical, Lock, PanelRight, Pin, Plus, Search, Upload, X } from '@lucide/svelte';
-  import { onDestroy, tick, untrack } from 'svelte';
+  import { onDestroy, onMount, tick, untrack } from 'svelte';
   import { chatMenu } from '../lib/actions';
   import * as api from '../lib/api';
   import { dayLabel, isSameDay, lastSeen, startOfDay } from '../lib/format';
@@ -158,9 +158,11 @@
     if (!scroller) return;
     scroller.scrollTop += direction * Math.max(60, Math.round(scroller.clientHeight / 5));
   }
-  ui.conversation = { scroll: scrollStep };
-  onDestroy(() => {
-    if (ui.conversation?.scroll === scrollStep) ui.conversation = null;
+  onMount(() => {
+    ui.conversation = { scroll: scrollStep };
+    return () => {
+      if (ui.conversation?.scroll === scrollStep) ui.conversation = null;
+    };
   });
 
   function scrollToBottom() {

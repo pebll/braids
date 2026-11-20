@@ -9,8 +9,8 @@ release workflow publishes the section of a version as its release notes.
 ### Changed
 - Keyboard: Ctrl+J / Ctrl+K (and Ctrl+↓ / Ctrl+↑) now move the highlight in
   the chat list (this was Alt), and Alt+J / Alt+K (and Alt+↓ / Alt+↑) scroll
-  the open chat. Shortcuts you changed yourself stay as they are; all can be
-  changed in Settings → Keyboard.
+  the open chat. If you changed the chat list shortcuts yourself, yours stay
+  as they are; all can be changed in Settings → Keyboard.
 
 ### Fixed
 - Nix: after an update, braids kept using the old core until the computer

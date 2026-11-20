@@ -326,7 +326,7 @@
       store.search = '';
       ui.listCursor = '';
       searchInput?.blur();
-    } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    } else if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && !(e.altKey || e.ctrlKey || e.metaKey)) {
       e.preventDefault();
       move(e.key === 'ArrowDown' ? 1 : -1);
     } else if (e.key === 'Enter') {

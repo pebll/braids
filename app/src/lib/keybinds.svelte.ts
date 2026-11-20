@@ -80,9 +80,10 @@ export const ACCOUNT_ACTIONS: Partial<Record<Action, string>> = {
 };
 
 // text editing keys keep their usual meaning in a text field with text
-// (Ctrl+A selects all there, Ctrl+Up/Down move by paragraph; in an empty
-// field it is the shortcut)
-const TEXT_EDITING = new Set(['Mod+A', 'Mod+C', 'Mod+V', 'Mod+X', 'Mod+Z', 'Mod+Shift+Z', 'Mod+Y', 'Mod+ArrowUp', 'Mod+ArrowDown']);
+// (Ctrl+A selects all there, in an empty field it is the shortcut); in a
+// multi-line field (the composer) Ctrl+Up/Down move by paragraph too
+const TEXT_EDITING = new Set(['Mod+A', 'Mod+C', 'Mod+V', 'Mod+X', 'Mod+Z', 'Mod+Shift+Z', 'Mod+Y']);
+const MULTILINE_EDITING = new Set(['Mod+ArrowUp', 'Mod+ArrowDown']);
 
 export const isMac = typeof navigator !== 'undefined' && navigator.platform.toLowerCase().includes('mac');
 
@@ -157,7 +158,7 @@ export function actionFor(e: KeyboardEvent): Action | undefined {
   if (!combo) return undefined;
   const target = e.target as HTMLInputElement | null;
   const hasText = !!target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') && target.value !== '';
-  if (hasText && TEXT_EDITING.has(combo)) return undefined;
+  if (hasText && (TEXT_EDITING.has(combo) || (target.tagName === 'TEXTAREA' && MULTILINE_EDITING.has(combo)))) return undefined;
   return ACTIONS.find((a) => bindings(a.id).includes(combo))?.id;
 }
 

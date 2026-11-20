@@ -340,7 +340,7 @@
         tick().then(resize);
       } else if (ui.reply) ui.reply = null;
       else textarea?.blur();
-    } else if (e.key === 'ArrowUp' && !text && !attachments.length) {
+    } else if (e.key === 'ArrowUp' && !(e.altKey || e.ctrlKey || e.metaKey) && !text && !attachments.length) {
       if (editLastOwnMessage()) e.preventDefault();
     }
   }
